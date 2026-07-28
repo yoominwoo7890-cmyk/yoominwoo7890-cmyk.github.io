@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>진자 가속도 기록계</title>
+<style>
+:root{
+  --paper:#E9EBE5; --panel:#F5F6F2; --line:#CFD5CD;
+  --ink:#1E2320; --ink-2:#6A726B;
+  --pen-a:#B23A2E; --pen-b:#1D6E6E; --warn:#8A5A00; --ok:#1D6E6E;
+  --ax:#B23A2E; --ay:#2F7A4F; --az:#2F5FA0;
+  --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI",Roboto,"Noto Sans KR",sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Roboto Mono",monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+  font-size:15px;line-height:1.5;
+  padding:14px 14px calc(28px + env(safe-area-inset-bottom));
+  max-width:620px;margin-inline:auto}
+h1{font-size:13px;font-weight:500;color:var(--ink-2);margin:0 0 12px;
+  display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+h1 a{color:var(--ink-2);font-size:12px;cursor:pointer;text-decoration:underline}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:4px;margin-bottom:10px}
+
+.pick{padding:16px 14px}
+.pick p{margin:0 0 12px;font-size:13px;color:var(--ink-2);line-height:1.6}
+.pick label{display:block;font-size:12px;color:var(--ink-2);margin:14px 0 5px}
+.pick input{width:100%;font-family:var(--mono);font-size:22px;padding:11px 12px;
+  border:1px solid var(--line);border-radius:4px;background:#fff;color:var(--ink);
+  text-align:center;letter-spacing:.1em}
+.pick .row{display:grid;gap:8px;margin-top:14px}
+
+.head{display:flex;align-items:center;gap:10px;padding:12px 14px 10px}
+.nums{flex:1;min-width:0}
+#spring{flex:none;width:84px;height:112px;border-left:1px solid var(--line)}
+.read{display:flex;align-items:baseline;gap:7px;width:100%}
+.read .v{font-family:var(--mono);font-size:clamp(38px,12vw,54px);font-weight:500;
+  letter-spacing:-.035em;line-height:.85;font-variant-numeric:tabular-nums}
+.read .u{font-family:var(--mono);font-size:16px;color:var(--ink-2)}
+.trio{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%}
+.trio span{display:block;font-size:10.5px;font-weight:600;letter-spacing:.1em;margin-bottom:1px}
+.trio b{font-family:var(--mono);font-size:clamp(16px,5vw,24px);font-weight:500;
+  letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.bar{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;
+  padding:10px 14px;border-top:1px solid var(--line)}
+.seg{display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:#fff}
+.seg button{padding:5px 10px;font-size:12px;font-weight:500;border:0;border-radius:0;
+  background:transparent;color:var(--ink-2);cursor:pointer;font-family:var(--sans)}
+.seg button.on{background:var(--ink);color:#fff}
+.s{font-size:12px;color:var(--ink-2);margin-left:auto}
+.s.on{color:var(--pen-a);font-weight:500}
+
+.chan{padding:11px 14px 0}
+.lab{display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+  font-size:11.5px;color:var(--ink-2);margin-bottom:5px}
+.lab b{font-weight:500}
+.lab .now{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.lab em{font-style:normal;color:var(--ink-2);margin-right:7px}
+canvas{display:block;background:transparent}
+#chA,#chB{width:100%;border:1px solid var(--line);background:#FCFDFB}
+.legend{font-size:11px;color:var(--ink-2);margin:0;padding:11px 14px 12px;line-height:1.55}
+.key{display:inline-block;width:9px;height:2px;vertical-align:middle;margin:0 3px 2px 0}
+
+.ctrl{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px}
+.ctrl button,.pick button{font-family:var(--sans);font-size:15px;font-weight:500;
+  padding:16px 8px;border-radius:4px;border:1px solid var(--ink);
+  background:var(--ink);color:#fff;cursor:pointer}
+.ctrl button.ghost,.pick button.ghost{background:transparent;color:var(--ink)}
+.ctrl button:disabled{opacity:.3;cursor:default}
+.ctrl button.wide{grid-column:1/-1}
+.ctrl button.rec{background:var(--pen-a);border-color:var(--pen-a)}
+.opt{grid-column:1/-1;display:flex;align-items:center;gap:9px;font-size:13px;color:var(--ink-2)}
+.opt input{width:18px;height:18px;accent-color:var(--pen-a);flex:none}
+
+.per{padding:14px}
+.per .k{font-size:11.5px;color:var(--ink-2);margin-bottom:3px}
+.per .big{font-family:var(--mono);font-size:38px;font-weight:500;line-height:1;
+  letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.per .big small{font-size:15px;color:var(--ink-2);font-weight:400}
+.per .sub{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--ink-2)}
+.per .sub span{font-family:var(--mono);color:var(--ink)}
+
+.send{padding:16px 14px}
+.send .code{font-family:var(--mono);font-size:46px;font-weight:500;letter-spacing:.06em;line-height:1.05}
+.send .k{font-size:11.5px;color:var(--ink-2)}
+.send .st{font-size:17px;font-weight:500;margin-top:10px}
+.send .st.rec{color:var(--pen-a)}
+.send .g{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.send .g b{display:block;font-family:var(--mono);font-size:19px;font-weight:500;
+  font-variant-numeric:tabular-nums}
+
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;
+  background:var(--pen-a);margin-right:7px;vertical-align:middle}
+.dot.ok{background:var(--ok)}
+
+details{background:var(--panel);border:1px solid var(--line);border-radius:4px;margin-bottom:10px}
+summary{padding:11px 14px;font-size:13px;color:var(--ink-2);cursor:pointer;
+  list-style:none;display:flex;justify-content:space-between}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"▾";font-size:11px}
+details[open] summary{border-bottom:1px solid var(--line)}
+details[open] summary::after{content:"▴"}
+table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px}
+th,td{padding:5px 10px;text-align:right;font-variant-numeric:tabular-nums}
+tbody tr:nth-child(odd){background:#EFF1EC}
+th{font-size:10.5px;color:var(--ink-2);font-weight:500}
+th:first-child,td:first-child{text-align:left;padding-left:14px}
+th:last-child,td:last-child{padding-right:14px}
+.banner{background:var(--warn);color:#fff;padding:11px 13px;border-radius:4px;
+  font-size:13.5px;margin-bottom:10px}
+.tip{font-size:12px;color:var(--ink-2);margin:14px 2px 0;line-height:1.6}
+</style>
+</head>
+<body>
+
+<h1><span>진자 가속도 기록계</span><a id="again" hidden>역할 바꾸기</a></h1>
+<div id="banner"></div>
+
+<div class="card" id="pick">
+  <div class="pick">
+    <p>폰 하나로 재려면 <b>단독</b>. 폰을 매달고 태블릿으로 보려면
+       폰은 <b>송신부</b>, 태블릿은 <b>수신부</b>를 고르고 같은 방 코드를 넣으세요.</p>
+    <div class="row"><button id="mSolo">단독</button></div>
+    <label for="room">방 코드 (송신부·수신부만 필요)</label>
+    <input id="room" value="1" autocomplete="off">
+    <div class="row" style="grid-template-columns:1fr 1fr">
+      <button id="mSend">송신부</button>
+      <button class="ghost" id="mRecv">수신부</button>
+    </div>
+  </div>
+</div>
+
+<div class="card" id="pSend" hidden>
+  <div class="send">
+    <div class="k">방 코드</div>
+    <div class="code" id="sCode">—</div>
+    <div class="st" id="sState">센서를 켜 주세요</div>
+    <div class="g">
+      <div><span class="k">보낸 샘플</span><b id="sSent">0</b></div>
+      <div><span class="k"><span class="dot" id="sDot"></span>서버</span><b id="sConn">—</b></div>
+    </div>
+  </div>
+  <div class="ctrl">
+    <button class="wide" id="sStart">센서 켜기</button>
+    <button class="ghost wide" id="sCsv" disabled>이 폰에 저장된 CSV 내려받기</button>
+  </div>
+</div>
+
+<div id="pView" hidden>
+  <div class="card">
+    <div class="head">
+      <div class="nums">
+        <div class="read" id="one">
+          <span class="v" id="rMag">—</span><span class="u" id="rUnit">g</span>
+        </div>
+        <div class="trio" id="three" hidden>
+          <div><span style="color:var(--ax)">AX</span><b id="rX">—</b></div>
+          <div><span style="color:var(--ay)">AY</span><b id="rY">—</b></div>
+          <div><span style="color:var(--az)">AZ</span><b id="rZ">—</b></div>
+        </div>
+      </div>
+      <canvas id="spring"></canvas>
+    </div>
+    <div class="bar">
+      <div class="seg" id="segU">
+        <button data-v="g" class="on">g</button>
+        <button data-v="ms2">m/s²</button>
+      </div>
+      <div class="seg" id="segV">
+        <button data-v="mag" class="on">|a|</button>
+        <button data-v="xyz">x y z</button>
+      </div>
+      <span class="s" id="rTag">센서 대기</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="chan">
+      <div class="lab">
+        <b style="color:var(--pen-a)" id="labA">가속도</b>
+        <span class="now"><em id="ivA"></em><span id="cA">—</span></span>
+      </div>
+      <canvas id="chA"></canvas>
+    </div>
+    <div class="chan">
+      <div class="lab">
+        <b style="color:var(--pen-b)" id="labB">각속도 ω</b>
+        <span class="now"><em id="ivB"></em><span id="cB">—</span></span>
+      </div>
+      <canvas id="chB"></canvas>
+    </div>
+    <p class="legend" id="legend"></p>
+  </div>
+
+  <div class="card" id="cSolo" hidden>
+    <div class="ctrl">
+      <button class="wide" id="bStart">센서 켜기</button>
+      <button id="bRec" disabled>기록 시작</button>
+      <button class="ghost" id="bCsv" disabled>CSV 내려받기</button>
+      <label class="opt"><input type="checkbox" id="oDelay" checked>5초 뒤 시작 (소리로 알림)</label>
+    </div>
+  </div>
+
+  <div class="card" id="cRecv" hidden>
+    <div class="send" style="padding-bottom:0">
+      <div class="k"><span class="dot" id="rDot"></span><span id="rLink">송신부 기다리는 중…</span></div>
+    </div>
+    <div class="ctrl">
+      <button class="wide" id="qRec" disabled>기록 시작</button>
+      <button class="ghost wide" id="qCsv" disabled>CSV 내려받기 (받은 데이터)</button>
+      <label class="opt"><input type="checkbox" id="qDelay" checked>5초 뒤 시작 (폰에서 소리로 알림)</label>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="per">
+      <div class="k">측정된 주기 T</div>
+      <div class="big" id="pMain">—</div>
+      <div class="sub">
+        <div>각속도에서 <span id="pB">—</span></div>
+        <div>가속도에서 <span id="pA">—</span></div>
+        <div><span id="sN">0</span>샘플 · <span id="sT">0.0</span>s</div>
+      </div>
+    </div>
+  </div>
+
+  <details><summary>최근 기록</summary>
+    <table>
+      <thead id="th"></thead>
+      <tbody id="tb"><tr><td style="text-align:center;color:var(--ink-2);padding:14px">기록을 시작하면 표시됩니다</td></tr></tbody>
+    </table>
+  </details>
+
+  <p class="tip">
+    오른쪽 용수철은 폰에 매단 가상의 용수철저울입니다. |a|에 비례해 늘어나며 1주기에 두 번 튑니다.<br>
+    세로축은 신호가 넘치면 자동으로 넓어지고, 여유가 생기면 천천히 좁아집니다.
+  </p>
+</div>
+
+<script>
+function banner(msg){
+  const b = document.getElementById('banner');
+  b.innerHTML = '';
+  const d = document.createElement('div');
+  d.className = 'banner'; d.textContent = msg;
+  b.appendChild(d);
+}
+window.addEventListener('error', e => banner('오류: ' + e.message));
+window.addEventListener('unhandledrejection', e => banner('오류: ' + e.reason));
+if (!(location.protocol === 'https:' || location.hostname === 'localhost'))
+  banner('HTTPS가 아니어서 센서를 쓸 수 없습니다. https 주소로 열어 주세요.');
+</script>
+
+<script type="module">
+import { initializeApp }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, set, onValue }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const CFG = {
+  apiKey: "AIzaSyAwn5pRptBTs_-Krawmkygh3ot03T4AJqU",
+  authDomain: "pendulum-69d5a.firebaseapp.com",
+  databaseURL: "https://pendulum-69d5a-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "pendulum-69d5a",
+  storageBucket: "pendulum-69d5a.firebasestorage.app",
+  messagingSenderId: "896770448041",
+  appId: "1:896770448041:web:1a027670c6dec5a9bb67b8"
+};
+const $ = id => document.getElementById(id);
+
+/* ══ 1. 역할 ══════════════════════════════════════════════ */
+let ROLE = null, ROOM = '1', db = null;
+
+$('mSolo').addEventListener('click', () => enter('solo'));
+$('mSend').addEventListener('click', () => enter('send'));
+$('mRecv').addEventListener('click', () => enter('recv'));
+$('again').addEventListener('click', () => location.reload());
+
+function enter(role){
+  ROLE = role;
+  ROOM = ($('room').value || '1').trim().replace(/[.#$/\[\]]/g, '');
+  $('pick').hidden = true;
+  $('again').hidden = false;
+  if (role === 'solo'){
+    $('pView').hidden = false; $('cSolo').hidden = false;
+  } else if (role === 'send'){
+    $('pSend').hidden = false; $('sCode').textContent = ROOM;
+    connect(); startSender();
+  } else {
+    $('pView').hidden = false; $('cRecv').hidden = false;
+    setTag('수신 대기');
+    connect(); startReceiver();
+  }
+  apply();
+  /* 숨겨져 있던 캔버스는 폭이 0으로 측정됩니다. 보이자마자 다시 잽니다. */
+  refit(); requestAnimationFrame(refit); setTimeout(refit, 60); setTimeout(refit, 300);
+}
+
+function connect(){
+  try{
+    db = getDatabase(initializeApp(CFG));
+    onValue(ref(db, '.info/connected'), s => {
+      const on = s.val() === true;
+      for (const id of ['sDot','rDot']){
+        const el = $(id); if (el) el.className = 'dot' + (on ? ' ok' : '');
+      }
+      if ($('sConn')) $('sConn').textContent = on ? '연결됨' : '끊김';
+    });
+  }catch(err){ banner('Firebase 시작 실패: ' + err); }
+}
+
+/* ══ 2. 단위와 보기 방식 ══════════════════════════════════ */
+const UNITS = {
+  g:   {name:'g',    k:1,       dec:3, sfx:'_g'},
+  ms2: {name:'m/s²', k:9.80665, dec:2, sfx:'_ms2'}
+};
+let U = UNITS.g, VIEW = 'mag';
+const toU = v => v * U.k;
+
+$('segU').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  U = UNITS[b.dataset.v];
+  for (const x of $('segU').querySelectorAll('button')) x.classList.toggle('on', x === b);
+  apply();
+});
+$('segV').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  VIEW = b.dataset.v;
+  for (const x of $('segV').querySelectorAll('button')) x.classList.toggle('on', x === b);
+  apply();
+});
+
+function apply(){
+  const isMag = VIEW === 'mag';
+  $('one').hidden = !isMag;
+  $('three').hidden = isMag;
+  $('rUnit').textContent = U.name;
+  $('legend').innerHTML = isMag
+    ? '● 극대점 · 가속도는 점 간격 <b>× 2 = 주기</b>, 각속도는 점 간격 <b>= 주기</b>'
+    : '<span class="key" style="background:var(--ax)"></span>ax'
+    + '<span class="key" style="background:var(--ay);margin-left:12px"></span>ay'
+    + '<span class="key" style="background:var(--az);margin-left:12px"></span>az'
+    + '<br>성분 보기에서는 극대점을 표시하지 않습니다. 주기 계산은 |a| 로 계속 진행됩니다.';
+  $('th').innerHTML = isMag
+    ? `<tr><th>t (s)</th><th>|a| (${U.name})</th><th>ω (°/s)</th></tr>`
+    : `<tr><th>t (s)</th><th>ax</th><th>ay</th><th>az</th><th>ω</th></tr>`;
+  labCache = '';
+}
+
+/* ══ 3. 값 보관소 ═════════════════════════════════════════ */
+const G = 9.80665;
+let recording = false, t0 = 0;
+let rows = [], ring = [];
+let live = {mag:1, x:0, y:0, z:0, w:0};
+/* 그래프 오른쪽 끝이 가리키는 시각. 마지막 샘플이 아니라 이 값을 씁니다.
+   덕분에 데이터가 뭉쳐 도착해도 화면은 일정한 속도로 흐릅니다. */
+let viewNow = performance.now();
+
+/* ── 수신부 재생 버퍼 ──────────────────────────────────────
+   송신부는 0.2초마다 12개씩 묶어 보냅니다. 받자마자 전부 그리면
+   초당 5번만 갱신되어 뚝뚝 끊깁니다. 그래서 큐에 담아 두었다가
+   0.35초 늦은 시계로 원래 속도대로 한 개씩 풀어냅니다.        */
+let isRecv = false, queue = [], playT = null, lastFrame = performance.now();
+const BUFFER = 350;
+
+function playback(dt){
+  if (!queue.length && playT === null) return;
+  const newest = queue.length ? queue[queue.length-1].t : playT;
+  if (playT === null) playT = newest - BUFFER;
+
+  playT += dt;                            // 실시간 속도로 전진
+  const err = (newest - BUFFER) - playT;  // 버퍼 두께를 유지하도록 보정
+  if (Math.abs(err) > 2000) playT = newest - BUFFER;   // 크게 어긋나면 점프
+  else playT += err * Math.min(dt/1000, 0.05);         // 아니면 서서히
+
+  while (queue.length && queue[0].t <= playT){
+    const s = queue.shift();
+    recording = s.r;
+    feed(s.t, s.mag, s.x, s.y, s.z, s.w);
+  }
+}
+
+function feed(tMs, mag, x, y, z, w){
+  live = {mag, x, y, z, w};
+  ring.push({t:tMs, mag, x, y, z, w});
+  while (ring.length && tMs - ring[0].t > 10000) ring.shift();
+  peakAccel(tMs, mag);
+  peakGyro(tMs, w);
+  if (recording){
+    if (t0 === 0) t0 = tMs;
+    rows.push({t:(tMs - t0)/1000, mag, x, y, z, w});
+    if (rows.length === 200000){ setRec(false); banner('샘플 20만 개에 도달해 자동 정지했습니다.'); }
+  }
+}
+
+/* ══ 4. 센서 ══════════════════════════════════════════════ */
+let sensorOn = false, rawCount = 0, warnedNull = false;
+let axisPick = 'alpha', axisAcc = {alpha:0, beta:0, gamma:0}, axisAt = 0;
+let onSample = null;
+
+async function turnOnSensor(btn){
+  btn.disabled = true;
+  try{
+    if (typeof DeviceMotionEvent === 'undefined'){
+      banner('이 브라우저에는 가속도 센서 기능이 없습니다.');
+      btn.disabled = false; return false;
+    }
+    if (typeof DeviceMotionEvent.requestPermission === 'function'){
+      const res = await DeviceMotionEvent.requestPermission();
+      if (res !== 'granted'){
+        banner('센서 권한이 거부되었습니다. 설정 > Safari > 동작 및 방향 접근을 켜 주세요.');
+        btn.disabled = false; return false;
+      }
+    }
+    window.addEventListener('devicemotion', onMotion);
+    sensorOn = true;
+    btn.textContent = '센서 켜짐';
+    keepAwake();
+    setTimeout(() => { if (rawCount === 0)
+      banner('센서 값이 들어오지 않습니다. 센서가 없는 기기일 수 있습니다.'); }, 2000);
+    return true;
+  }catch(err){ banner('센서 켜기 실패: ' + err); btn.disabled = false; return false; }
+}
+
+function onMotion(e){
+  rawCount++;
+  const a = e.accelerationIncludingGravity;
+  if (!a || a.x === null){
+    if (!warnedNull){ banner('가속도 값이 비어 있습니다.'); warnedNull = true; }
+    return;
+  }
+  const now = performance.now();
+  const x = a.x/G, y = a.y/G, z = a.z/G;
+  const mag = Math.hypot(x, y, z);
+  let w = 0;
+  const r = e.rotationRate;
+  if (r && r.alpha !== null){
+    axisAcc.alpha = Math.max(axisAcc.alpha, Math.abs(r.alpha));
+    axisAcc.beta  = Math.max(axisAcc.beta,  Math.abs(r.beta));
+    axisAcc.gamma = Math.max(axisAcc.gamma, Math.abs(r.gamma));
+    if (now - axisAt > 3000){
+      axisPick = Object.keys(axisAcc).reduce((p,c) => axisAcc[c] > axisAcc[p] ? c : p, 'alpha');
+      axisAcc = {alpha:0, beta:0, gamma:0}; axisAt = now;
+    }
+    w = r[axisPick] || 0;
+  }
+  if (ROLE === 'solo') feed(now, mag, x, y, z, w);
+  if (onSample) onSample(now, mag, x, y, z, w);
+}
+
+let wl = null;
+async function keepAwake(){
+  try{ if ('wakeLock' in navigator){
+    wl = await navigator.wakeLock.request('screen');
+    wl.addEventListener('release', () => { wl = null; });
+  }}catch(err){}
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && sensorOn && !wl) keepAwake();
+});
+
+/* ══ 5. 극대점과 주기 ═════════════════════════════════════ */
+const median = v => { const s = [...v].sort((a,b)=>a-b); return s[s.length>>1]; };
+let pa = null, pb = null;
+
+function showPeriod(){
+  const main = (pb !== null) ? pb : pa;
+  $('pMain').innerHTML = (main === null) ? '—' : main.toFixed(3) + ' <small>s</small>';
+  $('pA').textContent = (pa === null) ? '—' : pa.toFixed(3) + ' s';
+  $('pB').textContent = (pb === null) ? '—' : pb.toFixed(3) + ' s';
+}
+function commit(s, minIv, maxIv){
+  s.peaks.push({t:s.pt, v:s.pv});
+  if (s.peaks.length > 60) s.peaks.shift();
+  if (s.last !== null){
+    const iv = (s.pt - s.last)/1000;
+    if (iv > minIv && iv < maxIv){ s.iv.push(iv); if (s.iv.length > 7) s.iv.shift(); }
+  }
+  s.last = s.pt;
+}
+const A = {buf:[], above:false, pv:0, pt:0, last:null, iv:[], peaks:[]};
+function peakAccel(now, mag){
+  A.buf.push(mag); if (A.buf.length > 240) A.buf.shift();
+  if (A.buf.length < 60) return;
+  let mn = Infinity, mx = -Infinity, sum = 0;
+  for (const v of A.buf){ if (v < mn) mn = v; if (v > mx) mx = v; sum += v; }
+  const mean = sum/A.buf.length, h = Math.max((mx-mn)*0.15, 0.01);
+  if (mag > mean + h){
+    if (!A.above){ A.above = true; A.pv = mag; A.pt = now; }
+    else if (mag > A.pv){ A.pv = mag; A.pt = now; }
+  } else if (A.above){
+    A.above = false; commit(A, 0.08, 10);
+    if (A.iv.length >= 3){ pa = median(A.iv)*2; showPeriod(); }
+  }
+}
+const B = {amp:0, above:false, pv:0, pt:0, last:null, iv:[], peaks:[]};
+function peakGyro(now, w){
+  B.amp = Math.max(B.amp*0.999, Math.abs(w));
+  const h = Math.max(B.amp*0.25, 4);
+  if (w > h){
+    if (!B.above){ B.above = true; B.pv = w; B.pt = now; }
+    else if (w > B.pv){ B.pv = w; B.pt = now; }
+  } else if (B.above){
+    B.above = false; commit(B, 0.15, 20);
+    if (B.iv.length >= 3){ pb = median(B.iv); showPeriod(); }
+  }
+}
+function resetPeaks(){
+  for (const s of [A, B]){ s.above = false; s.last = null; s.iv = []; s.peaks = []; }
+  A.buf = []; B.amp = 0; pa = pb = null; showPeriod();
+}
+
+/* ══ 6. 기록 시작 / 정지 ══════════════════════════════════ */
+function setRec(on){
+  if (on){ rows = []; t0 = 0; recording = true; resetPeaks(); }
+  else recording = false;
+  const b = $('bRec');
+  if (b){ b.textContent = on ? '기록 정지' : '기록 시작';
+    b.classList.toggle('rec', on); $('bCsv').disabled = on || rows.length === 0; }
+  const q = $('qRec');
+  if (q){ q.textContent = on ? '기록 정지' : '기록 시작';
+    q.classList.toggle('rec', on); $('qCsv').disabled = on || rows.length === 0; }
+  if ($('sCsv')) $('sCsv').disabled = on || rows.length === 0;
+  setTag(on ? '기록 중' : (sensorOn || ROLE === 'recv' ? '준비됨' : '센서 대기'), on);
+}
+function setTag(txt, on){
+  const el = $('rTag'); if (!el) return;
+  el.textContent = txt; el.className = 's' + (on ? ' on' : '');
+}
+
+let ac = null;
+function beep(freq, dur){
+  try{
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.frequency.value = freq; o.connect(g); g.connect(ac.destination);
+    g.gain.setValueAtTime(.25, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(.001, ac.currentTime + dur);
+    o.start(); o.stop(ac.currentTime + dur);
+  }catch(err){}
+}
+function countdown(n, done, tick){
+  beep(660, .08); tick(n);
+  const id = setInterval(() => {
+    n--;
+    if (n > 0){ beep(660, .08); tick(n); }
+    else { clearInterval(id); beep(990, .25); done(); }
+  }, 1000);
+  return id;
+}
+
+$('bStart').addEventListener('click', async () => {
+  if (await turnOnSensor($('bStart'))){ $('bRec').disabled = false; setTag('센서 켜짐'); }
+});
+let soloTimer = null;
+$('bRec').addEventListener('click', () => {
+  if (recording || soloTimer){
+    if (soloTimer){ clearInterval(soloTimer); soloTimer = null; }
+    setRec(false); return;
+  }
+  if ($('oDelay').checked){
+    $('bRec').classList.add('rec');
+    soloTimer = countdown(5,
+      () => { soloTimer = null; setRec(true); },
+      n => $('bRec').textContent = '시작까지 ' + n);
+  } else setRec(true);
+});
+
+/* ══ 7. CSV ═══════════════════════════════════════════════ */
+function saveCsv(){
+  try{
+    const k = U.k, e = U.sfx;
+    let s = `t_s,a_mag${e},ax${e},ay${e},az${e},w_dps\n`;
+    for (const r of rows)
+      s += [r.t.toFixed(4), (r.mag*k).toFixed(5), (r.x*k).toFixed(5),
+            (r.y*k).toFixed(5), (r.z*k).toFixed(5), r.w.toFixed(3)].join(',') + '\n';
+    const url = URL.createObjectURL(new Blob([s], {type:'text/csv'}));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'pendulum_' + new Date().toISOString().slice(0,19).replace(/[:T]/g,'-') + '.csv';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }catch(err){ banner('CSV 저장 실패: ' + err); }
+}
+for (const id of ['bCsv','qCsv','sCsv']){
+  const el = $(id); if (el) el.addEventListener('click', saveCsv);
+}
+
+/* ══ 8. 송신부 ════════════════════════════════════════════ */
+function startSender(){
+  let buf = [], sent = 0, myRun = -1, cdTimer = null;
+
+  /* 예전에 남은 데이터와 명령을 지우고 시작합니다 */
+  set(ref(db, `rooms/${ROOM}/data`), null).catch(() => {});
+  set(ref(db, `rooms/${ROOM}/cmd`), null).catch(() => {});
+
+  $('sStart').addEventListener('click', async () => {
+    if (await turnOnSensor($('sStart'))){
+      $('sState').textContent = '대기 중 · 태블릿에서 시작하세요';
+      $('sCsv').disabled = true;
+    }
+  });
+
+  onSample = (now, mag, x, y, z, w) => {
+    buf.push([(now/1000).toFixed(3), mag.toFixed(4), x.toFixed(4),
+              y.toFixed(4), z.toFixed(4), w.toFixed(1)].join(','));
+    if (recording){
+      if (t0 === 0) t0 = now;
+      rows.push({t:(now-t0)/1000, mag, x, y, z, w});
+    }
+  };
+
+  setInterval(() => {
+    if (!db || buf.length === 0) return;
+    const v = buf.join(';'); const n = buf.length; buf = [];
+    set(ref(db, `rooms/${ROOM}/data`), {v:v, r:recording ? 1 : 0, i:Date.now()})
+      .then(() => { sent += n; $('sSent').textContent = sent; })
+      .catch(err => banner('전송 거부됨: ' + err.message));
+  }, 200);
+
+  setInterval(() => {
+    if (!db) return;
+    set(ref(db, `rooms/${ROOM}/state`), {
+      rec: recording ? 1 : 0, on: sensorOn ? 1 : 0, n: rows.length, ts: Date.now()
+    }).catch(() => {});
+  }, 1000);
+
+  onValue(ref(db, `rooms/${ROOM}/cmd`), s => {
+    const c = s.val(); if (!c) return;
+    if (c.rec && c.run !== myRun){
+      myRun = c.run;
+      if (cdTimer){ clearInterval(cdTimer); cdTimer = null; }
+      if (c.delay){
+        sState('곧 시작합니다', true);
+        cdTimer = countdown(5,
+          () => { cdTimer = null; setRec(true); sState('기록 중', true); },
+          n => $('sState').textContent = '시작까지 ' + n);
+      } else { setRec(true); sState('기록 중', true); }
+    } else if (!c.rec && (recording || cdTimer)){
+      if (cdTimer){ clearInterval(cdTimer); cdTimer = null; }
+      myRun = c.run;
+      setRec(false);
+      sState('대기 중 · ' + rows.length + '샘플 저장됨', false);
+      $('sCsv').disabled = rows.length === 0;
+    }
+  }, err => banner('명령 읽기 실패: ' + err.message));
+
+  function sState(txt, rec){
+    $('sState').textContent = txt;
+    $('sState').className = 'st' + (rec ? ' rec' : '');
+  }
+}
+
+/* ══ 9. 수신부 ════════════════════════════════════════════
+   송신부 시각을 그대로 쓰면 송신부가 새로고침될 때 시간이 뒤로
+   튑니다. 여기서는 자기 시간축으로 옮겨 담고, 크게 어긋나면
+   기준을 다시 잡습니다.                                       */
+function startReceiver(){
+  let run = 0, lastSeen = 0, senderRec = false, anchor = null;
+  isRecv = true;
+
+  function localTime(sT){
+    const now = performance.now();
+    if (!anchor) anchor = {s:sT, l:now};
+    const t = anchor.l + (sT - anchor.s);
+    if (Math.abs(t - now) > 20000){
+      anchor = {s:sT, l:now};
+      ring = []; resetPeaks();
+      return now;
+    }
+    return t;
+  }
+
+  onValue(ref(db, `rooms/${ROOM}/data`), s => {
+    const d = s.val(); if (!d || !d.v) return;
+    lastSeen = Date.now();
+    const rec = d.r === 1;
+    for (const line of d.v.split(';')){
+      const p = line.split(',');
+      if (p.length < 6) continue;
+      queue.push({t:localTime(parseFloat(p[0])*1000), mag:+p[1],
+                  x:+p[2], y:+p[3], z:+p[4], w:+p[5], r:rec});
+    }
+    if (queue.length > 3000) queue.splice(0, queue.length - 3000);
+  }, err => banner('수신 거부됨: ' + err.message));
+
+  onValue(ref(db, `rooms/${ROOM}/state`), s => {
+    const v = s.val(); if (!v) return;
+    lastSeen = Date.now();
+    senderRec = v.rec === 1;
+    $('qRec').disabled = false;
+    $('qRec').textContent = senderRec ? '기록 정지' : '기록 시작';
+    $('qRec').classList.toggle('rec', senderRec);
+    if (!senderRec) $('qCsv').disabled = rows.length === 0;
+    setTag(senderRec ? '기록 중' : '준비됨', senderRec);
+  });
+
+  setInterval(() => {
+    const gap = Date.now() - lastSeen;
+    const alive = lastSeen > 0 && gap < 3000;
+    $('rDot').className = 'dot' + (alive ? ' ok' : '');
+    $('rLink').textContent = lastSeen === 0
+      ? `방 ${ROOM} · 송신부 기다리는 중…`
+      : (alive ? `방 ${ROOM} · 송신부 연결됨`
+               : `방 ${ROOM} · 응답 없음 (${(gap/1000).toFixed(0)}초)`);
+  }, 500);
+
+  $('qRec').addEventListener('click', () => {
+    const want = !senderRec;
+    if (want){ rows = []; t0 = 0; resetPeaks(); }
+    run++;
+    set(ref(db, `rooms/${ROOM}/cmd`), {
+      rec: want ? 1 : 0, run: run, delay: $('qDelay').checked ? 1 : 0
+    }).catch(err => banner('명령 전송 실패: ' + err.message));
+  });
+}
+
+/* ══ 10. 세로축 자동 조절 ═════════════════════════════════
+   넘치면 즉시 넓히고, 3초 이상 여유가 계속되면 한 단계 좁힙니다.
+   범위는 모두 g 단위 기준이며 표시할 때만 변환합니다.          */
+const R_MAG = [[0.4,1.6],[0,3],[0,6],[0,12],[0,20]];
+const R_SYM = [1.6, 3, 6, 12, 20];
+const R_W   = [200, 500, 1000, 2000];
+let iMag = 0, iSym = 0, iW = 0;
+const shrink = {mag:0, sym:0, w:0};
+
+function stepIdx(cur, need, key){
+  const now = performance.now();
+  if (need > cur){ shrink[key] = 0; return need; }
+  if (need < cur){
+    if (!shrink[key]) shrink[key] = now;
+    if (now - shrink[key] > 3000){ shrink[key] = 0; return cur - 1; }
+    return cur;
+  }
+  shrink[key] = 0; return cur;
+}
+function autoRange(){
+  if (!ring.length) return;
+  let mn = Infinity, mx = -Infinity, ax = 0, aw = 0;
+  for (const p of ring){
+    if (p.mag < mn) mn = p.mag;
+    if (p.mag > mx) mx = p.mag;
+    const m = Math.max(Math.abs(p.x), Math.abs(p.y), Math.abs(p.z));
+    if (m > ax) ax = m;
+    const q = Math.abs(p.w);
+    if (q > aw) aw = q;
+  }
+  let n = R_MAG.findIndex(r => mn >= r[0] && mx <= r[1]);
+  iMag = stepIdx(iMag, n < 0 ? R_MAG.length-1 : n, 'mag');
+  n = R_SYM.findIndex(r => ax <= r);
+  iSym = stepIdx(iSym, n < 0 ? R_SYM.length-1 : n, 'sym');
+  n = R_W.findIndex(r => aw <= r);
+  iW = stepIdx(iW, n < 0 ? R_W.length-1 : n, 'w');
+}
+
+/* ══ 11. 화면 그리기 ══════════════════════════════════════ */
+const H_A = 148, H_B = 100, H_S = 112;
+const chA = $('chA'), ctxA = chA.getContext('2d');
+const chB = $('chB'), ctxB = chB.getContext('2d');
+const spr = $('spring'), ctxS = spr.getContext('2d');
+const PEN_A = '#B23A2E', PEN_B = '#1D6E6E';
+const CX = '#B23A2E', CY = '#2F7A4F', CZ = '#2F5FA0';
+
+function fit(c, cssH){
+  const d = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.max(c.clientWidth, 1);
+  c.width = Math.round(w*d); c.height = Math.round(cssH*d);
+  c.style.height = cssH + 'px';
+  c.getContext('2d').setTransform(d, 0, 0, d, 0, 0);
+  return {w:w, h:cssH};
+}
+let dimA = {w:1,h:H_A}, dimB = {w:1,h:H_B}, dimS = {w:1,h:H_S};
+let lastW = 0, rt = null;
+function refit(){
+  const w = chA.clientWidth;
+  if (w < 1 || w === lastW) return;
+  lastW = w;
+  dimA = fit(chA, H_A); dimB = fit(chB, H_B); dimS = fit(spr, H_S);
+}
+/* 화면에 나타나거나 크기가 바뀌면 자동으로 다시 잽니다 */
+if (window.ResizeObserver) new ResizeObserver(() => refit()).observe(chA);
+window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(refit, 150); });
+window.addEventListener('orientationchange', () => setTimeout(refit, 300));
+window.addEventListener('load', refit);
+
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const mapMag = (v, d) => { const r = R_MAG[iMag];
+  return d.h - clamp((v - r[0])/(r[1] - r[0]), 0, 1)*d.h; };
+const mapSym = (v, d) => d.h/2 - clamp(v/R_SYM[iSym], -1, 1)*d.h/2;
+const mapW   = (v, d) => d.h/2 - clamp(v/R_W[iW], -1, 1)*d.h/2;
+
+function grid(ctx, d, refV, map, txt){
+  ctx.clearRect(0, 0, d.w, d.h);
+  ctx.lineWidth = 1; ctx.setLineDash([]); ctx.strokeStyle = '#DDE2DA';
+  for (let i = 1; i < 10; i++){
+    const x = Math.round(d.w*i/10) + .5;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, d.h); ctx.stroke();
+  }
+  for (let i = 1; i < 6; i++){
+    const y = Math.round(d.h*i/6) + .5;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(d.w, y); ctx.stroke();
+  }
+  const y = map(refV, d);
+  if (y > 1 && y < d.h - 1){
+    ctx.strokeStyle = '#AEB6AC';
+    ctx.beginPath(); ctx.moveTo(0, Math.round(y)+.5); ctx.lineTo(d.w, Math.round(y)+.5); ctx.stroke();
+    ctx.fillStyle = '#8E968C'; ctx.font = '10px ui-monospace, monospace';
+    ctx.fillText(txt, 4, Math.round(y) - 4);
+  }
+}
+function trace(ctx, d, color, pick, map, head){
+  if (ring.length < 2) return;
+  const now = viewNow;
+  ctx.strokeStyle = color; ctx.lineWidth = 1.6;
+  ctx.lineJoin = 'round'; ctx.setLineDash([]);
+  ctx.beginPath();
+  let started = false;
+  for (const p of ring){
+    const x = d.w - (now - p.t)/10000*d.w, y = map(pick(p), d);
+    if (started) ctx.lineTo(x, y); else { ctx.moveTo(x, y); started = true; }
+  }
+  ctx.stroke();
+  if (head){
+    const y = map(pick(ring[ring.length-1]), d);
+    ctx.fillStyle = color; ctx.beginPath();
+    ctx.moveTo(d.w, y); ctx.lineTo(d.w-7, y-4.5); ctx.lineTo(d.w-7, y+4.5);
+    ctx.closePath(); ctx.fill();
+  }
+}
+function marks(ctx, d, st, color, map, out){
+  const el = $(out);
+  if (!ring.length){ el.textContent = ''; return; }
+  const now = viewNow;
+  const vis = [];
+  for (const p of st.peaks) if (now - p.t <= 10000) vis.push(p);
+  for (const p of vis){
+    const x = d.w - (now - p.t)/10000*d.w, y = map(p.v, d);
+    ctx.strokeStyle = color; ctx.globalAlpha = .4; ctx.lineWidth = 1;
+    ctx.setLineDash([2,3]);
+    ctx.beginPath(); ctx.moveTo(x, y+4); ctx.lineTo(x, d.h); ctx.stroke();
+    ctx.setLineDash([]); ctx.globalAlpha = 1;
+    ctx.beginPath(); ctx.arc(x, y, 3.2, 0, 6.2832);
+    ctx.fillStyle = '#FCFDFB'; ctx.fill();
+    ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.stroke();
+  }
+  el.textContent = vis.length >= 2
+    ? '점 간격 ' + ((vis[vis.length-1].t - vis[vis.length-2].t)/1000).toFixed(3) + 's ·' : '';
+}
+function drawSpring(){
+  const d = dimS, ctx = ctxS;
+  ctx.clearRect(0, 0, d.w, d.h);
+  const cx = d.w/2, yTop = 10, restY = 68;
+  const yM = restY + clamp((live.mag - 1)*46, -26, 30);
+  ctx.strokeStyle = '#AEB6AC'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(cx-22, yTop); ctx.lineTo(cx+22, yTop); ctx.stroke();
+  ctx.lineWidth = 1;
+  for (let i = -21; i < 22; i += 7){
+    ctx.beginPath(); ctx.moveTo(cx+i, yTop); ctx.lineTo(cx+i-5, yTop-5); ctx.stroke();
+  }
+  ctx.setLineDash([2,3]); ctx.strokeStyle = '#C6CCC4';
+  ctx.beginPath(); ctx.moveTo(2, restY+12); ctx.lineTo(d.w-2, restY+12); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#9AA298'; ctx.font = '9px ui-monospace, monospace';
+  ctx.fillText('1 g', 2, restY+24);
+  const yA = yTop+3, yB = yM-12, N = 96, coils = 7, amp = 11;
+  ctx.strokeStyle = PEN_A; ctx.lineWidth = 1.7; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(cx, yTop); ctx.lineTo(cx, yA);
+  for (let i = 1; i <= N; i++){
+    const f = i/N;
+    ctx.lineTo(cx + Math.sin(f*coils*2*Math.PI)*amp, yA + f*(yB-yA));
+  }
+  ctx.lineTo(cx, yB); ctx.stroke();
+  ctx.fillStyle = PEN_A; ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(cx-12, yM-12, 24, 24, 4);
+  else ctx.rect(cx-12, yM-12, 24, 24);
+  ctx.fill();
+}
+
+let labCache = '', tick = 0;
+function labels(){
+  const fmt = v => U.k === 1 ? v.toFixed(1) : (v*U.k).toFixed(0);
+  const a = VIEW === 'mag'
+    ? `가속도 크기 |a| · ${fmt(R_MAG[iMag][0])}–${fmt(R_MAG[iMag][1])} ${U.name}`
+    : `가속도 성분 · ±${fmt(R_SYM[iSym])} ${U.name}`;
+  const b = `각속도 ω · ±${R_W[iW]} °/s`;
+  const key = a + '|' + b;
+  if (key === labCache) return;
+  labCache = key;
+  $('labA').textContent = a;
+  $('labB').textContent = b;
+}
+
+function frame(){
+  const t = performance.now();
+  const dt = Math.min(t - lastFrame, 200);   // 탭이 잠들었다 돌아와도 튀지 않게
+  lastFrame = t;
+
+  if (isRecv){ playback(dt); viewNow = (playT === null) ? t : playT; }
+  else viewNow = t;
+  while (ring.length && viewNow - ring[0].t > 11000) ring.shift();
+
+  if (!$('pView').hidden){
+    if ((tick++ % 6) === 0) autoRange();
+    labels();
+    const f = v => toU(v).toFixed(U.dec);
+    $('rMag').textContent = f(live.mag);
+    $('rX').textContent = f(live.x);
+    $('rY').textContent = f(live.y);
+    $('rZ').textContent = f(live.z);
+    $('cA').textContent = VIEW === 'mag'
+      ? f(live.mag) + ' ' + U.name
+      : `${f(live.x)} / ${f(live.y)} / ${f(live.z)}`;
+    $('cB').textContent = live.w.toFixed(0) + ' °/s';
+
+    if (VIEW === 'mag'){
+      grid(ctxA, dimA, 1, mapMag, U.k === 1 ? '1.0 g' : '9.81 m/s²');
+      trace(ctxA, dimA, PEN_A, p => p.mag, mapMag, true);
+      marks(ctxA, dimA, A, PEN_A, mapMag, 'ivA');
+    } else {
+      grid(ctxA, dimA, 0, mapSym, '0');
+      trace(ctxA, dimA, CX, p => p.x, mapSym, false);
+      trace(ctxA, dimA, CY, p => p.y, mapSym, false);
+      trace(ctxA, dimA, CZ, p => p.z, mapSym, false);
+      $('ivA').textContent = '';
+    }
+    grid(ctxB, dimB, 0, mapW, '0');
+    trace(ctxB, dimB, PEN_B, p => p.w, mapW, true);
+    marks(ctxB, dimB, B, PEN_B, mapW, 'ivB');
+    drawSpring();
+
+    if (recording && rows.length){
+      $('sN').textContent = rows.length;
+      $('sT').textContent = rows[rows.length-1].t.toFixed(1);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+apply();
+requestAnimationFrame(frame);
+
+setInterval(() => {
+  if (!recording || rows.length === 0 || $('pView').hidden) return;
+  const f = v => toU(v).toFixed(U.dec);
+  $('tb').innerHTML = rows.slice(-10).reverse().map(r =>
+    VIEW === 'mag'
+      ? `<tr><td>${r.t.toFixed(2)}</td><td>${f(r.mag)}</td><td>${r.w.toFixed(1)}</td></tr>`
+      : `<tr><td>${r.t.toFixed(2)}</td><td>${f(r.x)}</td><td>${f(r.y)}</td><td>${f(r.z)}</td><td>${r.w.toFixed(1)}</td></tr>`
+  ).join('');
+}, 200);
+</script>
+</body>
+</html>
