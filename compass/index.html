@@ -38,6 +38,11 @@ input[type=range]{width:100%;margin:0;accent-color:var(--dip);height:28px}
   border:1px solid var(--line);background:#fff;color:var(--ink-2);cursor:pointer;
   font-family:var(--sans)}
 .chips button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+button.loc{width:100%;margin-top:10px;font-family:var(--sans);font-size:14px;
+  font-weight:500;padding:12px 8px;border-radius:4px;border:1px solid var(--ink);
+  background:transparent;color:var(--ink);cursor:pointer}
+button.loc:disabled{opacity:.4;cursor:default}
+.ctl .src{font-size:11px;color:var(--ink-2);line-height:1.5}
 
 .two{display:grid;grid-template-columns:1fr 1fr}
 .two > div{padding:13px 14px}
@@ -77,14 +82,12 @@ button:disabled{opacity:.35;cursor:default}
     </div>
   </div>
   <div class="ctl">
-    <div class="row"><span class="k">복각 (지역에 따라 다름)</span><span class="v" id="dv">53°</span></div>
-    <input type="range" id="dipR" min="-90" max="90" step="1" value="53">
-    <div class="chips" id="dipC">
-      <button data-d="0">적도 0°</button>
-      <button data-d="53" class="on">서울 53°</button>
-      <button data-d="90">자북극 90°</button>
-      <button data-d="-64">시드니 −64°</button>
+    <div class="row">
+      <span class="k">복각</span>
+      <span class="v" id="dv">53°</span>
     </div>
+    <div class="src" id="dsrc">기본값 · 아래 버튼으로 내 위치 값을 가져오세요</div>
+    <button class="loc" id="loc">내 위치로 복각 설정</button>
   </div>
 </div>
 
@@ -109,10 +112,10 @@ button:disabled{opacity:.35;cursor:default}
 </div>
 
 <p class="tip">
-  <b>복각을 왜 손으로 넣나</b> 브라우저는 자기장 3축 원시값을 주지 않아 복각을 잴 수 없습니다.
-  대신 값을 바꿔가며 <b>다른 위도에서 나침반이 어떻게 보이는지</b> 확인할 수 있습니다.
-  적도 0°에서는 바늘이 수평, 자북극 90°에서는 수직으로 곤두섭니다.
-  방위각은 실제로 측정된 값입니다.<br><br>
+  <b>복각은 왜 계산인가</b> 브라우저는 자기장 3축 원시값을 주지 않아 복각을 직접 잴 수 없습니다.
+  대신 <b>내 위치의 위경도</b>로 지구 자기장 모형에서 계산합니다.
+  실제 지구 자기장은 잘 맞지만, 교실의 철제 책상 같은 국소 왜곡은 반영되지 않습니다.
+  방위각은 폰의 지자기 센서로 실제 측정한 값입니다.<br><br>
   <b>보정</b> 지자기 센서는 8자를 그리듯 몇 번 크게 돌려 줘야 정확해집니다.<br><br>
   <b>주변</b> 철제 책상, 스피커, 다른 휴대폰이 자기장을 크게 왜곡합니다. 창가나 복도가 낫습니다.
 </p>
@@ -155,15 +158,72 @@ $('segS').addEventListener('click', e => {
   SHAPE = b.dataset.v;
   for (const x of $('segS').children) x.classList.toggle('on', x === b);
 });
-$('dipR').addEventListener('input', e => setDip(+e.target.value));
-$('dipC').addEventListener('click', e => {
-  const b = e.target.closest('button'); if (!b) return;
-  setDip(+b.dataset.d); $('dipR').value = DIP;
-});
-function setDip(v){
+$('loc').addEventListener('click', getLocation);
+function setDip(v, src){
   DIP = v;
-  $('dv').textContent = v + '°';
-  for (const x of $('dipC').children) x.classList.toggle('on', +x.dataset.d === v);
+  $('dv').textContent = v.toFixed(1) + '°';
+  if (src) $('dsrc').textContent = src;
+}
+
+/* ══ 위치 → 복각 ═══════════════════════════════════════════
+   ① 영국지질조사국(BGS)이 공개한 WMM 모형에 물어봅니다.
+   ② 인터넷이 없거나 응답이 없으면 쌍극자 근사로 계산합니다.
+      지구를 막대자석 하나로 본 근사라 몇 도 오차가 있습니다.  */
+function dipoleInclination(lat, lon){
+  const PLAT = 80.7*D2R, PLON = -72.7*D2R;      // 지자기 북극 (쌍극자 축)
+  const la = lat*D2R, lo = lon*D2R;
+  const sinLm = Math.sin(la)*Math.sin(PLAT)
+              + Math.cos(la)*Math.cos(PLAT)*Math.cos(lo - PLON);
+  const lm = Math.asin(clamp(sinLm, -1, 1));     // 지자기 위도
+  return Math.atan(2*Math.tan(lm))*R2D;          // tan I = 2 tan(위도)
+}
+function findIncl(o){
+  if (!o || typeof o !== 'object') return null;
+  if (o.inclination !== undefined){
+    const v = (o.inclination && o.inclination.value !== undefined)
+            ? o.inclination.value : o.inclination;
+    if (typeof v === 'number') return v;
+  }
+  for (const k in o){ const r = findIncl(o[k]); if (r !== null) return r; }
+  return null;
+}
+async function fromWMM(lat, lon){
+  const url = 'https://geomag.bgs.ac.uk/web_service/GMModels/wmm/current'
+            + '?latitude=' + lat.toFixed(4) + '&longitude=' + lon.toFixed(4)
+            + '&altitude=0&format=json';
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 4000);
+  try{
+    const r = await fetch(url, {signal: ctl.signal});
+    clearTimeout(t);
+    if (!r.ok) return null;
+    return findIncl(await r.json());
+  }catch(e){ clearTimeout(t); return null; }
+}
+
+function getLocation(){
+  if (!navigator.geolocation){
+    banner('이 브라우저는 위치 기능을 지원하지 않습니다.'); return;
+  }
+  $('loc').disabled = true;
+  $('loc').textContent = '위치 확인 중…';
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const lat = pos.coords.latitude, lon = pos.coords.longitude;
+    const here = '위도 ' + lat.toFixed(3) + ' · 경도 ' + lon.toFixed(3);
+    const wmm = await fromWMM(lat, lon);
+    if (wmm !== null) setDip(wmm, 'WMM 모형 · ' + here);
+    else setDip(dipoleInclination(lat, lon),
+                '쌍극자 근사 (오차 몇 도) · ' + here);
+    $('loc').disabled = false;
+    $('loc').textContent = '다시 가져오기';
+  }, err => {
+    const m = err.code === 1 ? '위치 권한이 거부되었습니다. 주소창 왼쪽 자물쇠에서 허용해 주세요.'
+            : err.code === 3 ? '위치를 가져오는 데 시간이 너무 걸립니다. 창가로 이동해 보세요.'
+            : '위치를 가져오지 못했습니다.';
+    banner(m);
+    $('loc').disabled = false;
+    $('loc').textContent = '내 위치로 복각 설정';
+  }, {enableHighAccuracy:false, timeout:12000, maximumAge:600000});
 }
 
 /* ══ 센서 ══════════════════════════════════════════════════
@@ -511,7 +571,7 @@ function draw(now){
   requestAnimationFrame(draw);
 }
 requestAnimationFrame(draw);
-setDip(53);
+setDip(53, '기본값 · 아래 버튼으로 내 위치 값을 가져오세요');
 </script>
 </body>
 </html>
