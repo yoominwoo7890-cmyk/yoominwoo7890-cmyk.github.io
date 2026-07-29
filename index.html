@@ -7,35 +7,50 @@
 <style>
 :root{
   --paper:#E9EBE5; --panel:#F5F6F2; --line:#CFD5CD;
-  --ink:#1E2320; --ink-2:#6A726B;
+  --ink:#1E2320; --ink-2:#6A726B; --accent:#B23A2E;
   --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI",Roboto,"Noto Sans KR",sans-serif;
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Roboto Mono",monospace;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
   font-size:15px;line-height:1.5;
-  padding:26px 14px calc(40px + env(safe-area-inset-bottom));
+  padding:22px 14px calc(40px + env(safe-area-inset-bottom));
   max-width:620px;margin-inline:auto}
-header{margin-bottom:22px}
-.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;
-  color:var(--ink-2);margin:0 0 5px}
+
+/* 경로 표시 */
+nav{font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;
+  color:var(--ink-2);margin-bottom:14px;min-height:16px}
+nav a{color:var(--ink-2);text-decoration:none;border-bottom:1px solid var(--line);
+  cursor:pointer;padding-bottom:1px}
+nav a:active{color:var(--ink)}
+nav span.sep{opacity:.5;margin:0 6px}
+nav b{font-weight:500;color:var(--ink)}
+
+header{margin-bottom:20px}
 h1{font-size:23px;font-weight:600;margin:0;letter-spacing:-.015em}
 header p{font-size:13px;color:var(--ink-2);margin:8px 0 0;line-height:1.6}
 
-a.item{display:block;text-decoration:none;color:inherit;
+/* 카드 */
+.item{display:block;width:100%;text-align:left;text-decoration:none;color:inherit;
   background:var(--panel);border:1px solid var(--line);border-radius:4px;
-  padding:15px 40px 15px 16px;margin-bottom:9px;position:relative}
-a.item:active{background:#EFF1EC}
-a.item .no{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--ink-2)}
-a.item h2{font-size:17px;font-weight:600;margin:3px 0 4px;letter-spacing:-.01em}
-a.item p{font-size:13px;color:var(--ink-2);margin:0;line-height:1.55}
-a.item .tags{margin-top:9px;display:flex;flex-wrap:wrap;gap:6px}
-a.item .tag{font-size:11px;font-family:var(--mono);color:var(--ink-2);
+  padding:15px 40px 15px 16px;margin-bottom:9px;position:relative;
+  font-family:var(--sans);font-size:15px;cursor:pointer}
+.item:active{background:#EFF1EC}
+.item .no{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--ink-2)}
+.item h2{font-size:17px;font-weight:600;margin:3px 0 4px;letter-spacing:-.01em}
+.item p{font-size:13px;color:var(--ink-2);margin:0;line-height:1.55}
+.item .tags{margin-top:9px;display:flex;flex-wrap:wrap;gap:6px}
+.item .tag{font-size:11px;font-family:var(--mono);color:var(--ink-2);
   border:1px solid var(--line);border-radius:3px;padding:2px 7px;background:#fff}
-a.item .go{position:absolute;right:15px;top:50%;transform:translateY(-50%);
+.item .go{position:absolute;right:15px;top:50%;transform:translateY(-50%);
   color:var(--ink-2);font-size:18px}
-.soon{opacity:.5}
-.soon .go{display:none}
+.item.top{padding:22px 44px 22px 20px;background:#fff}
+.item.top h2{font-size:21px;margin-top:5px}
+.item.soon{opacity:.55}
+.item.soon .go{display:none}
+
+.empty{background:var(--panel);border:1px dashed var(--line);border-radius:4px;
+  padding:26px 16px;text-align:center;color:var(--ink-2);font-size:13px;line-height:1.7}
 
 footer{margin-top:26px;font-size:12px;color:var(--ink-2);line-height:1.7}
 footer code{font-family:var(--mono);font-size:11.5px;background:var(--panel);
@@ -44,66 +59,165 @@ footer code{font-family:var(--mono);font-size:11.5px;background:var(--panel);
 </head>
 <body>
 
+<nav id="crumb"></nav>
 <header>
-  <p class="eyebrow">물리 · 측정 도구</p>
-  <h1>휴대폰으로 하는 실험</h1>
-  <p>휴대폰의 센서를 그대로 측정 장비로 씁니다. 설치할 것 없이 눌러서 바로 여세요.</p>
+  <h1 id="title"></h1>
+  <p id="desc"></p>
 </header>
-
 <div id="list"></div>
-
-<footer>
-  각 도구는 <code>https</code> 주소에서만 센서를 쓸 수 있습니다.<br>
-  실험 중에는 화면 자동 회전을 잠그고, 절전으로 화면이 꺼지지 않게 해 주세요.
-</footer>
+<footer id="foot"></footer>
 
 <script>
 /* ══════════════════════════════════════════════════════════
-   여기만 고치면 목록이 바뀝니다.
-   새 도구를 만들면 아래 덩어리를 복사해 붙여 넣으세요.
-     path  : 폴더 이름 (그 안에 index.html 이 있어야 합니다)
-     title : 목록에 보일 이름
-     desc  : 한 줄 설명
-     tags  : 쓰는 센서나 주제
-     ready : false 로 두면 '준비 중'으로 표시되고 눌리지 않습니다
-   마지막 덩어리 뒤에는 쉼표를 붙이지 않습니다.
-   ══════════════════════════════════════════════════════════ */
-const SIMS = [
-  {
-    path : 'pendulum',
-    title: '진자 가속도 기록계',
-    desc : '휴대폰을 실에 매달아 흔들면 가속도와 각속도를 재고 주기를 계산합니다. 태블릿으로 실시간 관찰과 원격 조작이 됩니다.',
-    tags : ['가속도계', '자이로', '단진자', 'CSV'],
-    ready: true
-  },
-  {
-    path : 'sound',
-    title: '음파 간섭 발생기',
-    desc : '스피커 두 대의 위상차를 조절해 보강·상쇄 무늬를 만듭니다. 걸어 다니며 널 간격을 재면 음속이 나옵니다.',
-    tags : ['스피커 2대', '간섭', '위상'],
-    ready: true
-  },
-  {
-    path : 'compass',
-    title: '3D 자기장 나침반',
-    desc : '지구 자기장의 방향을 3차원 바늘로 봅니다. 평면 나침반이 보여주지 못하는 복각이 함께 보입니다.',
-    tags : ['지자기', '복각', '3D'],
-    ready: true
-  }
-];
+   여기만 고치면 됩니다.
 
-const list = document.getElementById('list');
-SIMS.forEach((s, i) => {
-  const el = document.createElement('a');
-  el.className = 'item' + (s.ready ? '' : ' soon');
-  if (s.ready) el.href = s.path + '/';
-  el.innerHTML =
-    `<div class="no">${String(i+1).padStart(2,'0')}${s.ready ? '' : ' · 준비 중'}</div>` +
-    `<h2>${s.title}</h2><p>${s.desc}</p>` +
-    `<div class="tags">${s.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>` +
-    `<span class="go">→</span>`;
-  list.appendChild(el);
-});
+   폴더 칸(고를 수 있는 칸)  : items 를 가집니다
+   실제 도구(눌러서 여는 것) : path 를 가집니다
+                              path 는 저장소 폴더 이름이며
+                              그 안에 index.html 이 있어야 합니다
+
+   새 시뮬레이션을 만들면, 알맞은 분야의 items 안에
+   아래 모양으로 한 덩어리를 넣으면 됩니다.
+
+     { id:'projectile', title:'포물선 운동',
+       desc:'한 줄 설명', tags:['역학'], path:'projectile' }
+
+   ══════════════════════════════════════════════════════════ */
+const ROOT = {
+  title: '휴대폰으로 하는 물리',
+  desc : '센서로 직접 재거나, 시뮬레이션으로 확인합니다. 설치할 것 없이 눌러서 여세요.',
+  items: [
+    {
+      id: 'tools',
+      title: '실험 도구',
+      desc : '휴대폰의 센서를 그대로 측정 장비로 씁니다. 실제 값을 재고 기록합니다.',
+      items: [
+        {
+          id:'pendulum', path:'pendulum',
+          title:'진자 가속도 기록계',
+          desc :'휴대폰을 실에 매달아 흔들면 가속도와 각속도를 재고 주기를 계산합니다. 태블릿으로 실시간 관찰과 원격 조작이 됩니다.',
+          tags :['가속도계','자이로','단진자','CSV']
+        },
+        {
+          id:'sound', path:'sound',
+          title:'음파 간섭 발생기',
+          desc :'스피커 두 대의 위상차를 조절해 보강·상쇄 무늬를 만듭니다. 걸어 다니며 널 간격을 재면 음속이 나옵니다.',
+          tags :['스피커 2대','간섭','위상']
+        },
+        {
+          id:'compass', path:'compass',
+          title:'3D 자기장 나침반',
+          desc :'지구 자기장의 방향을 3차원으로 봅니다. 평면 나침반이 보여주지 못하는 복각이 함께 보입니다.',
+          tags :['지자기','복각','3D']
+        }
+      ]
+    },
+    {
+      id: 'sim',
+      title: '시뮬레이션',
+      desc : '직접 재기 어려운 현상을 화면에서 다뤄 봅니다. 조건을 바꿔가며 결과를 관찰합니다.',
+      items: [
+        { id:'mech',   title:'역학 시뮬레이션',
+          desc:'운동, 힘, 에너지, 충돌, 회전', items:[] },
+        { id:'em',     title:'전자기학 시뮬레이션',
+          desc:'전기장, 자기장, 회로, 전자기 유도', items:[] },
+        { id:'wave',   title:'파동광학 시뮬레이션',
+          desc:'파동, 간섭, 회절, 굴절, 편광', items:[] },
+        { id:'modern', title:'현대물리학 시뮬레이션',
+          desc:'상대성, 양자, 원자, 핵', items:[] },
+        { id:'math',   title:'수리물리학 시뮬레이션',
+          desc:'벡터, 미적분, 좌표계, 수치 계산', items:[] }
+      ]
+    }
+  ]
+};
+
+/* ══ 아래는 손대지 않아도 됩니다 ══════════════════════════ */
+const $ = id => document.getElementById(id);
+
+function resolve(hash){
+  const ids = hash.replace(/^#/, '').split('/').filter(Boolean);
+  const trail = [ROOT];
+  let node = ROOT;
+  for (const id of ids){
+    if (!node.items) break;
+    const next = node.items.find(x => x.id === id);
+    if (!next) break;
+    node = next; trail.push(node);
+  }
+  return trail;
+}
+
+function crumb(trail){
+  const el = $('crumb'); el.innerHTML = '';
+  trail.forEach((n, i) => {
+    if (i) el.insertAdjacentHTML('beforeend', '<span class="sep">›</span>');
+    const name = i === 0 ? '홈' : n.title.replace(' 시뮬레이션','');
+    if (i === trail.length - 1){
+      el.insertAdjacentHTML('beforeend', '<b>' + name + '</b>');
+    } else {
+      const a = document.createElement('a');
+      a.textContent = name;
+      a.href = '#' + trail.slice(1, i+1).map(x => x.id).join('/');
+      el.appendChild(a);
+    }
+  });
+}
+
+function render(){
+  const trail = resolve(location.hash);
+  const node = trail[trail.length - 1];
+  /* 주소가 도구를 직접 가리키면 그 폴더로 넘깁니다 */
+  if (node.path){ location.replace(node.path + '/'); return; }
+  const depth = trail.length - 1;
+  const base = trail.slice(1).map(x => x.id);
+
+  crumb(trail);
+  $('title').textContent = node.title;
+  $('desc').textContent  = node.desc || '';
+  $('desc').style.display = node.desc ? '' : 'none';
+
+  const list = $('list'); list.innerHTML = '';
+  const items = node.items || [];
+
+  if (items.length === 0){
+    list.innerHTML = '<div class="empty">아직 준비된 항목이 없습니다.<br>곧 채워집니다.</div>';
+  }
+
+  items.forEach((it, i) => {
+    const isLink = !!it.path;
+    const kids = it.items ? it.items.length : 0;
+    const soon = !isLink && kids === 0;
+
+    const el = document.createElement(isLink ? 'a' : 'button');
+    el.className = 'item' + (depth === 0 ? ' top' : '') + (soon ? ' soon' : '');
+    if (isLink) el.href = it.path + '/';
+    else el.addEventListener('click', () => {
+      location.hash = base.concat(it.id).join('/');
+    });
+
+    const badge = isLink ? String(i+1).padStart(2,'0')
+                : soon    ? '준비 중'
+                : kids + '개';
+    el.innerHTML =
+      '<div class="no">' + badge + '</div>' +
+      '<h2>' + it.title + '</h2>' +
+      (it.desc ? '<p>' + it.desc + '</p>' : '') +
+      (it.tags ? '<div class="tags">' +
+        it.tags.map(t => '<span class="tag">' + t + '</span>').join('') + '</div>' : '') +
+      '<span class="go">→</span>';
+    list.appendChild(el);
+  });
+
+  $('foot').innerHTML = depth === 0
+    ? '각 도구는 <code>https</code> 주소에서만 센서를 쓸 수 있습니다.<br>' +
+      '실험 중에는 화면 자동 회전을 잠그고, 절전으로 화면이 꺼지지 않게 해 주세요.'
+    : '';
+  window.scrollTo(0, 0);
+}
+
+window.addEventListener('hashchange', render);
+render();
 </script>
 </body>
 </html>
