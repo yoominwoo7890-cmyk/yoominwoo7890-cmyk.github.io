@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>3D 자기장 나침반</title>
+<style>
+:root{
+  --paper:#E9EBE5; --panel:#F5F6F2; --line:#CFD5CD;
+  --ink:#1E2320; --ink-2:#6A726B;
+  --nee:#B23A2E; --hor:#1D6E6E; --dip:#8A5A00;
+  --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI",Roboto,"Noto Sans KR",sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Roboto Mono",monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+  font-size:15px;line-height:1.5;
+  padding:14px 14px calc(30px + env(safe-area-inset-bottom));
+  max-width:620px;margin-inline:auto}
+h1{font-size:13px;font-weight:500;color:var(--ink-2);margin:0 0 12px;
+  display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+#mode{font-family:var(--mono);font-size:11px;letter-spacing:.06em}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:4px;margin-bottom:10px}
+#view{display:block;width:100%;aspect-ratio:1/1;max-height:360px;
+  background:#FCFDFB;border-radius:4px 4px 0 0}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;padding:10px 14px;
+  border-top:1px solid var(--line);font-size:11.5px;color:var(--ink-2)}
+.legend i{display:inline-block;width:11px;height:2px;vertical-align:middle;
+  margin-right:5px;font-style:normal}
+
+.two{display:grid;grid-template-columns:1fr 1fr}
+.two > div{padding:13px 14px}
+.two > div + div{border-left:1px solid var(--line)}
+.k{font-size:11.5px;color:var(--ink-2);margin-bottom:2px}
+.v{font-family:var(--mono);font-size:31px;font-weight:500;line-height:1;
+  letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.v small{font-size:14px;color:var(--ink-2);font-weight:400}
+.axes{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line)}
+.axes div{padding:10px 14px}
+.axes div + div{border-left:1px solid var(--line)}
+.axes b{display:block;font-family:var(--mono);font-size:15px;font-weight:500;
+  font-variant-numeric:tabular-nums}
+
+.ctrl{padding:12px;display:grid;gap:8px}
+button{font-family:var(--sans);font-size:15px;font-weight:500;padding:16px 8px;
+  border-radius:4px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer}
+button.ghost{background:transparent;color:var(--ink)}
+button:disabled{opacity:.35;cursor:default}
+
+.banner{background:#8A5A00;color:#fff;padding:11px 13px;border-radius:4px;
+  font-size:13.5px;margin-bottom:10px}
+.tip{font-size:12px;color:var(--ink-2);line-height:1.65;margin:14px 2px 0}
+.tip b{color:var(--ink);font-weight:500}
+</style>
+</head>
+<body>
+
+<h1><span>3D 자기장 나침반</span><span id="mode">센서 대기</span></h1>
+<div id="banner"></div>
+
+<div class="card">
+  <canvas id="view"></canvas>
+  <div class="legend">
+    <span><i style="background:var(--nee)"></i>자기장 방향</span>
+    <span><i style="background:var(--hor)"></i>수평 성분 (자북)</span>
+    <span><i style="background:var(--ink-2)"></i>수평면</span>
+  </div>
+</div>
+
+<div class="card">
+  <div class="two">
+    <div><div class="k">방위각</div><div class="v" id="hd">—</div></div>
+    <div><div class="k">복각</div><div class="v" id="dp">—</div></div>
+  </div>
+  <div class="axes" id="raw" hidden>
+    <div><span class="k">Bx</span><b id="bx">—</b></div>
+    <div><span class="k">By</span><b id="by">—</b></div>
+    <div><span class="k">Bz</span><b id="bz">—</b></div>
+  </div>
+  <div class="two" id="mag" hidden style="border-top:1px solid var(--line)">
+    <div><div class="k">세기 |B|</div><div class="v" id="bt">—</div></div>
+    <div><div class="k">수평 성분</div><div class="v" id="bh">—</div></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="ctrl">
+    <button id="start">센서 켜기</button>
+    <button class="ghost" id="cal">보정 안내</button>
+  </div>
+</div>
+
+<p class="tip">
+  <b>보정</b> 지자기 센서는 8자를 그리듯 몇 번 크게 돌려 줘야 정확해집니다.
+  방위가 엉뚱하면 먼저 이걸 해 보세요.<br><br>
+  <b>주변</b> 철제 책상, 스피커, 다른 휴대폰, 형광등이 자기장을 크게 왜곡합니다.
+  창가나 복도에서 재면 지구 자기장에 가깝습니다.<br><br>
+  <b>복각</b> 지구 자기장은 수평이 아닙니다. 우리나라에서는 약 53° 아래를 향합니다.
+  폰을 수평으로 들어도 바늘이 아래로 기울어 있는 이유입니다.
+</p>
+
+<script>
+const $ = id => document.getElementById(id);
+function banner(msg){
+  const b = $('banner'); b.innerHTML = '';
+  if (!msg) return;
+  const d = document.createElement('div');
+  d.className = 'banner'; d.textContent = msg; b.appendChild(d);
+}
+window.addEventListener('error', e => {
+  /* 브라우저가 한 프레임 안에서 크기 계산을 미뤘다는 알림일 뿐이라
+     화면에는 띄우지 않습니다 */
+  if (/ResizeObserver/.test(e.message || '')) return;
+  banner('오류: ' + e.message);
+});
+if (!(location.protocol === 'https:' || location.hostname === 'localhost'))
+  banner('HTTPS가 아니어서 센서를 쓸 수 없습니다.');
+
+/* ══ 벡터 도구 ═════════════════════════════════════════════ */
+const sub = (a,b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
+const mul = (a,s) => [a[0]*s, a[1]*s, a[2]*s];
+const dot = (a,b) => a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+const len = a => Math.hypot(a[0], a[1], a[2]);
+const cross = (a,b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
+function norm(a){ const L = len(a); return L < 1e-9 ? [0,0,1] : mul(a, 1/L); }
+
+/* ══ 센서 ══════════════════════════════════════════════════
+   두 갈래로 갑니다.
+   ① Magnetometer 를 쓸 수 있으면 3축 원시값(µT)을 그대로 씁니다.
+   ② 없으면 기기 방위에서 지구 자기장 방향을 계산합니다.
+      방위각은 실제 지자기 센서에서 나온 값이고, 복각만 모형값입니다. */
+const DIP_MODEL = 53;                 // 우리나라 복각 (도)
+let mode = null;                      // 'real' | 'model'
+let sensorOn = false;
+let up = [0,0,1];                     // 기기 좌표에서의 '위쪽'
+let B  = [0,1,-1];                    // 기기 좌표에서의 자기장
+let Braw = null;                      // 실측 µT (실측 모드일 때만)
+let haveOri = false;
+
+/* 기기 방위 → 회전행렬 R (기기 → 지구) */
+let R = null;
+function setOrientation(alpha, beta, gamma){
+  const a = alpha*Math.PI/180, b = beta*Math.PI/180, g = gamma*Math.PI/180;
+  const cA = Math.cos(a), sA = Math.sin(a);
+  const cB = Math.cos(b), sB = Math.sin(b);
+  const cG = Math.cos(g), sG = Math.sin(g);
+  R = [
+    [cA*cG - sA*sB*sG, -sA*cB, cA*sG + sA*sB*cG],
+    [sA*cG + cA*sB*sG,  cA*cB, sA*sG - cA*sB*cG],
+    [-cB*sG,            sB,    cB*cG]
+  ];
+  /* 지구 좌표의 위쪽(0,0,1)을 기기 좌표로 */
+  up = [R[2][0], R[2][1], R[2][2]];
+  haveOri = true;
+  if (mode === 'model'){
+    /* 지구 좌표의 자기장: 북쪽으로 cos δ, 아래로 sin δ */
+    const d = DIP_MODEL*Math.PI/180, c = Math.cos(d), s = Math.sin(d);
+    B = [R[1][0]*c - R[2][0]*s, R[1][1]*c - R[2][1]*s, R[1][2]*c - R[2][2]*s];
+  }
+}
+
+function onOri(e){
+  let alpha = e.alpha;
+  if (typeof e.webkitCompassHeading === 'number')   // iOS
+    alpha = 360 - e.webkitCompassHeading;
+  if (alpha === null || e.beta === null) return;
+  setOrientation(alpha, e.beta, e.gamma || 0);
+}
+
+/* 실측값은 흔들리므로 살짝 눌러 줍니다 */
+function smooth(target){
+  const k = 0.18;
+  B = [B[0] + (target[0]-B[0])*k,
+       B[1] + (target[1]-B[1])*k,
+       B[2] + (target[2]-B[2])*k];
+}
+
+$('start').addEventListener('click', async () => {
+  $('start').disabled = true;
+  try{
+    /* iOS 권한 */
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function'){
+      const res = await DeviceOrientationEvent.requestPermission();
+      if (res !== 'granted'){
+        banner('센서 권한이 거부되었습니다. 설정 > Safari > 동작 및 방향 접근을 켜 주세요.');
+        $('start').disabled = false; return;
+      }
+    }
+    window.addEventListener('deviceorientationabsolute', onOri);
+    window.addEventListener('deviceorientation', onOri);
+
+    /* 진짜 자기장 센서를 먼저 시도 */
+    let ok = false;
+    if ('Magnetometer' in window){
+      try{
+        const m = new Magnetometer({frequency: 30, referenceFrame: 'device'});
+        m.addEventListener('error', ev => {
+          if (!ok) fallback('센서를 열 수 없어 방위 기반으로 전환했습니다.');
+        });
+        m.addEventListener('reading', () => {
+          ok = true;
+          if (mode !== 'real') setReal();
+          Braw = [m.x, m.y, m.z];
+          smooth(Braw);
+        });
+        m.start();
+        setTimeout(() => { if (!ok) fallback(); }, 1200);
+      }catch(err){ fallback(); }
+    } else fallback();
+
+    sensorOn = true;
+    $('start').textContent = '센서 켜짐';
+    keepAwake();
+    setTimeout(() => { if (!haveOri)
+      banner('방위 값이 들어오지 않습니다. 센서가 없는 기기일 수 있습니다.'); }, 2500);
+  }catch(err){ banner('센서 켜기 실패: ' + err); $('start').disabled = false; }
+});
+
+function setReal(){
+  mode = 'real';
+  $('mode').textContent = '실측 자기장 (µT)';
+  $('mode').style.color = 'var(--nee)';
+  $('raw').hidden = false; $('mag').hidden = false;
+}
+function fallback(msg){
+  if (mode === 'real') return;
+  mode = 'model';
+  $('mode').textContent = '방위 기반 · 복각 ' + DIP_MODEL + '° 모형';
+  $('raw').hidden = true; $('mag').hidden = true;
+  if (msg) banner(msg);
+}
+
+let wl = null;
+async function keepAwake(){
+  try{ if ('wakeLock' in navigator && !wl){
+    wl = await navigator.wakeLock.request('screen');
+    wl.addEventListener('release', () => { wl = null; });
+  }}catch(e){}
+}
+$('cal').addEventListener('click', () => {
+  banner('폰을 공중에서 8자를 그리듯 크게 3~4번 돌린 뒤 다시 보세요.');
+  setTimeout(() => banner(''), 6000);
+});
+
+/* ══ 판독값 ════════════════════════════════════════════════ */
+function readouts(){
+  const b = norm(B), u = norm(up);
+  const down = mul(u, -1);
+
+  /* 복각: 자기장이 수평면 아래로 기운 각 */
+  const dip = Math.asin(Math.max(-1, Math.min(1, dot(b, down))))*180/Math.PI;
+
+  /* 수평 성분 = 자기장에서 연직 성분을 뺀 것 → 자북 방향 */
+  const Bh = sub(b, mul(u, dot(b, u)));
+  const nh = norm(Bh);
+
+  /* 폰 윗변(+Y)을 수평면에 투영한 방향 */
+  const yv = [0,1,0];
+  const yh = norm(sub(yv, mul(u, dot(yv, u))));
+
+  /* 자북에서 폰 윗변까지, 위에서 봤을 때 시계 방향 각 */
+  let hd = Math.atan2(dot(cross(nh, yh), down), dot(nh, yh))*180/Math.PI;
+  if (hd < 0) hd += 360;
+
+  $('hd').innerHTML = hd.toFixed(0) + '<small>°</small>';
+  $('dp').innerHTML = dip.toFixed(1) + '<small>°</small>';
+
+  if (mode === 'real' && Braw){
+    $('bx').textContent = Braw[0].toFixed(1);
+    $('by').textContent = Braw[1].toFixed(1);
+    $('bz').textContent = Braw[2].toFixed(1);
+    const T = len(Braw);
+    $('bt').innerHTML = T.toFixed(1) + '<small> µT</small>';
+    $('bh').innerHTML = (T*Math.cos(dip*Math.PI/180)).toFixed(1) + '<small> µT</small>';
+  }
+  return {b, u, nh};
+}
+
+/* ══ 3D 그리기 ═════════════════════════════════════════════
+   화면(카메라)이 기기에 붙어 있습니다. 폰을 돌리면 바늘이
+   공간에 고정된 채 화면 안에서 움직입니다.                    */
+const cv = $('view'), c = cv.getContext('2d');
+let W = 1, H = 1, Rp = 1, CX = 0, CY = 0, lastW = 0, lastH = 0;
+/* 크기는 CSS 가 정합니다. 여기서는 읽기만 하고 바꾸지 않습니다.
+   (예전에 style.height 를 여기서 바꿨더니 크기 감시기가 되먹임을
+    일으켜 ResizeObserver 경고가 났습니다) */
+function fit(){
+  const w = Math.max(cv.clientWidth, 1), h = Math.max(cv.clientHeight, 1);
+  if (w === lastW && h === lastH) return;
+  lastW = w; lastH = h;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = w; H = h;
+  cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  Rp = Math.min(W, H)*0.36; CX = W/2; CY = H/2;
+}
+fit();
+if (window.ResizeObserver) new ResizeObserver(() => requestAnimationFrame(fit)).observe(cv);
+window.addEventListener('resize', fit);
+window.addEventListener('load', fit);
+
+const DIST = 3.4;                       // 카메라 거리 (구 반지름 1 기준)
+function proj(v){                       // 원근 투영
+  const s = (Rp*DIST)/(DIST - v[2]);
+  return [CX + v[0]*s, CY - v[1]*s, s];
+}
+function ring(u, n){                    // u 에 수직인 대원 위의 점들
+  let e1 = cross(u, [0,0,1]);
+  if (len(e1) < 0.1) e1 = cross(u, [1,0,0]);
+  e1 = norm(e1);
+  const e2 = norm(cross(u, e1));
+  const pts = [];
+  for (let i = 0; i <= n; i++){
+    const t = i/n*Math.PI*2;
+    pts.push([e1[0]*Math.cos(t) + e2[0]*Math.sin(t),
+              e1[1]*Math.cos(t) + e2[1]*Math.sin(t),
+              e1[2]*Math.cos(t) + e2[2]*Math.sin(t)]);
+  }
+  return pts;
+}
+function arrow3(v, color, width){
+  const p = proj(mul(v, 0.94)), o = proj([0,0,0]);
+  c.strokeStyle = color; c.lineWidth = width; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(o[0], o[1]); c.lineTo(p[0], p[1]); c.stroke();
+  const tip = proj(v);
+  c.fillStyle = color;
+  c.beginPath(); c.arc(tip[0], tip[1], 4 + p[2]/Rp*2.2, 0, 6.2832); c.fill();
+}
+
+function draw(){
+  c.clearRect(0, 0, W, H);
+  if (!sensorOn || !haveOri){
+    c.fillStyle = '#8E968C';
+    c.font = '13px ' + getComputedStyle(document.body).fontFamily;
+    c.textAlign = 'center';
+    c.fillText('센서 켜기를 눌러 주세요', CX, CY);
+    c.textAlign = 'left';
+    requestAnimationFrame(draw); return;
+  }
+  const {b, u, nh} = readouts();
+
+  /* 구의 실루엣 */
+  c.strokeStyle = '#DDE2DA'; c.lineWidth = 1;
+  c.beginPath(); c.arc(CX, CY, Rp, 0, 6.2832); c.stroke();
+
+  /* 수평면 대원 — 뒤쪽은 점선 */
+  const pts = ring(u, 96);
+  for (const back of [true, false]){
+    c.strokeStyle = back ? '#C6CCC4' : '#6A726B';
+    c.lineWidth = back ? 1 : 1.4;
+    c.setLineDash(back ? [3,3] : []);
+    c.beginPath();
+    let pen = false;
+    for (const p of pts){
+      const isBack = p[2] < 0;
+      if (isBack !== back){ pen = false; continue; }
+      const q = proj(p);
+      pen ? c.lineTo(q[0], q[1]) : (c.moveTo(q[0], q[1]), pen = true);
+    }
+    c.stroke();
+  }
+  c.setLineDash([]);
+
+  /* 복각 호: 수평 성분에서 자기장까지 */
+  const steps = 26;
+  c.strokeStyle = '#8A5A00'; c.lineWidth = 1.2; c.setLineDash([2,3]);
+  c.beginPath();
+  for (let i = 0; i <= steps; i++){
+    const t = i/steps;
+    const v = norm([nh[0] + (b[0]-nh[0])*t, nh[1] + (b[1]-nh[1])*t, nh[2] + (b[2]-nh[2])*t]);
+    const q = proj(mul(v, 0.52));
+    i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]);
+  }
+  c.stroke(); c.setLineDash([]);
+
+  /* 수평 성분(자북) — 점선 */
+  const ph = proj(mul(nh, 0.94)), o = proj([0,0,0]);
+  c.strokeStyle = '#1D6E6E'; c.lineWidth = 1.6; c.setLineDash([4,3]);
+  c.beginPath(); c.moveTo(o[0], o[1]); c.lineTo(ph[0], ph[1]); c.stroke();
+  c.setLineDash([]);
+  const tn = proj(nh);
+  c.fillStyle = '#1D6E6E';
+  c.font = '600 12px ' + getComputedStyle(document.body).fontFamily;
+  c.textAlign = 'center';
+  c.fillText('N', tn[0], tn[1] - 8);
+  c.textAlign = 'left';
+
+  /* 자기장 바늘 — 뒤쪽 꼬리와 앞쪽 머리 */
+  c.strokeStyle = '#D6B3AC'; c.lineWidth = 2.4; c.lineCap = 'round';
+  const tail = proj(mul(b, -0.85));
+  c.beginPath(); c.moveTo(o[0], o[1]); c.lineTo(tail[0], tail[1]); c.stroke();
+  arrow3(b, '#B23A2E', 3.2);
+
+  /* 중심점 */
+  c.fillStyle = '#1E2320';
+  c.beginPath(); c.arc(o[0], o[1], 2.6, 0, 6.2832); c.fill();
+
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>
