@@ -56,6 +56,8 @@ button:disabled{opacity:.35;cursor:default}
   font-size:13.5px;margin-bottom:10px}
 .tip{font-size:12px;color:var(--ink-2);line-height:1.65;margin:14px 2px 0}
 .tip b{color:var(--ink);font-weight:500}
+.tip code{font-family:var(--mono);font-size:11px;background:#fff;
+  border:1px solid var(--line);border-radius:3px;padding:1px 5px}
 </style>
 </head>
 <body>
@@ -102,6 +104,10 @@ button:disabled{opacity:.35;cursor:default}
 </div>
 
 <p class="tip">
+  <b>Bx·By·Bz 가 안 보이면</b> 오른쪽 위 <b>방위 기반 · 왜?</b> 를 눌러 원인을 확인하세요.
+  대부분은 크롬 플래그가 꺼져 있어서입니다. 주소창에 <code>chrome://flags</code> 를 치고
+  <b>Generic Sensor Extra Classes</b> 를 Enabled 로 바꾼 뒤 재시작하면 됩니다.
+  아이폰 사파리는 어떤 방법으로도 원시값을 주지 않습니다.<br><br>
   <b>보정</b> 지자기 센서는 8자를 그리듯 몇 번 크게 돌려 줘야 정확해집니다.
   방위가 엉뚱하면 먼저 이걸 해 보세요.<br><br>
   <b>주변</b> 철제 책상, 스피커, 다른 휴대폰, 형광등이 자기장을 크게 왜곡합니다.
@@ -213,19 +219,7 @@ $('start').addEventListener('click', async () => {
     window.addEventListener('deviceorientationabsolute', onAbs);
     window.addEventListener('deviceorientation', onRel);
 
-    let ok = false;
-    if ('Magnetometer' in window){
-      try{
-        const m = new Magnetometer({frequency: 30, referenceFrame: 'device'});
-        m.addEventListener('error', () => { if (!ok) fallback(); });
-        m.addEventListener('reading', () => {
-          if (!ok){ ok = true; setReal(); }
-          Bt = [m.x, m.y, m.z];
-        });
-        m.start();
-        setTimeout(() => { if (!ok) fallback(); }, 1200);
-      }catch(err){ fallback(); }
-    } else fallback();
+    await tryMagnetometer();
 
     sensorOn = true;
     $('start').textContent = '센서 켜짐';
@@ -247,8 +241,61 @@ function setReal(){
 function fallback(){
   if (isReal) return;
   mode = 'model';
-  $('mode').textContent = '방위 기반 · 복각 ' + DIP_MODEL + '° 모형';
+  $('mode').textContent = '방위 기반 · 왜?';
+  $('mode').style.color = 'var(--dip)';
+  $('mode').style.textDecoration = 'underline';
+  $('mode').style.cursor = 'pointer';
   $('raw').hidden = true; $('mag').hidden = true;
+}
+$('mode').addEventListener('click', () => {
+  if (isReal || !magWhy) return;
+  banner(magWhy);
+});
+
+/* ── 자기장 센서를 열어 보고, 안 되면 이유를 남깁니다 ────── */
+let magWhy = '';
+async function tryMagnetometer(){
+  if (!('Magnetometer' in window)){
+    magWhy = 'Magnetometer 기능이 이 브라우저에 없습니다. 안드로이드 크롬 주소창에 '
+           + 'chrome://flags 를 치고 "Generic Sensor Extra Classes" 를 Enabled 로 바꾼 뒤 '
+           + '재시작하세요. 아이폰 사파리는 지원하지 않습니다.';
+    fallback(); return;
+  }
+  if (navigator.permissions){
+    try{
+      const p = await navigator.permissions.query({name:'magnetometer'});
+      if (p.state === 'denied'){
+        magWhy = '브라우저 설정에서 센서 권한이 차단되어 있습니다. 사이트 설정에서 허용해 주세요.';
+        fallback(); return;
+      }
+    }catch(e){ /* 이 이름을 모르는 브라우저면 그냥 넘어갑니다 */ }
+  }
+  let ok = false;
+  try{
+    const m = new Magnetometer({frequency: 20, referenceFrame: 'device'});
+    m.addEventListener('error', ev => {
+      const n = (ev.error && ev.error.name) || '알 수 없음';
+      magWhy = '센서 오류: ' + n
+        + (n === 'NotAllowedError'  ? ' — 권한이 거부되었습니다.' :
+           n === 'NotReadableError' ? ' — 이 기기에 자기장 센서가 없거나 읽을 수 없습니다.' :
+           n === 'SecurityError'    ? ' — 보안 정책에 막혔습니다. https 주소인지 확인하세요.' : '');
+      if (!ok) fallback();
+    });
+    m.addEventListener('reading', () => {
+      if (!ok){ ok = true; magWhy = ''; setReal(); }
+      Bt = [m.x, m.y, m.z];
+    });
+    m.start();
+    setTimeout(() => {
+      if (!ok && !magWhy){
+        magWhy = '센서를 켰지만 3초 동안 값이 들어오지 않았습니다. 기기에 자기장 센서가 없을 수 있습니다.';
+        fallback();
+      }
+    }, 3000);
+  }catch(err){
+    magWhy = '센서를 열 수 없습니다: ' + err.name + ' — ' + err.message;
+    fallback();
+  }
 }
 
 let wl = null;
