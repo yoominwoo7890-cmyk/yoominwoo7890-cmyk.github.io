@@ -97,8 +97,9 @@ canvas{display:block;background:#FCFDFB;border:1px solid var(--line);width:100%}
 </div>
 
 <p class="tip">
-가로 전체를 2 ms 아래로 좁히면 파형이 자동으로 고정됩니다. 한 픽셀에 여러 샘플이 들어가는
-느린 시간축에서는 그 구간의 최댓값과 최솟값을 세로선으로 그리므로, 봉투가 곧 진폭 변화입니다.<br>
+한 픽셀에 표본이 하나 미만으로 들어가면(대략 가로 10 ms 이하) 파형이 자동으로 고정되고,
+표본 사이는 sinc로 되살려 부드러운 곡선으로 그립니다. 크게 늘리면 실제 표본 위치가 점으로 함께 찍힙니다.
+반대로 느린 시간축에서는 픽셀마다 그 구간의 최댓값과 최솟값을 띠로 채우므로, 띠의 두께가 곧 진폭입니다.<br>
 진폭은 기기가 받아들일 수 있는 최댓값을 100 %로 본 상대값입니다. 절대 음압(dB SPL)이 아닙니다.
 </p>
 
@@ -366,17 +367,47 @@ function grid(){
   cx.beginPath(); cx.moveTo(0, m); cx.lineTo(w, m); cx.stroke();
 }
 
-/* 빠른 시간축에서는 매 프레임 위상이 달라 파형이 흐려집니다.
-   가장 최근의 상승 교차점을 찾아 왼쪽 끝에 맞추면 화면이 멈춥니다. */
+/* 표본 사이를 직선으로 이으면 4 kHz에서 3 %쯤 어긋납니다. 신호는 표본율의
+   절반까지만 들어 있으므로 그 사이 값은 원래 정확히 복원됩니다. Lanczos 창을
+   씌운 sinc로 되살리면 오차가 0.1 % 아래로 떨어집니다. 정수 k에 대한
+   삼각함수는 미리 표로 만들어 두어 픽셀당 세 번만 계산합니다. */
+const LOBES = 8;
+const CK = new Float64Array(2*LOBES), SK = new Float64Array(2*LOBES);
+for (let k = -LOBES + 1; k <= LOBES; k++){
+  CK[k + LOBES - 1] = Math.cos(Math.PI*k/LOBES);
+  SK[k + LOBES - 1] = Math.sin(Math.PI*k/LOBES);
+}
+let gLo = 0, gHi = 0;
+const atc = i => at(i < gLo ? gLo : (i > gHi ? gHi : i));
+
+function sampleAt(t){
+  const n0 = Math.floor(t), d0 = t - n0;
+  if (d0 === 0) return atc(n0);
+  const s0 = Math.sin(Math.PI*d0);
+  const sA = Math.sin(Math.PI*d0/LOBES), cA = Math.cos(Math.PI*d0/LOBES);
+  let s = 0;
+  for (let k = -LOBES + 1; k <= LOBES; k++){
+    const d = d0 - k, j = k + LOBES - 1;
+    const w = LOBES*(s0*((k & 1) ? -1 : 1))*(sA*CK[j] - cA*SK[j])/(Math.PI*Math.PI*d*d);
+    s += atc(n0 + k)*w;
+  }
+  return s;
+}
+
+/* 빠른 시간축에서는 매 프레임 위상이 달라 파형이 흐려집니다. 가장 최근의
+   상승 교차점을 왼쪽 끝에 맞추되, 표본 단위로 맞추면 4 kHz에서 30°씩
+   튑니다. 교차점을 두 표본 사이까지 보간해 잡으면 화면이 못박힙니다. */
 function triggerStart(start){
-  const oldest = Math.max(1, total - BUFLEN + 1);
+  const oldest = Math.max(1, total - BUFLEN + LOBES + 2);
   const limit = Math.min(Math.floor(SR*0.05), start - oldest);
   for (let k = 0; k < limit; k++){
-    const i = start - k;
-    if (at(i-1) < 0 && at(i) >= 0) return i;
+    const i = start - k, v0 = at(i-1), v1 = at(i);
+    if (v0 < 0 && v1 >= 0) return v1 === v0 ? i : i - 1 - v0/(v1 - v0);
   }
   return start;
 }
+
+const envHiA = new Float32Array(2048), envLoA = new Float32Array(2048);
 
 let frozenEnd = -1, triggered = false, sppNow = 0;
 
@@ -390,6 +421,7 @@ function draw(){
 
   let start = end - span;
   const spp = span/w;
+  gLo = Math.max(0, total - BUFLEN + 1); gHi = end - 1;
   if (spp < 1) start = triggerStart(start);
   triggered = spp < 1; sppNow = spp;
 
@@ -400,32 +432,46 @@ function draw(){
     return y < 0 ? 0 : (y > h ? h : y);
   };
 
-  cx.strokeStyle = '#B23A2E'; cx.lineWidth = 1.5; cx.lineJoin = 'round';
+  cx.strokeStyle = '#B23A2E'; cx.lineJoin = 'round'; cx.lineCap = 'round';
 
   if (spp < 1){
+    cx.lineWidth = 1.6;
     cx.beginPath();
-    for (let i = 0; i <= span; i++){
-      const x = i/span*w, y = yOf(at(start + i));
-      i ? cx.lineTo(x, y) : cx.moveTo(x, y);
+    for (let px = 0; px <= w; px++){
+      const y = yOf(sampleAt(start + px*spp));
+      px ? cx.lineTo(px, y) : cx.moveTo(px, y);
     }
     cx.stroke();
-    if (spp < 0.25){
+    /* 아주 크게 늘렸을 때는 진짜 표본이 어디인지도 함께 보여줍니다 */
+    if (spp < 0.2){
       cx.fillStyle = '#B23A2E';
-      for (let i = 0; i <= span; i++)
-        cx.fillRect(i/span*w - 1, yOf(at(start + i)) - 1, 2, 2);
+      for (let i = Math.ceil(start); i <= start + span; i++){
+        cx.beginPath();
+        cx.arc((i - start)/spp, yOf(at(i)), 2, 0, 6.2832);
+        cx.fill();
+      }
     }
   } else {
-    /* 한 픽셀에 여러 샘플. 하나만 골라 찍으면 없던 무늬가 생기므로
-       그 구간의 최솟값과 최댓값을 이어 세로선으로 그립니다. */
-    cx.beginPath();
-    for (let px = 0; px < w; px++){
+    /* 한 픽셀에 여러 표본. 하나만 골라 찍으면 없던 무늬가 생기므로
+       그 구간의 최솟값과 최댓값을 구해 위아래 테두리로 잇고 안을 채웁니다. */
+    const n = Math.min(w, 2048);
+    for (let px = 0; px < n; px++){
       const s = start + Math.floor(px*spp), e = start + Math.floor((px+1)*spp);
-      let lo = 1, hi = -1;
+      let lo = 1e9, hi = -1e9;
       for (let i = s; i < e; i++){ const v = at(i); if (v < lo) lo = v; if (v > hi) hi = v; }
-      if (hi < lo) continue;
-      const x = px + .5;
-      cx.moveTo(x, yOf(hi)); cx.lineTo(x, yOf(lo));
+      if (hi < lo){ hi = lo = at(s); }
+      envHiA[px] = hi; envLoA[px] = lo;
     }
+    cx.beginPath();
+    for (let px = 0; px < n; px++){
+      const x = px + .5, y = yOf(envHiA[px]);
+      px ? cx.lineTo(x, y) : cx.moveTo(x, y);
+    }
+    for (let px = n - 1; px >= 0; px--) cx.lineTo(px + .5, yOf(envLoA[px]));
+    cx.closePath();
+    cx.fillStyle = 'rgba(178,58,46,.20)';
+    cx.fill();
+    cx.lineWidth = 1;
     cx.stroke();
   }
 
