@@ -41,6 +41,8 @@ canvas{display:block;background:#FCFDFB;border:1px solid var(--line);width:100%}
 .ctrl button:disabled{opacity:.3;cursor:default}
 .ctrl button.wide{grid-column:1/-1}
 .ctrl button.rec{background:var(--pen);border-color:var(--pen)}
+.ctrl button.sm{padding:11px 6px;font-size:13px;font-weight:400}
+.ctrl button.sm b{font-weight:500}
 .seg{grid-column:1/-1;display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--ink-2)}
 .seg .g{display:flex;flex:1;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:#fff}
 .seg .g button{flex:1;padding:9px 4px;font-size:13px;font-weight:500;border:0;border-radius:0;
@@ -114,6 +116,8 @@ canvas{display:block;background:#FCFDFB;border:1px solid var(--line);width:100%}
         <button data-v="16">16회</button>
       </div>
     </div>
+    <button class="ghost sm" id="bWave" disabled>화면 파형 CSV</button>
+    <button class="ghost sm" id="bLog" disabled>기록 CSV</button>
   </div>
 </div>
 
@@ -121,7 +125,8 @@ canvas{display:block;background:#FCFDFB;border:1px solid var(--line);width:100%}
 한 픽셀에 표본이 하나 미만으로 들어가면(대략 가로 10 ms 이하) 파형이 자동으로 고정되고,
 표본 사이는 sinc로 되살려 부드러운 곡선으로 그립니다. 크게 늘리면 실제 표본 위치가 점으로 함께 찍힙니다.
 반대로 느린 시간축에서는 픽셀마다 그 구간의 최댓값과 최솟값을 띠로 채우므로, 띠의 두께가 곧 진폭입니다.<br>
-진폭은 기기가 받아들일 수 있는 최댓값을 100 %로 본 상대값입니다. 절대 음압(dB SPL)이 아닙니다.
+진폭은 기기가 받아들일 수 있는 최댓값을 100 %로 본 상대값입니다. 절대 음압(dB SPL)이 아닙니다.<br>
+CSV로 나가는 값은 평균화를 거치지 않은 원래 측정값입니다. 화면과 달리 잡음이 그대로 들어 있습니다.
 </p>
 
 <script>
@@ -208,7 +213,7 @@ async function start(){
     }
     src.connect(node); node.connect(mute); mute.connect(ctx.destination);
 
-    running = true; frozenEnd = -1;
+    running = true; frozenEnd = -1; log.length = 0;
     $('bRun').textContent = '정지';
     $('bRun').classList.add('rec');
     $('bRun').disabled = false;
@@ -485,7 +490,7 @@ function blend(dst, src, n){
   for (let i = 0; i < n; i++) dst[i] += (src[i] - dst[i])*a;
 }
 
-let frozenEnd = -1, triggered = false, sppNow = 0, spanNow = 0, cycLive = false;
+let frozenEnd = -1, triggered = false, sppNow = 0, spanNow = 0, cycLive = false, startNow = 0;
 
 function draw(){
   const {w, h} = dim;
@@ -510,7 +515,7 @@ function draw(){
      서 있어야 마루를 세거나 봉투를 견줄 수 있습니다. */
   const canTrig = ampPeak > 0.002 && span < SR*0.5;
   if (canTrig) start = triggerStart(start);
-  triggered = canTrig; sppNow = spp;
+  triggered = canTrig; sppNow = spp; startNow = start;
 
   const key = span + '|' + gi + '|' + w + '|' + AVG[ai] + '|' + (spp < 1);
   if (key !== avgKey){ avgKey = key; avgFresh = true; }
@@ -594,7 +599,54 @@ function draw(){
 }
 requestAnimationFrame(draw);
 
-/* ── 7. 숫자 갱신 ────────────────────────────────────────────*/
+/* ── 7. CSV 내보내기 ─────────────────────────────────────────
+   두 가지가 필요합니다. 파형 자체는 표본 하나하나가 그대로 나가고,
+   기록은 초당 열 번 읽은 진동수와 진폭이 시간 순으로 쌓입니다.
+   도플러나 맥놀이처럼 시간에 따라 달라지는 것은 뒤쪽이 훨씬 쓸모 있습니다. */
+const log = [];
+const LOGMAX = 36000;                 /* 초당 10줄, 한 시간치 */
+
+function pad(n){ return String(n).padStart(2, '0'); }
+function stamp(){
+  const d = new Date();
+  return '' + d.getFullYear() + pad(d.getMonth()+1) + pad(d.getDate())
+    + '-' + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds());
+}
+
+/* 엑셀이 한글 머리글을 깨뜨리지 않도록 앞에 BOM을 붙입니다 */
+function download(name, text){
+  try{
+    const url = URL.createObjectURL(new Blob(['\ufeff' + text], {type:'text/csv;charset=utf-8'}));
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1500);
+  }catch(err){ banner('내보내기에 실패했습니다: ' + (err.message || err)); }
+}
+
+function csvWave(){
+  if (!buf || spanNow < 2) return;
+  const i0 = Math.ceil(startNow), i1 = Math.floor(startNow + spanNow);
+  const rows = ['시간(ms),진폭(%)'];
+  for (let i = i0; i <= i1; i++)
+    rows.push(((i - startNow)/SR*1000).toFixed(5) + ',' + (at(i)*100).toFixed(4));
+  download('파형_' + stamp() + '_' + SR + 'Hz.csv', rows.join('\n'));
+}
+
+function csvLog(){
+  if (!log.length) return;
+  const rows = ['시간(s),진동수(Hz),진폭(%),실효진폭(%),봉투최소(%),봉투최대(%)'];
+  for (const r of log)
+    rows.push(r.t.toFixed(3) + ',' + (r.f == null ? '' : r.f.toFixed(2)) + ','
+      + (r.p*100).toFixed(3) + ',' + (r.r*100).toFixed(3) + ','
+      + (r.lo == null ? ',' : (r.lo*100).toFixed(3) + ',' + (r.hi*100).toFixed(3)));
+  download('기록_' + stamp() + '.csv', rows.join('\n'));
+}
+
+$('bWave').addEventListener('click', csvWave);
+$('bLog') .addEventListener('click', csvLog);
+
+/* ── 8. 숫자 갱신 ────────────────────────────────────────────*/
 setInterval(() => {
   if (!buf) return;
   const end = running ? total : (frozenEnd > 0 ? frozenEnd : total);
@@ -634,6 +686,17 @@ setInterval(() => {
     $('tName').firstChild.nodeValue = '순음이 필요합니다';
   else if (xMode === 'cyc')
     $('tName').firstChild.nodeValue = '화면에 담을 주기';
+
+  if (running && total > N){
+    log.push({ t: end/SR, f: f, p: ampPeak, r: ampRms,
+               lo: envOk ? envLo : null, hi: envOk ? envHi : null });
+    if (log.length > LOGMAX) log.shift();
+  }
+  const nWave = Math.max(0, Math.floor(spanNow) + 1);
+  $('bWave').disabled = !buf || spanNow < 2;
+  $('bLog') .disabled = !log.length;
+  $('bWave').innerHTML = '화면 파형 <b>' + nWave.toLocaleString() + '행</b>';
+  $('bLog') .innerHTML = '기록 <b>' + log.length.toLocaleString() + '행</b>';
 }, 100);
 </script>
 </body>
