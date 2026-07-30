@@ -7,7 +7,7 @@
 <style>
 :root{
   --paper:#E9EBE5; --panel:#F5F6F2; --line:#CFD5CD;
-  --ink:#1E2320; --ink-2:#6A726B; --pen:#B23A2E; --warn:#8A5A00;
+  --ink:#1E2320; --ink-2:#6A726B; --pen:#B23A2E; --mark:#1D6E6E; --warn:#8A5A00;
   --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI",Roboto,"Noto Sans KR",sans-serif;
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Roboto Mono",monospace;
 }
@@ -22,11 +22,11 @@ h1{font-size:13px;font-weight:500;color:var(--ink-2);margin:0 0 12px}
 
 .read{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:14px}
 .read .k{font-size:11.5px;color:var(--ink-2);margin-bottom:3px}
-.read .v{font-family:var(--mono);font-size:clamp(28px,8.5vw,40px);font-weight:500;
+.read .v{font-family:var(--mono);font-size:clamp(27px,8.2vw,38px);font-weight:500;
   line-height:.95;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.read .v small{font-size:14px;color:var(--ink-2);font-weight:400;letter-spacing:0}
 .read .v.dim{color:var(--ink-2);opacity:.45}
-.sub{font-family:var(--mono);font-size:11.5px;color:var(--ink-2);
-  padding:0 14px 13px;margin:0}
+.sub{font-family:var(--mono);font-size:11.5px;color:var(--ink-2);padding:0 14px 13px;margin:0}
 
 .chan{padding:11px 14px 12px}
 .lab{display:flex;justify-content:space-between;align-items:baseline;
@@ -35,12 +35,17 @@ canvas{display:block;background:#FCFDFB;border:1px solid var(--line);width:100%}
 .axis{display:flex;justify-content:space-between;font-family:var(--mono);
   font-size:11px;color:var(--ink-2);margin-top:5px}
 
-button{width:100%;font-family:var(--sans);font-size:16px;font-weight:500;padding:16px 8px;
+button{width:100%;font-family:var(--sans);font-size:16px;font-weight:500;padding:15px 8px;
   border-radius:4px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer}
 button.ghost{background:transparent;color:var(--ink)}
 button.rec{background:var(--pen);border-color:var(--pen)}
+button.mark{background:transparent;color:var(--ink);border-color:var(--ink);font-size:15px}
+button.mark.live{background:var(--mark);border-color:var(--mark);color:#fff}
+button.sm{font-size:13.5px;font-weight:400;padding:12px 6px}
+button.sm b{font-weight:500}
 button:disabled{opacity:.3;cursor:default}
-button b{font-weight:500}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.two button{margin:0}
 button + button{margin-top:8px}
 
 .note{font-size:12px;color:var(--ink-2);line-height:1.65;margin:14px 2px 0}
@@ -56,12 +61,12 @@ button + button{margin-top:8px}
 <div class="card">
   <div class="read">
     <div>
-      <div class="k">지금 진폭</div>
-      <div class="v dim" id="vNow">—</div>
+      <div class="k">진동수</div>
+      <div class="v dim" id="vF">—</div>
     </div>
     <div>
-      <div class="k">최대 진폭</div>
-      <div class="v dim" id="vMax">—</div>
+      <div class="k">진폭</div>
+      <div class="v dim" id="vA">—</div>
     </div>
   </div>
   <p class="sub" id="sub">대기 중</p>
@@ -78,14 +83,18 @@ button + button{margin-top:8px}
 <div class="card">
   <div class="pad">
     <button id="bRun">녹음 시작</button>
-    <button class="ghost" id="bCsv" disabled>CSV 내보내기</button>
+    <button class="mark" id="bSeg" disabled>측정 시작</button>
+    <div class="two">
+      <button class="ghost sm" id="bA" disabled>진폭 CSV</button>
+      <button class="ghost sm" id="bF" disabled>진동수 CSV</button>
+    </div>
   </div>
 </div>
 
 <p class="note">
-표본율만큼 촘촘하게, 마이크가 준 값을 그대로 기록합니다. 계산하거나 다듬은 값이 아닙니다.<br>
-진폭은 기기가 받아들일 수 있는 최댓값을 ±1로 본 상대값입니다. 절대 음압(dB SPL)이 아니라
-기종이 다르면 값도 달라집니다.<br>
+진폭 CSV에는 마이크가 준 값이 표본 하나하나 그대로 들어갑니다. 계산하거나 다듬지 않은 원본입니다.<br>
+진동수 CSV에는 그 원본을 0.17초씩 분석해 얻은 값이 초당 열 줄로 들어갑니다. 같은 구간을 다른 눈으로 본 것입니다.<br>
+측정 구간을 잡지 않으면 녹음 전체가 나갑니다. 진폭은 ±1이 기기 한계인 상대값이며 절대 음압이 아닙니다.<br>
 한 번에 20초까지 담습니다. 그 이상은 행이 백만 개를 넘어 엑셀이 열지 못합니다.
 </p>
 
@@ -110,6 +119,7 @@ if (!(location.protocol === 'https:' || location.hostname === 'localhost'))
 const MAXSEC = 20, DEC = 512;
 let SR = 48000, buf = null, env0 = null, env1 = null;
 let cap = 0, n = 0, curE = -1, peak = 0, recent = 0;
+const flog = [];                     /* 진동수 기록 {i, f, a} */
 
 function alloc(sr){
   SR = sr; cap = Math.round(sr*MAXSEC);
@@ -117,6 +127,7 @@ function alloc(sr){
   const m = Math.ceil(cap/DEC) + 1;
   env0 = new Float32Array(m); env1 = new Float32Array(m);
   n = 0; curE = -1; peak = 0; recent = 0;
+  flog.length = 0; segA = segB = null; fHist.length = 0;
 }
 function push(ch){
   for (let i = 0; i < ch.length; i++){
@@ -130,7 +141,6 @@ function push(ch){
     if (a > peak) peak = a;
     n++;
   }
-  /* 화면에 띄울 '지금 진폭'은 최근 50 ms의 봉우리 */
   let r = 0;
   const from = Math.max(0, n - Math.round(SR*0.05));
   for (let i = from; i < n; i += 4){ const a = buf[i] < 0 ? -buf[i] : buf[i]; if (a > r) r = a; }
@@ -190,7 +200,6 @@ async function start(){
     $('bRun').textContent = '녹음 정지';
     $('bRun').classList.add('rec');
     $('bRun').disabled = false;
-    $('bCsv').disabled = true;
     if (SR < 44100)
       banner('표본율이 ' + SR + ' Hz로 낮습니다. 블루투스 마이크가 통화 모드로 잡힌 것 같습니다. 기기 내장 마이크를 쓰세요.');
     keepAwake();
@@ -204,9 +213,9 @@ async function start(){
 function stop(auto){
   if (!running) return;
   running = false;
+  if (segA != null && segB == null) segB = n;    /* 열린 구간은 닫고 멈춥니다 */
   $('bRun').textContent = '녹음 시작';
   $('bRun').classList.remove('rec');
-  $('bCsv').disabled = n < 2;
   if (node){ try{ node.disconnect(); }catch(e){} node = null; }
   if (stream){ for (const t of stream.getTracks()) t.stop(); stream = null; }
   if (ctx){ ctx.close().catch(()=>{}); ctx = null; }
@@ -226,9 +235,101 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && running && !wl) keepAwake();
 });
 
+/* ── 측정 구간 ───────────────────────────────────────────
+   표본 번호로 잡아 둡니다. 진폭과 진동수 두 파일이 같은 구간을
+   가리키므로, 범위를 정하는 방법은 이것 하나뿐입니다. */
+let segA = null, segB = null;
+const segEnd = () => segB == null ? n : segB;
+const hasSeg = () => segA != null;
+function segRange(){ return hasSeg() ? [segA, segEnd()] : [0, n]; }
+
+$('bSeg').addEventListener('click', () => {
+  if (segA == null || segB != null){ segA = n; segB = null; }
+  else segB = n;
+});
+function segUI(){
+  const b = $('bSeg');
+  b.disabled = !running && segA == null;
+  if (segA == null){ b.textContent = '측정 시작'; b.classList.remove('live'); }
+  else if (segB == null){
+    b.textContent = '측정 종료 · ' + ((segEnd()-segA)/SR).toFixed(1) + '초';
+    b.classList.add('live');
+  } else {
+    b.textContent = '구간 다시 잡기 · ' + ((segB-segA)/SR).toFixed(1) + '초';
+    b.classList.remove('live');
+  }
+}
+
+/* ── 진동수 ──────────────────────────────────────────────
+   창 함수를 씌운 8192점 FFT로 가장 센 성분을 찾고, 봉우리 양옆
+   칸의 로그 크기로 포물선을 맞춰 칸 사이 값까지 읽습니다.
+   조작할 것은 없고 숫자만 나옵니다. */
+const NF = 8192;
+const re = new Float32Array(NF), im = new Float32Array(NF);
+const mag = new Float32Array(NF >> 1);
+const win = new Float32Array(NF);
+for (let i = 0; i < NF; i++) win[i] = 0.5 - 0.5*Math.cos(2*Math.PI*i/(NF-1));
+
+function fft(){
+  for (let i = 1, j = 0; i < NF; i++){
+    let bit = NF >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j){
+      let t = re[i]; re[i] = re[j]; re[j] = t;
+      t = im[i]; im[i] = im[j]; im[j] = t;
+    }
+  }
+  for (let len = 2; len <= NF; len <<= 1){
+    const ang = -2*Math.PI/len, wr = Math.cos(ang), wi = Math.sin(ang), h = len >> 1;
+    for (let i = 0; i < NF; i += len){
+      let cr = 1, ci = 0;
+      for (let k = 0; k < h; k++){
+        const a = i + k, b = a + h;
+        const vr = re[b]*cr - im[b]*ci, vi = re[b]*ci + im[b]*cr;
+        re[b] = re[a] - vr; im[b] = im[a] - vi;
+        re[a] += vr;        im[a] += vi;
+        const t = cr*wr - ci*wi; ci = cr*wi + ci*wr; cr = t;
+      }
+    }
+  }
+}
+
+const KMIN = 8;
+const fHist = [];
+let fNow = null, aNow = 0;
+
+function analyze(){
+  if (n < NF) return null;
+  const base = n - NF;
+  let pk = 0, sum = 0;
+  for (let i = 0; i < NF; i++){
+    const v = buf[base + i], a = v < 0 ? -v : v;
+    if (a > pk) pk = a;
+    sum += v*v;
+    re[i] = v*win[i]; im[i] = 0;
+  }
+  aNow = pk;
+  if (Math.sqrt(sum/NF) < 0.0004) return null;      /* 사실상 무음 */
+  fft();
+  const kHi = (NF >> 1) - 2;
+  let k = KMIN + 1, best = -1, tot = 0;
+  for (let i = KMIN; i <= kHi; i++){
+    const m = re[i]*re[i] + im[i]*im[i];
+    mag[i] = m; tot += m;
+    if (m > best && i > KMIN){ best = m; k = i; }
+  }
+  if (best < (tot/(kHi - KMIN + 1))*40) return null;  /* 뚜렷한 봉우리 없음 */
+  const a = Math.log(mag[k-1] + 1e-20),
+        b = Math.log(mag[k]   + 1e-20),
+        c = Math.log(mag[k+1] + 1e-20);
+  const den = a - 2*b + c;
+  const d = den === 0 ? 0 : Math.max(-0.5, Math.min(0.5, 0.5*(a - c)/den));
+  return (k + d)*SR/NF;
+}
+
 /* ── 그리기 ──────────────────────────────────────────────
-   가로는 늘 녹음 전체입니다. 세로는 지금까지의 최댓값에 맞춰
-   저절로 잡히므로 눈금을 만질 일이 없습니다. */
+   가로는 늘 녹음 전체, 세로는 최댓값에 저절로 맞춥니다. */
 const H = 200;
 const cv = $('scope'), cx = cv.getContext('2d');
 let W = 1, lastW = 0, rt = null;
@@ -247,6 +348,8 @@ window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(refi
 window.addEventListener('orientationchange', () => setTimeout(refit, 300));
 refit(); requestAnimationFrame(refit); setTimeout(refit, 300);
 
+const hiA = new Float32Array(2048), loA = new Float32Array(2048);
+
 function draw(){
   requestAnimationFrame(draw);
   cx.clearRect(0, 0, W, H);
@@ -264,19 +367,26 @@ function draw(){
   cx.beginPath(); cx.moveTo(0, mid); cx.lineTo(W, mid); cx.stroke();
   if (n < 2) return;
 
+  /* 잡아 둔 구간을 옅게 칠해 어디가 나가는지 보이게 합니다 */
+  if (hasSeg()){
+    const xa = segA/n*W, xb = Math.min(W, segEnd()/n*W);
+    cx.fillStyle = 'rgba(29,110,110,.12)';
+    cx.fillRect(xa, 0, xb - xa, H);
+    cx.strokeStyle = 'rgba(29,110,110,.55)';
+    for (const x of [xa, xb]){
+      if (x <= 0 || x >= W) continue;
+      cx.beginPath(); cx.moveTo(x + .5, 0); cx.lineTo(x + .5, H); cx.stroke();
+    }
+  }
+
   const vmax = Math.max(peak*1.12, 0.02);
   const g = (H/2)/vmax;
-  const yOf = v => {
-    const y = H/2 - v*g;
-    return y < 0 ? 0 : (y > H ? H : y);
-  };
+  const yOf = v => { const y = H/2 - v*g; return y < 0 ? 0 : (y > H ? H : y); };
 
-  cx.strokeStyle = '#B23A2E'; cx.lineWidth = 1; cx.lineJoin = 'round';
-  cx.beginPath();
-  const hi = new Float32Array(W), lo = new Float32Array(W);
-  const raw = n <= 120000;              /* 짧을 때는 원본에서 바로 */
-  for (let px = 0; px < W; px++){
-    const a = Math.floor(n*px/W), b = Math.max(a + 1, Math.floor(n*(px+1)/W));
+  const cols = Math.min(W, 2048);
+  const raw = n <= 120000;
+  for (let px = 0; px < cols; px++){
+    const a = Math.floor(n*px/cols), b = Math.max(a + 1, Math.floor(n*(px+1)/cols));
     let mn = 1e9, mx = -1e9;
     if (raw){
       for (let i = a; i < b; i++){ const v = buf[i]; if (v < mn) mn = v; if (v > mx) mx = v; }
@@ -285,33 +395,54 @@ function draw(){
       for (let e = e0; e < e1; e++){ if (env0[e] < mn) mn = env0[e]; if (env1[e] > mx) mx = env1[e]; }
     }
     if (mx < mn){ mn = mx = 0; }
-    lo[px] = mn; hi[px] = mx;
+    loA[px] = mn; hiA[px] = mx;
   }
-  for (let px = 0; px < W; px++){
-    const x = px + .5, y = yOf(hi[px]);
+  cx.strokeStyle = '#B23A2E'; cx.lineWidth = 1; cx.lineJoin = 'round';
+  cx.beginPath();
+  for (let px = 0; px < cols; px++){
+    const x = px/cols*W + .5, y = yOf(hiA[px]);
     px ? cx.lineTo(x, y) : cx.moveTo(x, y);
   }
-  for (let px = W - 1; px >= 0; px--) cx.lineTo(px + .5, yOf(lo[px]));
+  for (let px = cols - 1; px >= 0; px--) cx.lineTo(px/cols*W + .5, yOf(loA[px]));
   cx.closePath();
   cx.fillStyle = 'rgba(178,58,46,.22)'; cx.fill();
   cx.stroke();
 }
 requestAnimationFrame(draw);
 
-/* ── 숫자 ────────────────────────────────────────────────*/
+/* ── 숫자 갱신 ───────────────────────────────────────────*/
 setInterval(() => {
-  const sec = n/SR;
+  if (running && buf){
+    const f = analyze();
+    /* 한 칸씩 튀는 것만 막고 변화는 놓치지 않도록 3개 중앙값 */
+    if (f === null) fHist.length = 0;
+    else { fHist.push(f); if (fHist.length > 3) fHist.shift(); }
+    const s = [...fHist].sort((x,y) => x-y);
+    fNow = s.length ? s[s.length >> 1] : null;
+    if (n >= NF) flog.push({ i: n, f: fNow, a: aNow });
+  }
   const has = n > 1;
-  $('vNow').classList.toggle('dim', !running);
-  $('vMax').classList.toggle('dim', !has);
-  $('vNow').textContent = running ? recent.toFixed(3) : '—';
-  $('vMax').textContent = has ? peak.toFixed(3) : '—';
+  const sec = n/SR;
+  $('vF').classList.toggle('dim', fNow == null);
+  $('vA').classList.toggle('dim', !has);
+  $('vF').innerHTML = fNow == null ? '—'
+    : (fNow < 1000 ? fNow.toFixed(1) : fNow.toFixed(0)) + ' <small>Hz</small>';
+  $('vA').textContent = has ? (running ? recent : peak).toFixed(3) : '—';
   $('tEnd').textContent = has ? sec.toFixed(2) + ' s' : '—';
   $('tag').textContent = running ? '기록 중' : (has ? '멈춤' : '—');
+
+  const [a, b] = segRange();
+  const rows = b - a;
   $('sub').textContent = has
-    ? sec.toFixed(2) + '초 · ' + n.toLocaleString() + '행 · '
-      + (n*19/1048576).toFixed(1) + ' MB · 표본율 ' + SR.toLocaleString() + ' Hz'
+    ? (hasSeg() ? '구간 ' : '전체 ') + ((b-a)/SR).toFixed(2) + '초 · '
+      + rows.toLocaleString() + '행 · ' + (rows*19/1048576).toFixed(1) + ' MB · '
+      + SR.toLocaleString() + ' Hz'
     : '대기 중';
+  $('bA').disabled = rows < 2;
+  $('bF').disabled = fRows().length < 1;
+  $('bA').innerHTML = '진폭 <b>' + rows.toLocaleString() + '행</b>';
+  $('bF').innerHTML = '진동수 <b>' + fRows().length.toLocaleString() + '행</b>';
+  segUI();
   if (peak > 0.985 && running) banner('소리가 기기 한계를 넘었습니다. 마이크를 멀리 두세요.');
 }, 100);
 
@@ -319,26 +450,48 @@ setInterval(() => {
    백만 행을 한 문자열로 이으면 폰의 기억공간이 모자랄 수 있어
    5만 행씩 나누어 담습니다. 앞의 BOM은 엑셀이 한글 머리글을
    깨뜨리지 않게 하는 표식입니다. */
-$('bCsv').addEventListener('click', () => {
-  if (n < 2) return;
+function fRows(){
+  const [a, b] = segRange();
+  return flog.filter(r => r.i >= a && r.i <= b);
+}
+function stamp(){
+  const d = new Date(), p = v => String(v).padStart(2, '0');
+  return '' + d.getFullYear() + p(d.getMonth()+1) + p(d.getDate())
+    + '-' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds());
+}
+function save(name, parts){
   try{
-    const parts = ['\ufeff시간(s),진폭\n'];
-    const STEP = 50000;
-    for (let s = 0; s < n; s += STEP){
-      const e = Math.min(n, s + STEP), rows = [];
-      for (let i = s; i < e; i++) rows.push((i/SR).toFixed(6) + ',' + buf[i].toFixed(6));
-      parts.push(rows.join('\n') + '\n');
-    }
-    const d = new Date(), p = v => String(v).padStart(2, '0');
-    const name = '음파_' + d.getFullYear() + p(d.getMonth()+1) + p(d.getDate())
-      + '-' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds())
-      + '_' + SR + 'Hz.csv';
     const url = URL.createObjectURL(new Blob(parts, {type:'text/csv;charset=utf-8'}));
-    const a = document.createElement('a');
-    a.href = url; a.download = name;
-    document.body.appendChild(a); a.click();
-    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 2000);
+    const el = document.createElement('a');
+    el.href = url; el.download = name;
+    document.body.appendChild(el); el.click();
+    setTimeout(() => { URL.revokeObjectURL(url); el.remove(); }, 2000);
   }catch(err){ banner('내보내기에 실패했습니다: ' + (err.message || err)); }
+}
+const tail = () => (hasSeg() ? '_구간' : '_전체') + '.csv';
+
+$('bA').addEventListener('click', () => {
+  const [a, b] = segRange();
+  if (b - a < 2) return;
+  const parts = ['\ufeff시간(s),진폭\n'];
+  const STEP = 50000;
+  for (let s = a; s < b; s += STEP){
+    const e = Math.min(b, s + STEP), rows = [];
+    for (let i = s; i < e; i++) rows.push(((i-a)/SR).toFixed(6) + ',' + buf[i].toFixed(6));
+    parts.push(rows.join('\n') + '\n');
+  }
+  save('진폭_' + stamp() + '_' + SR + 'Hz' + tail(), parts);
+});
+
+$('bF').addEventListener('click', () => {
+  const rs = fRows();
+  if (!rs.length) return;
+  const a = segRange()[0];
+  const rows = ['\ufeff시간(s),진동수(Hz),진폭'];
+  for (const r of rs)
+    rows.push(((r.i-a)/SR).toFixed(3) + ',' + (r.f == null ? '' : r.f.toFixed(2))
+      + ',' + r.a.toFixed(6));
+  save('진동수_' + stamp() + tail(), [rows.join('\n') + '\n']);
 });
 </script>
 </body>
