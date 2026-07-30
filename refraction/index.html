@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>굴절 측정기</title>
+<style>
+:root{
+  --paper:#E9EBE5; --panel:#F5F6F2; --line:#CFD5CD;
+  --ink:#1E2320; --ink-2:#6A726B; --warn:#8A5A00;
+  --bd:#6A726B; --inc:#B23A2E; --ref:#1D6E6E;
+  --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI",Roboto,"Noto Sans KR",sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Roboto Mono",monospace;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+  font-size:15px;line-height:1.5;
+  padding:14px 14px calc(28px + env(safe-area-inset-bottom));
+  max-width:620px;margin-inline:auto}
+h1{font-size:13px;font-weight:500;color:var(--ink-2);margin:0 0 12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:4px;margin-bottom:10px}
+.pad{padding:12px}
+.hide{display:none !important}
+
+button{font-family:var(--sans);font-size:15px;font-weight:500;padding:14px 8px;
+  border-radius:4px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer}
+button.ghost{background:transparent;color:var(--ink)}
+button:disabled{opacity:.3;cursor:default}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.row .wide{grid-column:1/-1}
+
+video{display:block;width:100%;background:#000;border-radius:3px}
+.stage{position:relative;touch-action:none;background:#20221F;border:1px solid var(--line);
+  border-radius:3px;overflow:hidden}
+canvas#view{display:block;width:100%}
+canvas#loupe{position:absolute;width:112px;height:112px;border-radius:56px;
+  border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.4);pointer-events:none;display:none}
+
+.seg{display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:#fff}
+.seg button{flex:1;padding:11px 4px;font-size:13.5px;border:0;border-radius:0;
+  background:transparent;color:var(--ink-2)}
+.seg button.on{color:#fff}
+.seg button[data-k=bd].on{background:var(--bd);border-color:var(--bd)}
+.seg button[data-k=inc].on{background:var(--inc)}
+.seg button[data-k=ref].on{background:var(--ref)}
+.seg button i{display:inline-block;width:9px;height:9px;border-radius:5px;margin-right:6px;
+  vertical-align:middle}
+
+label.f{display:block;font-size:11.5px;color:var(--ink-2);margin:0 0 5px}
+select{width:100%;font-family:var(--sans);font-size:15px;padding:12px 10px;
+  border:1px solid var(--line);border-radius:4px;background:#fff;color:var(--ink)}
+
+.note{font-size:12px;color:var(--ink-2);line-height:1.6;margin:0}
+.banner{background:var(--warn);color:#fff;padding:11px 13px;border-radius:4px;
+  font-size:13.5px;margin-bottom:10px}
+.flash{font-size:12.5px;padding:9px 11px;border-radius:4px;margin:0 0 9px;line-height:1.55}
+.flash.ok{background:#E4EDE6;color:#2C4A34;border:1px solid #C3D6C8}
+.flash.no{background:#F6E7E4;color:#7A2D22;border:1px solid #E4C6C0}
+
+.res h3{font-size:11.5px;font-weight:500;color:var(--ink-2);margin:14px 0 7px;
+  letter-spacing:.03em}
+.res h3:first-child{margin-top:0}
+table{width:100%;border-collapse:collapse;font-size:14px}
+td{padding:7px 0;border-bottom:1px solid var(--line)}
+td:last-child{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:0}
+td.k{color:var(--ink-2);font-size:13px}
+.big{font-family:var(--mono);font-size:34px;font-weight:500;letter-spacing:-.03em;line-height:1}
+.big small{font-size:14px;color:var(--ink-2);font-weight:400;letter-spacing:0}
+.guess{font-size:13px;color:var(--ink-2);margin:9px 0 0}
+.guess b{color:var(--ink);font-weight:500}
+</style>
+</head>
+<body>
+
+<h1>굴절 측정기</h1>
+<div id="banner"></div>
+
+<!-- ── 1단계 : 사진 얻기 ─────────────────────────────────── -->
+<div id="stepShot">
+  <div class="card">
+    <div class="pad">
+      <video id="cam" playsinline muted autoplay></video>
+      <p class="note" style="margin-top:10px">
+        경계면을 정면에서 찍으세요. 비스듬히 보면 원근 때문에 각이 실제와 달라집니다.<br>
+        빛줄기가 사진에 보여야 합니다. 물에는 우유 몇 방울, 공기 중에는 옅은 안개가 필요합니다.
+      </p>
+    </div>
+  </div>
+  <div class="card">
+    <div class="pad row">
+      <button class="wide" id="bShot" disabled>촬영</button>
+      <button class="ghost wide" id="bPick">사진 불러오기</button>
+    </div>
+  </div>
+  <input type="file" id="file" accept="image/*" class="hide">
+</div>
+
+<!-- ── 2단계 : 선 긋기 ───────────────────────────────────── -->
+<div id="stepDraw" class="hide">
+  <div class="card">
+    <div class="stage" id="stage">
+      <canvas id="view"></canvas>
+      <canvas id="loupe" width="224" height="224"></canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="pad">
+      <div class="seg" id="segMode">
+        <button data-k="bd" class="on"><i style="background:#6A726B"></i>경계면</button>
+        <button data-k="inc"><i style="background:#B23A2E"></i>입사광</button>
+        <button data-k="ref"><i style="background:#1D6E6E"></i>굴절광</button>
+      </div>
+      <p class="note" style="margin-top:10px" id="hint">화면을 끌어서 경계면을 그으세요. 끝점을 다시 잡아 옮길 수 있습니다.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="pad row">
+      <button class="ghost" id="bFit">자동 맞춤</button>
+      <button class="ghost" id="bClear">이 선 지우기</button>
+      <div class="wide"></div>
+      <div class="wide">
+        <label class="f" for="selN1">입사 매질 (빛이 들어오는 쪽)</label>
+        <select id="selN1"></select>
+      </div>
+      <button class="wide" id="bMeasure" disabled>측정</button>
+      <button class="ghost wide" id="bAgain">다시 찍기</button>
+    </div>
+  </div>
+
+  <div class="card hide" id="cardRes"><div class="pad res" id="res"></div></div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+function banner(msg){
+  const b = $('banner'); b.innerHTML = '';
+  if (!msg) return;
+  const d = document.createElement('div'); d.className = 'banner'; d.textContent = msg;
+  b.appendChild(d);
+}
+window.addEventListener('error', e => banner('오류: ' + e.message));
+window.addEventListener('unhandledrejection', e => banner('오류: ' + e.reason));
+if (!(location.protocol === 'https:' || location.hostname === 'localhost'))
+  banner('HTTPS가 아니어서 카메라를 쓸 수 없습니다. 사진 불러오기는 됩니다.');
+
+/* ── 매질 ────────────────────────────────────────────────
+   나트륨 D선(589 nm) 기준. 굴절 매질은 고르지 않습니다 — 그것이 측정 대상입니다. */
+const C = 299792458;
+const MED = [['진공',1.0000],['공기',1.0003],['얼음',1.31],['물',1.333],
+  ['에탄올',1.362],['석영',1.458],['글리세린',1.473],['아크릴',1.49],
+  ['유리 (크라운)',1.52],['폴리카보네이트',1.585],['유리 (플린트)',1.62],
+  ['사파이어',1.77],['다이아몬드',2.417]];
+MED.forEach(([nm,n],i) => {
+  const o = document.createElement('option');
+  o.value = i; o.textContent = nm + '  (n = ' + n.toFixed(n < 1.01 ? 4 : 3) + ')';
+  $('selN1').appendChild(o);
+});
+$('selN1').value = 1;
+
+/* ── 1단계 : 카메라와 파일 ───────────────────────────────── */
+const MAXPX = 1600;            /* 분석용 최대 변 길이 */
+let srcCv = null, PIX = null, IW = 0, IH = 0, camStream = null;
+
+async function openCam(){
+  try{
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+    camStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 } }, audio: false });
+    $('cam').srcObject = camStream;
+    await $('cam').play();
+    $('bShot').disabled = false;
+  }catch(err){
+    banner('카메라를 열지 못했습니다. 사진 불러오기를 쓰세요. (' + (err.message || err) + ')');
+  }
+}
+function closeCam(){
+  if (camStream){ for (const t of camStream.getTracks()) t.stop(); camStream = null; }
+  $('cam').srcObject = null;
+}
+openCam();
+
+function adopt(src, w, h){
+  const k = Math.min(1, MAXPX/Math.max(w, h));
+  IW = Math.round(w*k); IH = Math.round(h*k);
+  srcCv = document.createElement('canvas');
+  srcCv.width = IW; srcCv.height = IH;
+  const c = srcCv.getContext('2d', { willReadFrequently: true });
+  c.drawImage(src, 0, 0, IW, IH);
+  PIX = c.getImageData(0, 0, IW, IH).data;
+  L.bd = L.inc = L.ref = null;
+  $('cardRes').classList.add('hide');
+  $('stepShot').classList.add('hide');
+  $('stepDraw').classList.remove('hide');
+  closeCam();
+  ready(); hint();
+  requestAnimationFrame(() => { fitView(); draw(); });
+}
+
+$('bShot').addEventListener('click', () => {
+  const v = $('cam');
+  if (!v.videoWidth) return;
+  adopt(v, v.videoWidth, v.videoHeight);
+});
+$('bPick').addEventListener('click', () => $('file').click());
+$('file').addEventListener('change', async e => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  try{
+    /* 갤러리 사진에는 회전 정보가 따로 붙어 있어 그대로 그리면 누워 나옵니다 */
+    let bmp;
+    try{ bmp = await createImageBitmap(f, { imageOrientation: 'from-image' }); }
+    catch(_){ bmp = await createImageBitmap(f); }
+    adopt(bmp, bmp.width, bmp.height);
+  }catch(err){ banner('사진을 열지 못했습니다: ' + (err.message || err)); }
+  e.target.value = '';
+});
+$('bAgain').addEventListener('click', () => {
+  $('stepDraw').classList.add('hide');
+  $('stepShot').classList.remove('hide');
+  $('bShot').disabled = true;
+  openCam();
+});
+
+/* ── 화면 좌표 ↔ 사진 좌표 ───────────────────────────────── */
+const cv = $('view'), cx = cv.getContext('2d');
+let VW = 0, VH = 0, sc = 1, tx = 0, ty = 0;
+
+function sizeCanvas(){
+  const w = $('stage').clientWidth;
+  if (w < 1) return false;
+  const h = Math.round(Math.min(w*1.25, Math.max(240, w*0.78)));
+  const d = Math.min(window.devicePixelRatio || 1, 2);
+  VW = w; VH = h;
+  cv.width = Math.round(w*d); cv.height = Math.round(h*d);
+  cv.style.height = h + 'px';
+  cx.setTransform(d, 0, 0, d, 0, 0);
+  return true;
+}
+function fitView(){
+  if (!sizeCanvas() || !IW) return;
+  sc = Math.min(VW/IW, VH/IH);
+  tx = (VW - IW*sc)/2; ty = (VH - IH*sc)/2;
+}
+const toImg = (x, y) => [(x - tx)/sc, (y - ty)/sc];
+const toScr = (x, y) => [x*sc + tx, y*sc + ty];
+window.addEventListener('resize', () => { if (IW){ fitView(); draw(); } });
+window.addEventListener('orientationchange', () => setTimeout(() => { if (IW){ fitView(); draw(); } }, 300));
+
+/* ── 선 ──────────────────────────────────────────────────
+   전부 사진 좌표로 저장합니다. 화면 좌표로 두면 확대하거나
+   화면을 돌렸을 때 측정값이 달라집니다. */
+const L = { bd: null, inc: null, ref: null };
+const COL = { bd: '#6A726B', inc: '#B23A2E', ref: '#1D6E6E' };
+const NAME = { bd: '경계면', inc: '입사광', ref: '굴절광' };
+let mode = 'bd';
+
+$('segMode').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  for (const x of $('segMode').querySelectorAll('button')) x.classList.toggle('on', x === b);
+  mode = b.dataset.k;
+  ready(); hint(); draw();
+});
+function hint(t){
+  $('hint').textContent = t !== undefined ? t
+    : (L[mode] ? NAME[mode] + '을 그었습니다. 끝점을 잡아 옮기거나 자동 맞춤을 누르세요.'
+               : '화면을 끌어서 ' + NAME[mode] + '을 그으세요.');
+}
+$('bClear').addEventListener('click', () => { L[mode] = null; ready(); hint(); draw(); });
+function ready(){
+  $('bMeasure').disabled = !(L.bd && L.inc && L.ref);
+  $('bFit').disabled = !L[mode];
+}
+
+/* ── 손가락 조작 ─────────────────────────────────────────
+   한 손가락은 선 편집, 두 손가락은 확대와 이동. */
+const pts = new Map();
+let drag = null, pinch = null;
+
+cv.addEventListener('pointerdown', e => {
+  cv.setPointerCapture(e.pointerId);
+  const r = cv.getBoundingClientRect();
+  pts.set(e.pointerId, [e.clientX - r.left, e.clientY - r.top]);
+  if (pts.size === 2){ drag = null; startPinch(); loupe(null); return; }
+  if (pts.size !== 1) return;
+  const [sx, sy] = pts.get(e.pointerId);
+  const hit = hitEnd(sx, sy);
+  if (hit){
+    if (hit.k !== mode){
+      mode = hit.k;
+      for (const x of $('segMode').querySelectorAll('button')) x.classList.toggle('on', x.dataset.k === mode);
+    }
+    drag = { kind: 'end', i: hit.i };
+  } else {
+    const p = toImg(sx, sy);
+    L[mode] = [p[0], p[1], p[0], p[1]];
+    drag = { kind: 'end', i: 1 };
+  }
+  moveTo(sx, sy); 
+});
+cv.addEventListener('pointermove', e => {
+  if (!pts.has(e.pointerId)) return;
+  const r = cv.getBoundingClientRect();
+  pts.set(e.pointerId, [e.clientX - r.left, e.clientY - r.top]);
+  if (pts.size >= 2){ doPinch(); return; }
+  if (drag){ const [sx, sy] = pts.get(e.pointerId); moveTo(sx, sy); }
+});
+function endPtr(e){
+  pts.delete(e.pointerId);
+  if (pts.size < 2) pinch = null;
+  if (pts.size === 0){
+    if (drag && L[mode]){
+      const l = L[mode];
+      if (Math.hypot(l[2]-l[0], l[3]-l[1])*sc < 18){ L[mode] = null; }
+    }
+    drag = null; loupe(null); ready(); hint(); draw();
+  }
+}
+cv.addEventListener('pointerup', endPtr);
+cv.addEventListener('pointercancel', endPtr);
+
+function hitEnd(sx, sy){
+  for (const k of ['bd','inc','ref']){
+    const l = L[k]; if (!l) continue;
+    for (let i = 0; i < 2; i++){
+      const [px, py] = toScr(l[i*2], l[i*2+1]);
+      if (Math.hypot(px - sx, py - sy) < 24) return { k, i };
+    }
+  }
+  return null;
+}
+function moveTo(sx, sy){
+  const l = L[mode]; if (!l || !drag) return;
+  const p = toImg(sx, sy);
+  l[drag.i*2] = Math.max(0, Math.min(IW, p[0]));
+  l[drag.i*2+1] = Math.max(0, Math.min(IH, p[1]));
+  loupe([sx, sy]);
+  draw();
+}
+function startPinch(){
+  const a = [...pts.values()];
+  pinch = { d: Math.hypot(a[0][0]-a[1][0], a[0][1]-a[1][1]),
+            c: [(a[0][0]+a[1][0])/2, (a[0][1]+a[1][1])/2], sc, tx, ty };
+}
+function doPinch(){
+  if (!pinch) { startPinch(); return; }
+  const a = [...pts.values()];
+  const d = Math.hypot(a[0][0]-a[1][0], a[0][1]-a[1][1]);
+  const c = [(a[0][0]+a[1][0])/2, (a[0][1]+a[1][1])/2];
+  const k = Math.max(0.3, Math.min(12, pinch.sc*(d/(pinch.d || 1))));
+  const ix = (pinch.c[0] - pinch.tx)/pinch.sc, iy = (pinch.c[1] - pinch.ty)/pinch.sc;
+  sc = k; tx = c[0] - ix*k; ty = c[1] - iy*k;
+  draw();
+}
+
+/* ── 돋보기 ──────────────────────────────────────────────
+   끝점을 잡으면 손가락이 그 점을 가립니다. 확대창이 없으면
+   각도가 몇 도씩 어긋납니다. */
+const lp = $('loupe'), lc = lp.getContext('2d');
+function loupe(at){
+  if (!at || !srcCv){ lp.style.display = 'none'; return; }
+  const [sx, sy] = at;
+  const Z = 4, R = 112;
+  lc.setTransform(1,0,0,1,0,0);
+  lc.clearRect(0,0,224,224);
+  lc.fillStyle = '#20221F'; lc.fillRect(0,0,224,224);
+  const [ix, iy] = toImg(sx, sy);
+  const half = R/(sc*Z);
+  lc.imageSmoothingEnabled = false;
+  lc.drawImage(srcCv, ix-half, iy-half, half*2, half*2, 0, 0, 224, 224);
+  lc.strokeStyle = COL[mode]; lc.lineWidth = 2;
+  lc.beginPath(); lc.moveTo(112,88); lc.lineTo(112,136);
+  lc.moveTo(88,112); lc.lineTo(136,112); lc.stroke();
+  lp.style.display = 'block';
+  lp.style.left = Math.max(4, Math.min(VW-116, sx-56)) + 'px';
+  lp.style.top  = (sy > 150 ? sy-136 : sy+28) + 'px';
+}
+
+/* ── 자동 맞춤 ───────────────────────────────────────────
+   광선은 배경에서 가장 크게 벗어나면서 색이 일관된 줄,
+   경계면은 밝기가 급변하는 단차로 찾습니다. 색은 미리 정하지 않습니다. */
+function median(a){ const b = Float64Array.from(a).sort(); return b[b.length>>1]; }
+
+function fitLine(A, B, kind, band, gate){
+  const dx = B[0]-A[0], dy = B[1]-A[1], Ln = Math.hypot(dx, dy);
+  if (Ln < 12) return null;
+  const ux = dx/Ln, uy = dy/Ln, mx = -uy, my = ux;
+  const NT = Math.max(24, Math.min(400, Math.round(Ln)));
+  const S = 2*band + 1;
+
+  const R = new Float32Array(NT*S), G = new Float32Array(NT*S), Bb = new Float32Array(NT*S);
+  const ok = new Uint8Array(NT*S);
+  for (let i = 0; i < NT; i++){
+    const t = Ln*i/(NT-1);
+    for (let j = 0; j < S; j++){
+      const s = j - band;
+      const x = Math.round(A[0]+ux*t+mx*s), y = Math.round(A[1]+uy*t+my*s), k = i*S+j;
+      if (x < 0 || y < 0 || x >= IW || y >= IH) continue;
+      const o = (y*IW+x)*4;
+      R[k] = PIX[o]; G[k] = PIX[o+1]; Bb[k] = PIX[o+2]; ok[k] = 1;
+    }
+  }
+
+  const score = new Float32Array(NT*S);
+  let noise = 1, floor = 0;
+  const outer = Math.round(band*0.5);
+
+  if (kind === 'ray'){
+    /* 배경은 띠 바깥쪽에서만 잽니다. 굵은 빛줄기가 띠 가운데를
+       채워도 배경 추정이 끌려가지 않습니다. */
+    const vr = [], vg = [], vb = [];
+    for (let i = 0; i < NT; i++) for (let j = 0; j < S; j++){
+      const k = i*S+j;
+      if (ok[k] && Math.abs(j-band) > outer){ vr.push(R[k]); vg.push(G[k]); vb.push(Bb[k]); }
+    }
+    if (vr.length < 50) return null;
+    const br = median(vr), bg = median(vg), bl = median(vb);
+    const mag = new Float32Array(NT*S);
+    for (let k = 0; k < ok.length; k++) if (ok[k])
+      mag[k] = Math.hypot(R[k]-br, G[k]-bg, Bb[k]-bl);
+    const so = Float64Array.from(mag).sort();
+    const cut = so[Math.floor(so.length*0.95)];
+    let rr = 0, rg = 0, rb = 0, n = 0;
+    for (let k = 0; k < ok.length; k++) if (ok[k] && mag[k] >= cut){
+      rr += R[k]-br; rg += G[k]-bg; rb += Bb[k]-bl; n++;
+    }
+    if (!n) return null;
+    const rn = Math.hypot(rr, rg, rb) || 1;
+    rr /= rn; rg /= rn; rb /= rn;
+    const proj = [];
+    for (let i = 0; i < NT; i++) for (let j = 0; j < S; j++){
+      const k = i*S+j; if (!ok[k]) continue;
+      const d = (R[k]-br)*rr + (G[k]-bg)*rg + (Bb[k]-bl)*rb;
+      score[k] = d > 0 ? d : 0;
+      if (Math.abs(j-band) > outer) proj.push(d);
+    }
+    const pm = median(proj);
+    noise = 1.4826*(median(proj.map(v => Math.abs(v-pm))) || 0.5);
+    floor = 0;
+  } else {
+    const lum = new Float32Array(NT*S);
+    for (let k = 0; k < ok.length; k++) lum[k] = 0.299*R[k] + 0.587*G[k] + 0.114*Bb[k];
+    const gs = [];
+    for (let i = 0; i < NT; i++) for (let j = 2; j < S-2; j++){
+      const k = i*S+j;
+      if (ok[k-2] && ok[k+2]){ score[k] = Math.abs(lum[k+2]-lum[k-2]); gs.push(score[k]); }
+    }
+    if (gs.length < 50) return null;
+    floor = median(gs);
+    noise = 1.4826*(median(gs.map(v => Math.abs(v-floor))) || 0.5);
+  }
+
+  const cs = new Float64Array(NT), cw = new Float64Array(NT), half = [];
+  const win = Math.max(6, Math.round(band*0.35));
+  for (let i = 0; i < NT; i++){
+    let best = -1, bj = -1;
+    for (let j = 0; j < S; j++){ const v = score[i*S+j]; if (v > best){ best = v; bj = j; } }
+    if (bj < 0 || best <= 0){ cw[i] = 0; continue; }
+    let hc = 0;
+    for (let j = 0; j < S; j++) if (score[i*S+j] >= best*0.5) hc++;
+    half.push(hc);
+    let sw = 0, ss = 0;
+    for (let j = Math.max(0,bj-win); j <= Math.min(S-1,bj+win); j++){
+      const w = score[i*S+j]*score[i*S+j];
+      sw += w; ss += w*(j-band);
+    }
+    cs[i] = sw > 0 ? ss/sw : bj-band;
+    cw[i] = best;
+  }
+
+  const wv = []; for (let i = 0; i < NT; i++) if (cw[i] > 0) wv.push(cw[i]);
+  if (wv.length < NT*0.35) return null;
+  const wmed = median(wv);
+  const snr = (wmed - floor)/noise;
+  /* 검출 판정은 가장 넓은 띠에서만 내립니다. 띠가 좁아지면 광선이
+     띠를 거의 채워 배경 잡음 추정이 오염되기 때문입니다. */
+  if (gate && snr < (kind === 'ray' ? 6 : 3)) return null;
+  const thr = Math.max(wmed*0.35, floor + noise*2);
+  let used = 0;
+  for (let i = 0; i < NT; i++) if (cw[i] < thr) cw[i] = 0; else used++;
+  if (used < NT*0.35) return null;
+
+  let a = 0, b = 0, res = 0;
+  for (let pass = 0; pass < 2; pass++){
+    let Sw = 0, St = 0, Ss = 0, Stt = 0, Sts = 0;
+    for (let i = 0; i < NT; i++){
+      if (!cw[i]) continue;
+      const t = Ln*i/(NT-1), w = cw[i];
+      Sw += w; St += w*t; Ss += w*cs[i]; Stt += w*t*t; Sts += w*t*cs[i];
+    }
+    const den = Sw*Stt - St*St;
+    if (Math.abs(den) < 1e-9) return null;
+    b = (Sw*Sts - St*Ss)/den;
+    a = (Ss - b*St)/Sw;
+    let e = 0, c = 0;
+    for (let i = 0; i < NT; i++){
+      if (!cw[i]) continue;
+      const t = Ln*i/(NT-1), r = cs[i] - (a + b*t);
+      e += r*r; c++;
+    }
+    res = Math.sqrt(e/c);
+    if (pass === 0) for (let i = 0; i < NT; i++){
+      if (!cw[i]) continue;
+      const t = Ln*i/(NT-1);
+      if (Math.abs(cs[i] - (a + b*t)) > 2.5*res) cw[i] = 0;
+    }
+  }
+  if (res > band*0.4) return null;
+  const sig = Math.max(1, (half.length ? median(half) : 3)/2.355);
+  return { p1: [A[0]+mx*a, A[1]+my*a],
+           p2: [A[0]+ux*Ln+mx*(a+b*Ln), A[1]+uy*Ln+my*(a+b*Ln)], res, snr, sig };
+}
+
+function autoFit(A, B, kind){
+  const cl = (v, lo, hi) => Math.max(lo, Math.min(hi, Math.round(v)));
+  const first = fitLine(A, B, kind, 40, true);
+  if (!first) return null;
+  let a = first.p1, b = first.p2, last = first;
+  /* 다듬는 띠 폭을 잰 두께에 맞춥니다. 굵은 빛줄기는 띠도 넓게 둡니다. */
+  for (const band of [cl(6*first.sig, 16, 40), cl(5*first.sig, 10, 40)]){
+    const r = fitLine(a, b, kind, band, false);
+    if (!r) return null;
+    a = r.p1; b = r.p2; last = r;
+  }
+  return last;
+}
+
+function flash(el, ok, msg){
+  const d = document.createElement('div');
+  d.className = 'flash ' + (ok ? 'ok' : 'no');
+  d.textContent = msg;
+  el.replaceWith(d);
+  return d;
+}
+$('bFit').addEventListener('click', () => {
+  const l = L[mode]; if (!l) return;
+  const before = l.slice();
+  const r = autoFit([l[0],l[1]], [l[2],l[3]], mode === 'bd' ? 'edge' : 'ray');
+  if (!r){
+    hint(mode === 'bd' ? '경계면을 찾지 못했습니다. 밝기가 뚜렷하게 꺾이는 곳에 가깝게 그어 주세요.'
+                       : '빛줄기를 찾지 못했습니다. 줄에 더 가깝게 긋거나, 빛이 사진에 보이는지 확인하세요.');
+    return;
+  }
+  L[mode] = [r.p1[0], r.p1[1], r.p2[0], r.p2[1]];
+  const ang = a => Math.atan2(a[3]-a[1], a[2]-a[0])*180/Math.PI;
+  let dd = ang(L[mode]) - ang(before);
+  while (dd > 90) dd -= 180; while (dd < -90) dd += 180;
+  const mv = Math.hypot((L[mode][0]+L[mode][2])/2 - (before[0]+before[2])/2,
+                        (L[mode][1]+L[mode][3])/2 - (before[1]+before[3])/2);
+  hint(NAME[mode] + '을 맞췄습니다 — ' + mv.toFixed(0) + ' px 이동, '
+     + (dd >= 0 ? '+' : '') + dd.toFixed(1) + '° 회전. 마음에 안 들면 끝점을 다시 잡으세요.');
+  draw();
+});
+
+/* ── 기하 정리와 각 ──────────────────────────────────────
+   위치는 고쳐도 방향은 건드리지 않습니다. 방향이 곧 측정값입니다. */
+function geom(){
+  if (!(L.bd && L.inc && L.ref)) return null;
+  const uni = l => { const d = Math.hypot(l[2]-l[0], l[3]-l[1]); return d < 1 ? null : [(l[2]-l[0])/d, (l[3]-l[1])/d]; };
+  const ub = uni(L.bd), ui = uni(L.inc), ur = uni(L.ref);
+  if (!ub || !ui || !ur) return null;
+  const nx = -ub[1], ny = ub[0];                    /* 법선 */
+
+  /* 입사광 직선과 경계면 직선의 교점 */
+  const cr = (ax,ay,bx,by) => ax*by - ay*bx;
+  const d1 = cr(ui[0], ui[1], ub[0], ub[1]);
+  if (Math.abs(d1) < 1e-6) return { err: '입사광이 경계면과 나란합니다.' };
+  const wx = L.bd[0]-L.inc[0], wy = L.bd[1]-L.inc[1];
+  const t = cr(wx, wy, ub[0], ub[1])/d1;
+  const P = [L.inc[0]+ui[0]*t, L.inc[1]+ui[1]*t];
+
+  /* 각 선의 먼 쪽 끝을 P 기준으로 다시 세웁니다 */
+  const far = (l, u) => {
+    const d0 = Math.hypot(l[0]-P[0], l[1]-P[1]), d2 = Math.hypot(l[2]-P[0], l[3]-P[1]);
+    const q = d0 > d2 ? [l[0],l[1]] : [l[2],l[3]];
+    const len = Math.max(d0, d2);
+    const s = (q[0]-P[0])*u[0] + (q[1]-P[1])*u[1] >= 0 ? 1 : -1;
+    return { q: [P[0]+u[0]*s*len, P[1]+u[1]*s*len], len, s };
+  };
+  const fi = far(L.inc, ui), fr = far(L.ref, ur);
+
+  const th = u => Math.acos(Math.min(1, Math.abs(u[0]*nx + u[1]*ny)))*180/Math.PI;
+  const side = q => Math.sign((q[0]-P[0])*nx + (q[1]-P[1])*ny);
+
+  return { P, nrm: [nx, ny], ub, fi, fr,
+           t1: th(ui), t2: th(ur),
+           sameSide: side(fi.q) === side(fr.q) };
+}
+
+/* ── 측정 ────────────────────────────────────────────────*/
+$('bMeasure').addEventListener('click', () => {
+  const g = geom();
+  const box = $('res');
+  if (!g || g.err){ box.innerHTML = '<p class="note">' + ((g && g.err) || '선을 모두 그어 주세요.') + '</p>';
+    $('cardRes').classList.remove('hide'); return; }
+
+  const n1 = MED[+$('selN1').value][1];
+  const t1 = g.t1, t2 = g.t2;
+  const s1 = Math.sin(t1*Math.PI/180), s2 = Math.sin(t2*Math.PI/180);
+  const warn = [];
+  if (g.sameSide) warn.push('입사광과 굴절광이 경계면의 같은 쪽에 있습니다. 굴절광은 반대쪽으로 그어야 합니다.');
+  if (t1 < 20) warn.push('입사각이 ' + t1.toFixed(1) + '°로 작습니다. 이 범위에서는 오차가 크게 부풀어 결과를 믿기 어렵습니다. 빛을 더 비스듬히 넣어 다시 찍으세요.');
+  if (s2 < 1e-4) warn.push('굴절각이 0에 가까워 굴절률을 구할 수 없습니다.');
+
+  const n2 = s2 > 1e-4 ? n1*s1/s2 : NaN;
+  const v1 = C/n1, v2 = C/n2;
+  const dth = Math.PI/180;                     /* 각을 1° 틀렸다고 볼 때 */
+  const cot = a => Math.abs(Math.cos(a*Math.PI/180)/Math.sin(a*Math.PI/180));
+  const rel = Math.hypot(cot(t1)*dth, cot(t2)*dth);
+  const dn2 = n2*rel;
+
+  let guess = '';
+  if (isFinite(n2)){
+    let bi = -1, bd = 1e9;
+    MED.forEach(([nm, n], i) => { const d = Math.abs(n - n2); if (d < bd){ bd = d; bi = i; } });
+    guess = '<p class="guess">표에서 가장 가까운 것은 <b>' + MED[bi][0] + '</b> (n = '
+      + MED[bi][1].toFixed(3) + ') 입니다. 차이 ' + (bd/MED[bi][1]*100).toFixed(1) + ' %</p>';
+  }
+  const SUP = {'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹'};
+  const e = v => v.toExponential(3).replace(/e\+(\d+)/,
+    (_, d) => ' × 10' + [...d].map(c => SUP[c]).join(''));
+
+  box.innerHTML =
+    warn.map(w => '<div class="flash no">' + w + '</div>').join('') +
+    '<h3>사진에서 잰 값</h3><table>' +
+      '<tr><td class="k">입사각 θ₁</td><td>' + t1.toFixed(2) + '°</td></tr>' +
+      '<tr><td class="k">굴절각 θ₂</td><td>' + t2.toFixed(2) + '°</td></tr>' +
+      '<tr><td class="k">sin θ₁ / sin θ₂</td><td>' + (s2 > 1e-4 ? (s1/s2).toFixed(4) : '—') + '</td></tr>' +
+    '</table>' +
+    '<h3>고른 값 — 입사 매질</h3><table>' +
+      '<tr><td class="k">굴절률 n₁</td><td>' + n1.toFixed(4) + '</td></tr>' +
+      '<tr><td class="k">빛의 속력 v₁</td><td>' + e(v1) + ' m/s</td></tr>' +
+    '</table>' +
+    '<h3>구한 값 — 굴절 매질</h3>' +
+    '<div class="big">' + (isFinite(n2) ? n2.toFixed(3) : '—') + ' <small>= n₂</small></div>' +
+    '<table style="margin-top:12px">' +
+      '<tr><td class="k">빛의 속력 v₂</td><td>' + (isFinite(v2) ? e(v2) + ' m/s' : '—') + '</td></tr>' +
+      '<tr><td class="k">각을 1°씩 틀렸다면</td><td>± ' + (isFinite(dn2) ? dn2.toFixed(3) : '—') + '</td></tr>' +
+    '</table>' + guess;
+  $('cardRes').classList.remove('hide');
+  draw();
+  $('cardRes').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+});
+
+/* ── 그리기 ──────────────────────────────────────────────*/
+function draw(){
+  if (!srcCv){ return; }
+  cx.clearRect(0, 0, VW, VH);
+  cx.fillStyle = '#20221F'; cx.fillRect(0, 0, VW, VH);
+  cx.imageSmoothingQuality = 'high';
+  cx.drawImage(srcCv, tx, ty, IW*sc, IH*sc);
+
+  const g = geom();
+  if (g && !g.err){
+    const [px, py] = toScr(g.P[0], g.P[1]);
+    const [nx, ny] = g.nrm;
+    const R = Math.max(VW, VH);
+    cx.save();
+    cx.strokeStyle = 'rgba(255,255,255,.75)'; cx.lineWidth = 1; cx.setLineDash([5,5]);
+    cx.beginPath();
+    cx.moveTo(px - nx*R, py - ny*R); cx.lineTo(px + nx*R, py + ny*R); cx.stroke();
+    cx.restore();
+  }
+
+  for (const k of ['bd','inc','ref']){
+    const l = L[k]; if (!l) continue;
+    const [x1,y1] = toScr(l[0], l[1]), [x2,y2] = toScr(l[2], l[3]);
+    cx.strokeStyle = 'rgba(0,0,0,.45)'; cx.lineWidth = 5; cx.lineCap = 'round';
+    cx.beginPath(); cx.moveTo(x1,y1); cx.lineTo(x2,y2); cx.stroke();
+    cx.strokeStyle = COL[k]; cx.lineWidth = 2.5;
+    cx.beginPath(); cx.moveTo(x1,y1); cx.lineTo(x2,y2); cx.stroke();
+    const on = k === mode;
+    for (const [ex,ey] of [[x1,y1],[x2,y2]]){
+      cx.beginPath(); cx.arc(ex, ey, on ? 8 : 6, 0, 6.2832);
+      cx.fillStyle = '#fff'; cx.fill();
+      cx.strokeStyle = COL[k]; cx.lineWidth = on ? 3 : 2; cx.stroke();
+    }
+  }
+
+  if (g && !g.err){
+    const [px, py] = toScr(g.P[0], g.P[1]);
+    cx.beginPath(); cx.arc(px, py, 5, 0, 6.2832);
+    cx.fillStyle = '#fff'; cx.fill();
+    cx.strokeStyle = '#20221F'; cx.lineWidth = 2; cx.stroke();
+    drawAngles(g, px, py);
+  }
+}
+
+/* ── 각을 그림 위에 ──────────────────────────────────────
+   법선에서 각 광선까지 호를 그리고 값을 붙입니다. 어느 쪽에서
+   잰 각인지가 눈에 보여야 표면 기준으로 재는 실수를 막습니다. */
+function box(x, y, w, h){
+  cx.beginPath();
+  if (cx.roundRect) cx.roundRect(x, y, w, h, 4);
+  else cx.rect(x, y, w, h);
+}
+
+function pill(x, y, text, col){
+  cx.font = '500 13px ' + getComputedStyle(document.body).fontFamily;
+  const w = cx.measureText(text).width + 14, h = 22;
+  const rx = Math.max(4, Math.min(VW - w - 4, x - w/2));
+  const ry = Math.max(2, Math.min(VH - h - 2, y - h/2));
+  cx.fillStyle = 'rgba(30,35,32,.86)';
+  box(rx, ry, w, h); cx.fill();
+  cx.strokeStyle = col; cx.lineWidth = 1.5;
+  box(rx, ry, w, h); cx.stroke();
+  cx.fillStyle = '#fff'; cx.textAlign = 'left'; cx.textBaseline = 'middle';
+  cx.fillText(text, rx + 7, ry + h/2 + .5);
+}
+
+function oneArc(px, py, nd, rd, val, lab, col, r){
+  const a0 = Math.atan2(nd[1], nd[0]);
+  let dd = Math.atan2(rd[1], rd[0]) - a0;
+  while (dd > Math.PI) dd -= 2*Math.PI;
+  while (dd < -Math.PI) dd += 2*Math.PI;
+  cx.lineCap = 'butt';
+  cx.strokeStyle = 'rgba(0,0,0,.45)'; cx.lineWidth = 5.5;
+  cx.beginPath(); cx.arc(px, py, r, a0, a0 + dd, dd < 0); cx.stroke();
+  cx.strokeStyle = col; cx.lineWidth = 2.5;
+  cx.beginPath(); cx.arc(px, py, r, a0, a0 + dd, dd < 0); cx.stroke();
+  /* 법선 쪽 호 끝에 짧은 눈금 — 어디서부터 잰 각인지 표시 */
+  cx.lineWidth = 2;
+  cx.beginPath();
+  cx.moveTo(px + Math.cos(a0)*(r-6), py + Math.sin(a0)*(r-6));
+  cx.lineTo(px + Math.cos(a0)*(r+6), py + Math.sin(a0)*(r+6));
+  cx.stroke();
+  const am = a0 + dd/2;
+  pill(px + Math.cos(am)*(r+26), py + Math.sin(am)*(r+26),
+       lab + ' ' + val.toFixed(1) + '°', col);
+}
+
+function drawAngles(g, px, py){
+  /* 입사점이 화면 밖이면 호가 안 보이므로 구석에 값만 띄웁니다 */
+  if (px < 30 || px > VW-30 || py < 30 || py > VH-30){
+    pill(76, 20, 'θ₁ ' + g.t1.toFixed(1) + '°  θ₂ ' + g.t2.toFixed(1) + '°', '#CFD5CD');
+    return;
+  }
+  const [nx, ny] = g.nrm;
+  const d1 = [g.fi.q[0]-g.P[0], g.fi.q[1]-g.P[1]];
+  const d2 = [g.fr.q[0]-g.P[0], g.fr.q[1]-g.P[1]];
+  const s1 = (d1[0]*nx + d1[1]*ny) >= 0 ? 1 : -1;
+  const s2 = (d2[0]*nx + d2[1]*ny) >= 0 ? 1 : -1;
+  const r = Math.max(34, Math.min(64, Math.min(VW, VH)*0.17));
+  oneArc(px, py, [nx*s1, ny*s1], d1, g.t1, 'θ₁', COL.inc, r);
+  oneArc(px, py, [nx*s2, ny*s2], d2, g.t2, 'θ₂', COL.ref, r*0.82);
+}
+</script>
+</body>
+</html>
