@@ -44,9 +44,17 @@ button.mark.live{background:var(--mark);border-color:var(--mark);color:#fff}
 button.sm{font-size:13.5px;font-weight:400;padding:12px 6px}
 button.sm b{font-weight:500}
 button:disabled{opacity:.3;cursor:default}
+button + button{margin-top:8px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
 .two button{margin:0}
-button + button{margin-top:8px}
+
+.ivl{margin-top:12px}
+.ivl .t{font-size:11.5px;color:var(--ink-2);margin-bottom:5px}
+.seg{display:flex;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:#fff}
+.seg button{flex:1;padding:10px 2px;font-size:13px;font-weight:400;border:0;border-radius:0;
+  background:transparent;color:var(--ink-2);margin:0}
+.seg button.on{background:var(--ink);color:#fff;font-weight:500}
+.ivl .why{font-family:var(--mono);font-size:11px;color:var(--ink-2);margin:6px 0 0}
 
 .note{font-size:12px;color:var(--ink-2);line-height:1.65;margin:14px 2px 0}
 .banner{background:var(--warn);color:#fff;padding:11px 13px;border-radius:4px;
@@ -60,14 +68,8 @@ button + button{margin-top:8px}
 
 <div class="card">
   <div class="read">
-    <div>
-      <div class="k">진동수</div>
-      <div class="v dim" id="vF">—</div>
-    </div>
-    <div>
-      <div class="k">진폭</div>
-      <div class="v dim" id="vA">—</div>
-    </div>
+    <div><div class="k">진동수</div><div class="v dim" id="vF">—</div></div>
+    <div><div class="k">진폭</div><div class="v dim" id="vA">—</div></div>
   </div>
   <p class="sub" id="sub">대기 중</p>
 </div>
@@ -82,20 +84,34 @@ button + button{margin-top:8px}
 
 <div class="card">
   <div class="pad">
-    <button id="bRun">녹음 시작</button>
+    <button id="bRun">시작</button>
     <button class="mark" id="bSeg" disabled>측정 시작</button>
+    <div class="ivl">
+      <div class="t">진동수 창 · 진폭은 늘 1 ms</div>
+      <div class="seg" id="segIvl">
+        <button data-i="0">11 ms</button>
+        <button data-i="1">43 ms</button>
+        <button data-i="2" class="on">171 ms</button>
+        <button data-i="3">683 ms</button>
+      </div>
+      <p class="why" id="why"></p>
+    </div>
     <div class="two">
-      <button class="ghost sm" id="bA" disabled>진폭 CSV</button>
-      <button class="ghost sm" id="bF" disabled>진동수 CSV</button>
+      <button class="ghost sm" id="bM" disabled>측정 CSV</button>
+      <button class="ghost sm" id="bR" disabled>원본 CSV</button>
     </div>
   </div>
 </div>
 
 <p class="note">
-진폭 CSV에는 마이크가 준 값이 표본 하나하나 그대로 들어갑니다. 계산하거나 다듬지 않은 원본입니다.<br>
-진동수 CSV에는 그 원본을 0.17초씩 분석해 얻은 값이 초당 열 줄로 들어갑니다. 같은 구간을 다른 눈으로 본 것입니다.<br>
-측정 구간을 잡지 않으면 녹음 전체가 나갑니다. 진폭은 ±1이 기기 한계인 상대값이며 절대 음압이 아닙니다.<br>
-한 번에 20초까지 담습니다. 그 이상은 행이 백만 개를 넘어 엑셀이 열지 못합니다.
+측정 CSV에는 진폭과 진동수가 <b>같은 시각</b>으로 한 줄씩, 1 ms 간격으로 들어갑니다.
+대부분의 실험에는 이것만 있으면 됩니다.<br>
+진동수는 한 순간에는 정해지지 않습니다. 창 하나만큼을 봐야 값이 하나 나오므로,
+그 값을 다음 창까지 그대로 이어 붙였습니다. 새로 잰 줄에는 <b>갱신</b> 열이 1입니다 —
+평균이나 오차를 낼 때는 그 줄만 골라 쓰셔야 합니다. 그러지 않으면 같은 값을 여러 번 센 셈이 되어
+오차가 실제보다 작게 나옵니다.<br>
+원본 CSV에는 마이크가 준 표본이 하나하나 그대로 들어갑니다. 다듬지 않은 값이 필요할 때만 쓰세요.<br>
+녹음은 5분까지 됩니다. 원본 CSV만 한 번에 약 20초까지입니다 — 그 이상은 엑셀이 열지 못합니다.
 </p>
 
 <script>
@@ -112,14 +128,36 @@ window.addEventListener('unhandledrejection', e => banner('오류: ' + e.reason)
 if (!(location.protocol === 'https:' || location.hostname === 'localhost'))
   banner('HTTPS가 아니어서 마이크를 쓸 수 없습니다. https 주소로 열어 주세요.');
 
+/* ── 진동수 창 ───────────────────────────────────────────
+   진폭은 늘 1 ms 간격입니다. 진동수만 창 길이를 고릅니다. 창이
+   길수록 정밀하지만 그 시간 동안의 변화는 뭉개집니다. 오차와
+   최저 진동수는 합성 신호로 재어 둔 값입니다. */
+const AMS = 1;                       /* 진폭 간격 1 ms 고정 */
+const FWIN = [
+  { N:   512, ms:  11, err: '±1.8 Hz',  low: 188 },
+  { N:  2048, ms:  43, err: '±0.4 Hz',  low:  47 },
+  { N:  8192, ms: 171, err: '±0.1 Hz',  low:  12 },
+  { N: 32768, ms: 683, err: '±0.02 Hz', low:   3 }
+];
+let iv = 2;
+$('segIvl').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  for (const x of $('segIvl').querySelectorAll('button')) x.classList.toggle('on', x === b);
+  iv = +b.dataset.i; whyText();
+});
+function whyText(){
+  const q = FWIN[iv];
+  $('why').textContent = '진동수 오차 ' + q.err + ' · ' + q.low
+    + ' Hz 이상만 · 같은 값이 ' + Math.round(q.ms/AMS) + '줄씩 이어짐';
+}
+whyText();
+
 /* ── 기록통 ──────────────────────────────────────────────
    표본을 있는 그대로 담습니다. 화면에 그릴 때 쓰려고 512개마다
-   최솟값·최댓값 한 쌍을 같이 쌓아 둡니다. 매 프레임 백만 개를
-   훑으면 폰이 버티지 못하기 때문입니다. */
-const MAXSEC = 20, DEC = 512;
+   최솟값·최댓값 한 쌍을 같이 쌓아 둡니다. */
+const MAXSEC = 300, DEC = 512, MAXROW = 1000000;
 let SR = 48000, buf = null, env0 = null, env1 = null;
 let cap = 0, n = 0, curE = -1, peak = 0, recent = 0;
-const flog = [];                     /* 진동수 기록 {i, f, a} */
 
 function alloc(sr){
   SR = sr; cap = Math.round(sr*MAXSEC);
@@ -127,7 +165,7 @@ function alloc(sr){
   const m = Math.ceil(cap/DEC) + 1;
   env0 = new Float32Array(m); env1 = new Float32Array(m);
   n = 0; curE = -1; peak = 0; recent = 0;
-  flog.length = 0; segA = segB = null; fHist.length = 0;
+  segA = segB = null; fHist.length = 0;
 }
 function push(ch){
   for (let i = 0; i < ch.length; i++){
@@ -181,7 +219,6 @@ async function start(){
     await ctx.resume();
     alloc(ctx.sampleRate);
     banner('');
-
     const src = ctx.createMediaStreamSource(stream);
     const mute = ctx.createGain(); mute.gain.value = 0;
     if (ctx.audioWorklet){
@@ -195,9 +232,8 @@ async function start(){
       node.onaudioprocess = e => push(e.inputBuffer.getChannelData(0));
     }
     src.connect(node); node.connect(mute); mute.connect(ctx.destination);
-
     running = true;
-    $('bRun').textContent = '녹음 정지';
+    $('bRun').textContent = '정지';
     $('bRun').classList.add('rec');
     $('bRun').disabled = false;
     if (SR < 44100)
@@ -213,16 +249,15 @@ async function start(){
 function stop(auto){
   if (!running) return;
   running = false;
-  if (segA != null && segB == null) segB = n;    /* 열린 구간은 닫고 멈춥니다 */
-  $('bRun').textContent = '녹음 시작';
+  if (segA != null && segB == null) segB = n;
+  $('bRun').textContent = '시작';
   $('bRun').classList.remove('rec');
   if (node){ try{ node.disconnect(); }catch(e){} node = null; }
   if (stream){ for (const t of stream.getTracks()) t.stop(); stream = null; }
   if (ctx){ ctx.close().catch(()=>{}); ctx = null; }
   if (wl){ try{ wl.release(); }catch(e){} wl = null; }
-  if (auto) banner('20초가 차서 자동으로 멈췄습니다. CSV로 받으신 뒤 다시 시작하세요.');
+  if (auto) banner('5분이 차서 자동으로 멈췄습니다. 구간을 잡아 CSV로 받으신 뒤 다시 시작하세요.');
 }
-
 $('bRun').addEventListener('click', () => { running ? stop(false) : start(); });
 
 async function keepAwake(){
@@ -236,12 +271,11 @@ document.addEventListener('visibilitychange', () => {
 });
 
 /* ── 측정 구간 ───────────────────────────────────────────
-   표본 번호로 잡아 둡니다. 진폭과 진동수 두 파일이 같은 구간을
-   가리키므로, 범위를 정하는 방법은 이것 하나뿐입니다. */
+   두 파일이 같은 구간을 가리킵니다. 범위를 정하는 방법은 이것 하나뿐. */
 let segA = null, segB = null;
 const segEnd = () => segB == null ? n : segB;
 const hasSeg = () => segA != null;
-function segRange(){ return hasSeg() ? [segA, segEnd()] : [0, n]; }
+const segRange = () => hasSeg() ? [segA, segEnd()] : [0, n];
 
 $('bSeg').addEventListener('click', () => {
   if (segA == null || segB != null){ segA = n; segB = null; }
@@ -261,18 +295,22 @@ function segUI(){
 }
 
 /* ── 진동수 ──────────────────────────────────────────────
-   창 함수를 씌운 8192점 FFT로 가장 센 성분을 찾고, 봉우리 양옆
-   칸의 로그 크기로 포물선을 맞춰 칸 사이 값까지 읽습니다.
-   조작할 것은 없고 숫자만 나옵니다. */
-const NF = 8192;
-const re = new Float32Array(NF), im = new Float32Array(NF);
-const mag = new Float32Array(NF >> 1);
-const win = new Float32Array(NF);
-for (let i = 0; i < NF; i++) win[i] = 0.5 - 0.5*Math.cos(2*Math.PI*i/(NF-1));
-
-function fft(){
-  for (let i = 1, j = 0; i < NF; i++){
-    let bit = NF >> 1;
+   창 함수를 씌운 FFT로 가장 센 성분을 찾고, 봉우리 양옆 칸의
+   로그 크기로 포물선을 맞춰 칸 사이 값까지 읽습니다. 창 길이는
+   고른 간격에 따라 달라지므로 크기별로 만들어 두고 재사용합니다. */
+const KIT = {};
+function kit(N){
+  if (!KIT[N]){
+    const win = new Float32Array(N);
+    for (let i = 0; i < N; i++) win[i] = 0.5 - 0.5*Math.cos(2*Math.PI*i/(N-1));
+    KIT[N] = { re: new Float32Array(N), im: new Float32Array(N),
+               mag: new Float32Array(N >> 1), win };
+  }
+  return KIT[N];
+}
+function fft(re, im, N){
+  for (let i = 1, j = 0; i < N; i++){
+    let bit = N >> 1;
     for (; j & bit; bit >>= 1) j ^= bit;
     j ^= bit;
     if (i < j){
@@ -280,9 +318,9 @@ function fft(){
       t = im[i]; im[i] = im[j]; im[j] = t;
     }
   }
-  for (let len = 2; len <= NF; len <<= 1){
+  for (let len = 2; len <= N; len <<= 1){
     const ang = -2*Math.PI/len, wr = Math.cos(ang), wi = Math.sin(ang), h = len >> 1;
-    for (let i = 0; i < NF; i += len){
+    for (let i = 0; i < N; i += len){
       let cr = 1, ci = 0;
       for (let k = 0; k < h; k++){
         const a = i + k, b = a + h;
@@ -294,46 +332,70 @@ function fft(){
     }
   }
 }
-
-const KMIN = 8;
-const fHist = [];
-let fNow = null, aNow = 0;
-
-function analyze(){
-  if (n < NF) return null;
-  const base = n - NF;
-  let pk = 0, sum = 0;
-  for (let i = 0; i < NF; i++){
-    const v = buf[base + i], a = v < 0 ? -v : v;
-    if (a > pk) pk = a;
+/* end 직전 N개를 봅니다 */
+function freqAt(end, N){
+  const base = end - N;
+  if (base < 0 || end > n) return null;
+  const K = kit(N), re = K.re, im = K.im, mag = K.mag, win = K.win;
+  let sum = 0;
+  for (let i = 0; i < N; i++){
+    const v = buf[base + i];
     sum += v*v;
     re[i] = v*win[i]; im[i] = 0;
   }
-  aNow = pk;
-  if (Math.sqrt(sum/NF) < 0.0004) return null;      /* 사실상 무음 */
-  fft();
-  const kHi = (NF >> 1) - 2;
-  let k = KMIN + 1, best = -1, tot = 0;
-  for (let i = KMIN; i <= kHi; i++){
+  if (Math.sqrt(sum/N) < 0.0004) return null;        /* 사실상 무음 */
+  fft(re, im, N);
+  const kHi = (N >> 1) - 2, kMin = Math.max(2, Math.ceil(30*N/SR));
+  let k = kMin + 1, best = -1, tot = 0;
+  for (let i = kMin; i <= kHi; i++){
     const m = re[i]*re[i] + im[i]*im[i];
     mag[i] = m; tot += m;
-    if (m > best && i > KMIN){ best = m; k = i; }
+    if (m > best && i > kMin){ best = m; k = i; }
   }
-  if (best < (tot/(kHi - KMIN + 1))*40) return null;  /* 뚜렷한 봉우리 없음 */
+  if (best < (tot/(kHi - kMin + 1))*40) return null; /* 뚜렷한 봉우리 없음 */
   const a = Math.log(mag[k-1] + 1e-20),
         b = Math.log(mag[k]   + 1e-20),
         c = Math.log(mag[k+1] + 1e-20);
   const den = a - 2*b + c;
   const d = den === 0 ? 0 : Math.max(-0.5, Math.min(0.5, 0.5*(a - c)/den));
-  return (k + d)*SR/NF;
+  return (k + d)*SR/N;
 }
 
-/* ── 그리기 ──────────────────────────────────────────────
-   가로는 늘 녹음 전체, 세로는 최댓값에 저절로 맞춥니다. */
+/* ── 측정 표 만들기 ──────────────────────────────────────
+   진폭은 간격 안의 최댓값과 실효값, 진동수는 그 시각까지의 창.
+   두 값이 같은 줄에 놓입니다. */
+function ahop(){ return Math.max(1, Math.round(AMS/1000*SR)); }
+
+function rowsOf(a, b){
+  const N = FWIN[iv].N, hop = ahop(), out = [];
+  let fcur = null, next = 0;
+  for (let t = a; t + hop <= b; t += hop){
+    const rel = t - a;
+    let fresh = 0;
+    /* 창 하나가 끝날 때마다 진동수를 새로 재고, 다음 창까지 그 값을
+       그대로 이어 붙입니다. 새로 잰 줄에만 갱신 표시를 남깁니다. */
+    if (rel >= next){
+      const k = Math.floor(rel/N);
+      fcur = freqAt(a + (k+1)*N, N);
+      next = (k+1)*N;
+      fresh = fcur == null ? 0 : 1;   /* 값이 안 나온 창은 갱신으로 세지 않습니다 */
+    }
+    let pk = 0, sq = 0;
+    for (let i = t; i < t + hop; i++){
+      const v = buf[i], m = v < 0 ? -v : v;
+      if (m > pk) pk = m;
+      sq += v*v;
+    }
+    out.push({ t: rel/SR, pk, rms: Math.sqrt(sq/hop), f: fcur, fresh });
+  }
+  return out;
+}
+function rowCount(a, b){ return Math.max(0, Math.floor((b - a)/ahop())); }
+
+/* ── 그리기 ──────────────────────────────────────────────*/
 const H = 200;
 const cv = $('scope'), cx = cv.getContext('2d');
 let W = 1, lastW = 0, rt = null;
-
 function refit(){
   const w = cv.clientWidth;
   if (w < 1 || w === lastW) return;
@@ -349,7 +411,6 @@ window.addEventListener('orientationchange', () => setTimeout(refit, 300));
 refit(); requestAnimationFrame(refit); setTimeout(refit, 300);
 
 const hiA = new Float32Array(2048), loA = new Float32Array(2048);
-
 function draw(){
   requestAnimationFrame(draw);
   cx.clearRect(0, 0, W, H);
@@ -367,7 +428,6 @@ function draw(){
   cx.beginPath(); cx.moveTo(0, mid); cx.lineTo(W, mid); cx.stroke();
   if (n < 2) return;
 
-  /* 잡아 둔 구간을 옅게 칠해 어디가 나가는지 보이게 합니다 */
   if (hasSeg()){
     const xa = segA/n*W, xb = Math.min(W, segEnd()/n*W);
     cx.fillStyle = 'rgba(29,110,110,.12)';
@@ -382,9 +442,7 @@ function draw(){
   const vmax = Math.max(peak*1.12, 0.02);
   const g = (H/2)/vmax;
   const yOf = v => { const y = H/2 - v*g; return y < 0 ? 0 : (y > H ? H : y); };
-
-  const cols = Math.min(W, 2048);
-  const raw = n <= 120000;
+  const cols = Math.min(W, 2048), raw = n <= 120000;
   for (let px = 0; px < cols; px++){
     const a = Math.floor(n*px/cols), b = Math.max(a + 1, Math.floor(n*(px+1)/cols));
     let mn = 1e9, mx = -1e9;
@@ -411,18 +469,17 @@ function draw(){
 requestAnimationFrame(draw);
 
 /* ── 숫자 갱신 ───────────────────────────────────────────*/
+const fHist = [];
+let fNow = null;
 setInterval(() => {
   if (running && buf){
-    const f = analyze();
-    /* 한 칸씩 튀는 것만 막고 변화는 놓치지 않도록 3개 중앙값 */
+    const f = freqAt(n, FWIN[iv].N);
     if (f === null) fHist.length = 0;
     else { fHist.push(f); if (fHist.length > 3) fHist.shift(); }
     const s = [...fHist].sort((x,y) => x-y);
     fNow = s.length ? s[s.length >> 1] : null;
-    if (n >= NF) flog.push({ i: n, f: fNow, a: aNow });
   }
-  const has = n > 1;
-  const sec = n/SR;
+  const has = n > 1, sec = n/SR;
   $('vF').classList.toggle('dim', fNow == null);
   $('vA').classList.toggle('dim', !has);
   $('vF').innerHTML = fNow == null ? '—'
@@ -431,29 +488,25 @@ setInterval(() => {
   $('tEnd').textContent = has ? sec.toFixed(2) + ' s' : '—';
   $('tag').textContent = running ? '기록 중' : (has ? '멈춤' : '—');
 
-  const [a, b] = segRange();
-  const rows = b - a;
+  const [a, b] = segRange(), rawRows = b - a, mRows = rowCount(a, b);
+  const tooLong = rawRows > MAXROW;
   $('sub').textContent = has
-    ? (hasSeg() ? '구간 ' : '전체 ') + ((b-a)/SR).toFixed(2) + '초 · '
-      + rows.toLocaleString() + '행 · ' + (rows*19/1048576).toFixed(1) + ' MB · '
+    ? (hasSeg() ? '구간 ' : '전체 ') + (rawRows/SR).toFixed(2) + '초 · '
       + SR.toLocaleString() + ' Hz'
+      + (running ? ' · ' + (MAXSEC - sec).toFixed(0) + '초 남음' : '')
     : '대기 중';
-  $('bA').disabled = rows < 2;
-  $('bF').disabled = fRows().length < 1;
-  $('bA').innerHTML = '진폭 <b>' + rows.toLocaleString() + '행</b>';
-  $('bF').innerHTML = '진동수 <b>' + fRows().length.toLocaleString() + '행</b>';
+  $('bM').disabled = mRows < 1;
+  $('bR').disabled = rawRows < 2 || tooLong;
+  $('bM').innerHTML = '측정 <b>' + mRows.toLocaleString() + '행</b>';
+  $('bR').innerHTML = tooLong
+    ? '원본 — <b>' + (MAXROW/SR).toFixed(0) + '초</b> 이하로'
+    : '원본 <b>' + rawRows.toLocaleString() + '행</b>';
   segUI();
   if (peak > 0.985 && running) banner('소리가 기기 한계를 넘었습니다. 마이크를 멀리 두세요.');
 }, 100);
 
 /* ── CSV ─────────────────────────────────────────────────
-   백만 행을 한 문자열로 이으면 폰의 기억공간이 모자랄 수 있어
-   5만 행씩 나누어 담습니다. 앞의 BOM은 엑셀이 한글 머리글을
-   깨뜨리지 않게 하는 표식입니다. */
-function fRows(){
-  const [a, b] = segRange();
-  return flog.filter(r => r.i >= a && r.i <= b);
-}
+   앞의 BOM은 엑셀이 한글 머리글을 깨뜨리지 않게 하는 표식입니다. */
 function stamp(){
   const d = new Date(), p = v => String(v).padStart(2, '0');
   return '' + d.getFullYear() + p(d.getMonth()+1) + p(d.getDate())
@@ -470,9 +523,24 @@ function save(name, parts){
 }
 const tail = () => (hasSeg() ? '_구간' : '_전체') + '.csv';
 
-$('bA').addEventListener('click', () => {
+$('bM').addEventListener('click', () => {
   const [a, b] = segRange();
-  if (b - a < 2) return;
+  const btn = $('bM'), keep = btn.innerHTML;
+  btn.innerHTML = '계산 중…'; btn.disabled = true;
+  setTimeout(() => {
+    const rs = rowsOf(a, b);
+    const out = ['\ufeff시간(s),진폭,실효진폭,진동수(Hz),갱신'];
+    for (const r of rs)
+      out.push(r.t.toFixed(4) + ',' + r.pk.toFixed(6) + ',' + r.rms.toFixed(6)
+        + ',' + (r.f == null ? '' : r.f.toFixed(2)) + ',' + r.fresh);
+    save('측정_' + stamp() + '_창' + FWIN[iv].ms + 'ms' + tail(), [out.join('\n') + '\n']);
+    btn.innerHTML = keep; btn.disabled = false;
+  }, 30);
+});
+
+$('bR').addEventListener('click', () => {
+  const [a, b] = segRange();
+  if (b - a < 2 || b - a > MAXROW) return;
   const parts = ['\ufeff시간(s),진폭\n'];
   const STEP = 50000;
   for (let s = a; s < b; s += STEP){
@@ -480,18 +548,7 @@ $('bA').addEventListener('click', () => {
     for (let i = s; i < e; i++) rows.push(((i-a)/SR).toFixed(6) + ',' + buf[i].toFixed(6));
     parts.push(rows.join('\n') + '\n');
   }
-  save('진폭_' + stamp() + '_' + SR + 'Hz' + tail(), parts);
-});
-
-$('bF').addEventListener('click', () => {
-  const rs = fRows();
-  if (!rs.length) return;
-  const a = segRange()[0];
-  const rows = ['\ufeff시간(s),진동수(Hz),진폭'];
-  for (const r of rs)
-    rows.push(((r.i-a)/SR).toFixed(3) + ',' + (r.f == null ? '' : r.f.toFixed(2))
-      + ',' + r.a.toFixed(6));
-  save('진동수_' + stamp() + tail(), [rows.join('\n') + '\n']);
+  save('원본_' + stamp() + '_' + SR + 'Hz' + tail(), parts);
 });
 </script>
 </body>
