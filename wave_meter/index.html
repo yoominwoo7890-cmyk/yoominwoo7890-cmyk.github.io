@@ -43,6 +43,9 @@ canvas{display:block;background:#FCFDFB;border:1px solid var(--line);width:100%}
 .ctrl button.rec{background:var(--pen);border-color:var(--pen)}
 .ctrl button.sm{padding:11px 6px;font-size:13px;font-weight:400}
 .ctrl button.sm b{font-weight:500}
+.ctrl button.mark{background:transparent;color:var(--ink);border-color:var(--ink);
+  font-size:14px;padding:12px 8px}
+.ctrl button.mark.live{background:var(--pen-b);border-color:var(--pen-b);color:#fff}
 .seg{grid-column:1/-1;display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--ink-2)}
 .seg .g{display:flex;flex:1;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:#fff}
 .seg .g button{flex:1;padding:9px 4px;font-size:13px;font-weight:500;border:0;border-radius:0;
@@ -116,6 +119,7 @@ canvas{display:block;background:#FCFDFB;border:1px solid var(--line);width:100%}
         <button data-v="16">16회</button>
       </div>
     </div>
+    <button class="wide mark" id="bSeg" disabled>구간 측정 시작</button>
     <button class="ghost sm" id="bWave" disabled>화면 파형 CSV</button>
     <button class="ghost sm" id="bLog" disabled>기록 CSV</button>
   </div>
@@ -213,7 +217,7 @@ async function start(){
     }
     src.connect(node); node.connect(mute); mute.connect(ctx.destination);
 
-    running = true; frozenEnd = -1; log.length = 0;
+    running = true; frozenEnd = -1; log.length = 0; segA = segB = null;
     $('bRun').textContent = '정지';
     $('bRun').classList.add('rec');
     $('bRun').disabled = false;
@@ -232,6 +236,7 @@ async function start(){
 function stop(){
   running = false;
   frozenEnd = total;
+  if (segA != null && segB == null) segB = total;   /* 열린 구간은 닫고 멈춥니다 */
   $('bRun').textContent = '시작';
   $('bRun').classList.remove('rec');
   if (node){ try{ node.disconnect(); }catch(e){} node = null; }
@@ -520,6 +525,22 @@ function draw(){
   const key = span + '|' + gi + '|' + w + '|' + AVG[ai] + '|' + (spp < 1);
   if (key !== avgKey){ avgKey = key; avgFresh = true; }
 
+  /* 표시한 구간이 화면에 걸쳐 있으면 옅게 칠해 어디를 내보내는지 보입니다 */
+  if (segA != null){
+    const sA = segA, sB = (segB == null ? end : segB);
+    if (sB > start && sA < start + span){
+      const xa = Math.max(0, (sA - start)/span*w);
+      const xb = Math.min(w, (sB - start)/span*w);
+      cx.fillStyle = 'rgba(29,110,110,.12)';
+      cx.fillRect(xa, 0, xb - xa, h);
+      cx.strokeStyle = 'rgba(29,110,110,.55)'; cx.lineWidth = 1;
+      for (const x of [xa, xb]){
+        if (x <= 0 || x >= w) continue;
+        cx.beginPath(); cx.moveTo(x + .5, 0); cx.lineTo(x + .5, h); cx.stroke();
+      }
+    }
+  }
+
   const g = GAIN[gi]*h/2;
   const mid = h/2;
   const yOf = v => {
@@ -633,14 +654,52 @@ function csvWave(){
   download('파형_' + stamp() + '_' + SR + 'Hz.csv', rows.join('\n'));
 }
 
+/* 구간 표시. 표본 번호로 잡아 두면 시간 계산이 어긋나지 않습니다. */
+let segA = null, segB = null;
+
+function segNow(){ return running ? total : (frozenEnd > 0 ? frozenEnd : total); }
+function segSpan(){
+  if (segA == null) return null;
+  return [segA/SR, (segB == null ? segNow() : segB)/SR];
+}
+function segRows(){
+  const s = segSpan();
+  if (!s) return log;
+  return log.filter(r => r.t >= s[0] && r.t <= s[1]);
+}
+function segUI(){
+  const b = $('bSeg');
+  b.disabled = !running && segA == null;
+  const s = segSpan();
+  if (segA == null){
+    b.textContent = '구간 측정 시작';
+    b.classList.remove('live');
+  } else if (segB == null){
+    b.textContent = '측정 종료 · ' + (s[1]-s[0]).toFixed(1) + '초';
+    b.classList.add('live');
+  } else {
+    b.textContent = '구간 다시 잡기 · ' + (s[1]-s[0]).toFixed(1) + '초';
+    b.classList.remove('live');
+  }
+}
+$('bSeg').addEventListener('click', () => {
+  if (segA == null || segB != null){ segA = segNow(); segB = null; }
+  else segB = segNow();
+  segUI();
+});
+
 function csvLog(){
-  if (!log.length) return;
+  const rows0 = segRows();
+  if (!rows0.length) return;
+  const s = segSpan();
+  const t0 = s ? s[0] : rows0[0].t;      /* 구간이 있으면 그 시작을 0초로 */
   const rows = ['시간(s),진동수(Hz),진폭(%),실효진폭(%),봉투최소(%),봉투최대(%)'];
-  for (const r of log)
-    rows.push(r.t.toFixed(3) + ',' + (r.f == null ? '' : r.f.toFixed(2)) + ','
+  for (const r of rows0)
+    rows.push((r.t - t0).toFixed(3) + ',' + (r.f == null ? '' : r.f.toFixed(2)) + ','
       + (r.p*100).toFixed(3) + ',' + (r.r*100).toFixed(3) + ','
       + (r.lo == null ? ',' : (r.lo*100).toFixed(3) + ',' + (r.hi*100).toFixed(3)));
-  download('기록_' + stamp() + '.csv', rows.join('\n'));
+  download('기록_' + stamp() + (s ? '_구간' + (s[1]-s[0]).toFixed(1) + 's' : '') + '.csv',
+    rows.join('\n'));
 }
 
 $('bWave').addEventListener('click', csvWave);
@@ -693,10 +752,13 @@ setInterval(() => {
     if (log.length > LOGMAX) log.shift();
   }
   const nWave = Math.max(0, Math.floor(spanNow) + 1);
+  const nLog = segRows().length;
   $('bWave').disabled = !buf || spanNow < 2;
-  $('bLog') .disabled = !log.length;
+  $('bLog') .disabled = !nLog;
   $('bWave').innerHTML = '화면 파형 <b>' + nWave.toLocaleString() + '행</b>';
-  $('bLog') .innerHTML = '기록 <b>' + log.length.toLocaleString() + '행</b>';
+  $('bLog') .innerHTML = (segA == null ? '전체 기록 <b>' : '구간 기록 <b>')
+    + nLog.toLocaleString() + '행</b>';
+  segUI();
 }, 100);
 </script>
 </body>
