@@ -655,10 +655,43 @@ function draw3D(b){
   const e = [(eA[0]-eB[0])/2, (eA[1]-eB[1])/2];
   SHAPE === 'needle' ? drawNeedle(pN, pS, e) : drawBar(pN, pS, e);
 
+  mgOverlay3D();
+
   c.fillStyle = '#8E968C'; c.font = FONTL(11);
   c.textAlign = 'center';
   c.fillText('가로 눈금 30° · 세로 눈금 30°', CX, H - 12);
   c.textAlign = 'left';
+}
+
+/* 3D에서도 같은 것을 보여 줍니다. 기준 북은 수평면 대원 위의 한 방향이므로
+   지금 자북에서 편향각만큼 되돌린 자리에 놓입니다. */
+function mgOverlay3D(){
+  if (mgZero == null || mgDev == null || !basis) return;
+  const o = proj([0,0,0]);
+  const ref = azPt(-mgDev*D2R);              /* 기준 북 = 자북에서 편향각만큼 되돌림 */
+
+  c.save();
+  c.strokeStyle = '#8E968C'; c.lineWidth = 1.6; c.setLineDash([6,5]);
+  const pr = proj(mul(ref, 0.94));
+  c.beginPath(); c.moveTo(o[0], o[1]); c.lineTo(pr[0], pr[1]); c.stroke();
+  c.setLineDash([]);
+  label(mul(ref, 1.12), '기준 북', '#8E968C', 11);
+
+  /* 수평면 위, 기준 북에서 자북까지의 호 */
+  const t = Math.abs(mgDev);
+  const col = (t >= 15 && t <= 65) ? '#1D6E6E' : '#8A5A00';
+  const nseg = Math.max(2, Math.round(t/3));
+  c.strokeStyle = col; c.lineWidth = 2.6;
+  c.beginPath();
+  for (let i = 0; i <= nseg; i++){
+    const q = proj(mul(azPt((-mgDev + mgDev*i/nseg)*D2R), 0.52));
+    i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]);
+  }
+  c.stroke();
+  if (t > 1.5)
+    label(mul(azPt(-mgDev/2*D2R), 0.62), t.toFixed(1) + '°', col, 12);
+  c.restore();
+  c.textAlign = 'left'; c.textBaseline = 'alphabetic';
 }
 
 
