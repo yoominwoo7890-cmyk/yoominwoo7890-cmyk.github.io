@@ -78,7 +78,7 @@ button + button{margin-top:8px}
   <div class="chan">
     <div class="lab"><b style="color:var(--pen);font-weight:500">진폭 vs 시간</b><span id="tag">—</span></div>
     <canvas id="scope"></canvas>
-    <div class="axis"><span>0 s</span><span id="tEnd">—</span></div>
+    <div class="axis"><span id="tL">0</span><span id="tEnd">—</span></div>
   </div>
 </div>
 
@@ -86,6 +86,18 @@ button + button{margin-top:8px}
   <div class="pad">
     <button id="bRun">시작</button>
     <button class="mark" id="bSeg" disabled>측정 시작</button>
+    <div class="ivl">
+      <div class="t">그래프 가로 폭</div>
+      <div class="seg" id="segTb">
+        <button data-i="0">1 ms</button>
+        <button data-i="1">2 ms</button>
+        <button data-i="2" class="on">5 ms</button>
+        <button data-i="3">20 ms</button>
+        <button data-i="4">0.2 s</button>
+        <button data-i="5">전체</button>
+      </div>
+      <p class="why" id="whyTb"></p>
+    </div>
     <div class="ivl">
       <div class="t">진동수 창 · 진폭은 늘 1 ms</div>
       <div class="seg" id="segIvl">
@@ -111,6 +123,9 @@ button + button{margin-top:8px}
 평균이나 오차를 낼 때는 그 줄만 골라 쓰셔야 합니다. 그러지 않으면 같은 값을 여러 번 센 셈이 되어
 오차가 실제보다 작게 나옵니다.<br>
 원본 CSV에는 마이크가 준 표본이 하나하나 그대로 들어갑니다. 다듬지 않은 값이 필요할 때만 쓰세요.<br>
+그래프 가로 폭은 보기용일 뿐이며 CSV 범위와는 무관합니다. 좁게 두면 파형이 제자리에 고정되고
+표본 사이가 sinc로 복원되어 마루 모양이 보이며, '전체'로 두면 녹음 전부가 진폭 봉투로 보입니다.
+CSV로 나가는 범위는 언제나 측정 구간이 정합니다.<br>
 녹음은 5분까지 됩니다. 원본 CSV만 한 번에 약 20초까지입니다 — 그 이상은 엑셀이 열지 못합니다.
 </p>
 
@@ -140,6 +155,22 @@ const FWIN = [
   { N: 32768, ms: 683, err: '±0.02 Hz', low:   3 }
 ];
 let iv = 2;
+
+/* 가로 폭. 마지막 칸은 녹음 전체를 봉투로 보여 줍니다. */
+const TB = [0.001, 0.002, 0.005, 0.02, 0.2, null];
+let ti = 2;
+$('segTb').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  for (const x of $('segTb').querySelectorAll('button')) x.classList.toggle('on', x === b);
+  ti = +b.dataset.i; whyTb();
+});
+function whyTb(){
+  $('whyTb').textContent = TB[ti] == null
+    ? '녹음 전체를 진폭 봉투로 — 맥놀이와 소리 크기 변화를 보기 좋습니다'
+    : '파형이 제자리에 고정됩니다 — 마루 모양과 촘촘함을 보기 좋습니다';
+}
+whyTb();
+
 $('segIvl').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   for (const x of $('segIvl').querySelectorAll('button')) x.classList.toggle('on', x === b);
@@ -411,6 +442,57 @@ window.addEventListener('orientationchange', () => setTimeout(refit, 300));
 refit(); requestAnimationFrame(refit); setTimeout(refit, 300);
 
 const hiA = new Float32Array(2048), loA = new Float32Array(2048);
+let drawnSpan = 0, drawnTrig = false;
+
+/* 표본 사이를 직선으로 이으면 4 kHz에서 3 %쯤 어긋납니다. 신호에는
+   표본율 절반 위 성분이 없으므로 그 사이 값은 원래 하나로 정해져
+   있습니다. Lanczos 창을 씌운 sinc로 되살리면 오차가 0.1 % 아래입니다. */
+const LOBES = 8;
+const CK = new Float64Array(2*LOBES), SK = new Float64Array(2*LOBES);
+for (let k = -LOBES + 1; k <= LOBES; k++){
+  CK[k + LOBES - 1] = Math.cos(Math.PI*k/LOBES);
+  SK[k + LOBES - 1] = Math.sin(Math.PI*k/LOBES);
+}
+const atc = i => buf[i < 0 ? 0 : (i >= n ? n - 1 : i)];
+function sampleAt(t){
+  const n0 = Math.floor(t), d0 = t - n0;
+  if (d0 === 0) return atc(n0);
+  const s0 = Math.sin(Math.PI*d0);
+  const sA = Math.sin(Math.PI*d0/LOBES), cA = Math.cos(Math.PI*d0/LOBES);
+  let s = 0;
+  for (let k = -LOBES + 1; k <= LOBES; k++){
+    const d = d0 - k, j = k + LOBES - 1;
+    s += atc(n0 + k)*LOBES*(s0*((k & 1) ? -1 : 1))*(sA*CK[j] - cA*SK[j])/(Math.PI*Math.PI*d*d);
+  }
+  return s;
+}
+
+/* 기준선을 진폭의 30 % 지점에 두고 한 번 충분히 내려갔다 올라올 때만
+   인정합니다. 교차점 하나에는 잡음이 남으므로, 재어 둔 진동수로 창 안
+   교차점 수백 개의 위상을 평균 냅니다. 떨림이 3도에서 0.13도로 줄어듭니다. */
+function triggerStart(start){
+  const room = Math.min(Math.floor(SR*0.06), start - LOBES - 2);
+  if (room < 8) return start;
+  const lev = peak*0.3, hyst = Math.max(peak*0.15, 0.0008);
+  const T = (fNow && fNow > 20) ? SR/fNow : 0;
+  let armed = false, hit = -1, sx = 0, sy = 0, m = 0;
+  for (let i = start - room; i <= start; i++){
+    const v = buf[i];
+    if (!armed){ if (v < lev - hyst) armed = true; }
+    else if (v >= lev){
+      const a = buf[i-1];
+      const t = (v === a) ? i : i - 1 + (lev - a)/(v - a);
+      hit = t; armed = false;
+      if (T){ sx += Math.cos(2*Math.PI*t/T); sy += Math.sin(2*Math.PI*t/T); m++; }
+    }
+  }
+  if (T && m >= 3){
+    const ph = Math.atan2(sy, sx)/(2*Math.PI)*T;
+    return ph + Math.floor((start - ph)/T)*T;
+  }
+  return hit < 0 ? start : hit;
+}
+
 function draw(){
   requestAnimationFrame(draw);
   cx.clearRect(0, 0, W, H);
@@ -428,43 +510,75 @@ function draw(){
   cx.beginPath(); cx.moveTo(0, mid); cx.lineTo(W, mid); cx.stroke();
   if (n < 2) return;
 
+  /* 가로 폭을 정합니다. '전체'면 녹음 전부, 아니면 가장 최근 구간. */
+  const full = TB[ti] == null;
+  let span = full ? n : Math.min(n, Math.round(TB[ti]*SR));
+  let start = n - span;
+  const spp = span/W;
+  /* 파형이 보일 만큼 좁으면 제자리에 고정합니다 */
+  const trig = !full && spp < 1 && peak > 0.002;
+  if (trig) start = Math.max(0, triggerStart(start));
+  drawnSpan = span; drawnTrig = trig;
+
   if (hasSeg()){
-    const xa = segA/n*W, xb = Math.min(W, segEnd()/n*W);
-    cx.fillStyle = 'rgba(29,110,110,.12)';
-    cx.fillRect(xa, 0, xb - xa, H);
-    cx.strokeStyle = 'rgba(29,110,110,.55)';
-    for (const x of [xa, xb]){
-      if (x <= 0 || x >= W) continue;
-      cx.beginPath(); cx.moveTo(x + .5, 0); cx.lineTo(x + .5, H); cx.stroke();
+    const xa = (segA - start)/span*W, xb = (segEnd() - start)/span*W;
+    if (xb > 0 && xa < W){
+      cx.fillStyle = 'rgba(29,110,110,.12)';
+      cx.fillRect(Math.max(0, xa), 0, Math.min(W, xb) - Math.max(0, xa), H);
+      cx.strokeStyle = 'rgba(29,110,110,.55)';
+      for (const x of [xa, xb]){
+        if (x <= 0 || x >= W) continue;
+        cx.beginPath(); cx.moveTo(x + .5, 0); cx.lineTo(x + .5, H); cx.stroke();
+      }
     }
   }
 
   const vmax = Math.max(peak*1.12, 0.02);
   const g = (H/2)/vmax;
   const yOf = v => { const y = H/2 - v*g; return y < 0 ? 0 : (y > H ? H : y); };
-  const cols = Math.min(W, 2048), raw = n <= 120000;
-  for (let px = 0; px < cols; px++){
-    const a = Math.floor(n*px/cols), b = Math.max(a + 1, Math.floor(n*(px+1)/cols));
-    let mn = 1e9, mx = -1e9;
-    if (raw){
-      for (let i = a; i < b; i++){ const v = buf[i]; if (v < mn) mn = v; if (v > mx) mx = v; }
-    } else {
-      const e0 = (a/DEC)|0, e1 = Math.max(e0 + 1, Math.ceil(b/DEC));
-      for (let e = e0; e < e1; e++){ if (env0[e] < mn) mn = env0[e]; if (env1[e] > mx) mx = env1[e]; }
+  cx.strokeStyle = '#B23A2E'; cx.lineJoin = 'round'; cx.lineCap = 'round';
+
+  if (spp < 1){
+    /* 표본 사이를 sinc로 되살려 매끄러운 곡선으로 그립니다 */
+    cx.lineWidth = 1.6;
+    cx.beginPath();
+    for (let px = 0; px <= W; px++){
+      const y = yOf(sampleAt(start + px*spp));
+      px ? cx.lineTo(px, y) : cx.moveTo(px, y);
     }
-    if (mx < mn){ mn = mx = 0; }
-    loA[px] = mn; hiA[px] = mx;
+    cx.stroke();
+    if (spp < 0.2){
+      cx.fillStyle = '#B23A2E';
+      for (let i = Math.ceil(start); i <= start + span; i++){
+        cx.beginPath(); cx.arc((i - start)/spp, yOf(buf[i]), 2, 0, 6.2832); cx.fill();
+      }
+    }
+  } else {
+    /* 한 픽셀에 여러 표본. 그 구간의 최솟값과 최댓값을 띠로 채웁니다. */
+    const cols = Math.min(W, 2048), raw = span <= 120000;
+    for (let px = 0; px < cols; px++){
+      const a = start + Math.floor(span*px/cols), b = Math.max(a + 1, start + Math.floor(span*(px+1)/cols));
+      let mn = 1e9, mx = -1e9;
+      if (raw){
+        for (let i = a; i < b; i++){ const v = buf[i]; if (v < mn) mn = v; if (v > mx) mx = v; }
+      } else {
+        const e0 = (a/DEC)|0, e1 = Math.max(e0 + 1, Math.ceil(b/DEC));
+        for (let e = e0; e < e1; e++){ if (env0[e] < mn) mn = env0[e]; if (env1[e] > mx) mx = env1[e]; }
+      }
+      if (mx < mn){ mn = mx = 0; }
+      loA[px] = mn; hiA[px] = mx;
+    }
+    cx.lineWidth = 1;
+    cx.beginPath();
+    for (let px = 0; px < cols; px++){
+      const x = px/cols*W + .5, y = yOf(hiA[px]);
+      px ? cx.lineTo(x, y) : cx.moveTo(x, y);
+    }
+    for (let px = cols - 1; px >= 0; px--) cx.lineTo(px/cols*W + .5, yOf(loA[px]));
+    cx.closePath();
+    cx.fillStyle = 'rgba(178,58,46,.22)'; cx.fill();
+    cx.stroke();
   }
-  cx.strokeStyle = '#B23A2E'; cx.lineWidth = 1; cx.lineJoin = 'round';
-  cx.beginPath();
-  for (let px = 0; px < cols; px++){
-    const x = px/cols*W + .5, y = yOf(hiA[px]);
-    px ? cx.lineTo(x, y) : cx.moveTo(x, y);
-  }
-  for (let px = cols - 1; px >= 0; px--) cx.lineTo(px/cols*W + .5, yOf(loA[px]));
-  cx.closePath();
-  cx.fillStyle = 'rgba(178,58,46,.22)'; cx.fill();
-  cx.stroke();
 }
 requestAnimationFrame(draw);
 
@@ -485,8 +599,13 @@ setInterval(() => {
   $('vF').innerHTML = fNow == null ? '—'
     : (fNow < 1000 ? fNow.toFixed(1) : fNow.toFixed(0)) + ' <small>Hz</small>';
   $('vA').textContent = has ? (running ? recent : peak).toFixed(3) : '—';
-  $('tEnd').textContent = has ? sec.toFixed(2) + ' s' : '—';
-  $('tag').textContent = running ? '기록 중' : (has ? '멈춤' : '—');
+  const ms = drawnSpan/SR*1000;
+  $('tL').textContent = has ? (TB[ti] == null ? '0 s' : '0 ms') : '0';
+  $('tEnd').textContent = has
+    ? (TB[ti] == null ? sec.toFixed(2) + ' s' : (ms < 10 ? ms.toFixed(1) : ms.toFixed(0)) + ' ms')
+    : '—';
+  $('tag').textContent = running
+    ? (drawnTrig ? '고정됨' : '기록 중') : (has ? '멈춤' : '—');
 
   const [a, b] = segRange(), rawRows = b - a, mRows = rowCount(a, b);
   const tooLong = rawRows > MAXROW;
