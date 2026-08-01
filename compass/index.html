@@ -68,7 +68,7 @@ tr:last-child td{border-bottom:0}
 
 <div class="card">
   <div class="read">
-    <div><div class="k">편향각</div><div class="v dim" id="vT">—</div></div>
+    <div><div class="k" id="kT">방위</div><div class="v dim" id="vT">—</div></div>
     <div><div class="k">자기장</div><div class="v dim" id="vB">—</div></div>
   </div>
   <p class="sub" id="sub">센서 대기</p>
@@ -229,11 +229,13 @@ setInterval(() => {
     bNow = t < 89.5 ? Hh*Math.tan(t*D2R) : null;
   }
   const has = devNow != null;
-  $('vT').classList.toggle('dim', !has);
+  $('vT').classList.toggle('dim', !has && heading == null);
   $('vB').classList.toggle('dim', bNow == null);
-  $('vT').innerHTML = has ? devNow.toFixed(1) + ' <small>°</small>' : '—';
+  $('vT').innerHTML = has ? devNow.toFixed(1) + ' <small>°</small>'
+    : (heading != null ? heading.toFixed(0) + ' <small>° 방위</small>' : '—');
   $('vB').innerHTML = bNow == null ? '—'
     : (bNow < 100 ? bNow.toFixed(1) : bNow.toFixed(0)) + ' <small>μT</small>';
+  $('kT').textContent = zero == null ? '방위' : '편향각';
   $('sub').textContent = !sensorOn ? '센서 대기'
     : zero == null ? '자석을 치우고 기준을 잡으세요'
     : '기준 ' + zero.toFixed(0) + '° · 지구 ' + Hh.toFixed(1) + ' μT · '
@@ -281,7 +283,9 @@ function draw(){
   cx.beginPath(); cx.arc(cxp, cyp, R, 0, 6.2832); cx.stroke();
   cx.font = '500 11px ' + getComputedStyle(document.body).fontFamily;
   cx.fillStyle = '#6A726B'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
-  for (let a = -90; a <= 90; a += 15){
+  const zeroed = zero != null;
+  for (let a = zeroed ? -90 : -180; a <= 180; a += 15){
+    if (zeroed && a > 90) break;
     const r = a*D2R;
     const x1 = cxp + Math.sin(r)*(R-8), y1 = cyp - Math.cos(r)*(R-8);
     const x2 = cxp + Math.sin(r)*R,     y2 = cyp - Math.cos(r)*R;
@@ -289,26 +293,43 @@ function draw(){
     cx.lineWidth = (a % 45 === 0) ? 1.5 : 1;
     cx.beginPath(); cx.moveTo(x1, y1); cx.lineTo(x2, y2); cx.stroke();
     if (a % 45 === 0)
-      cx.fillText(a + '°', cxp + Math.sin(r)*(R+14), cyp - Math.cos(r)*(R+14));
+      cx.fillText((zeroed ? a : ((a % 360 + 360) % 360)) + '°',
+        cxp + Math.sin(r)*(R+14), cyp - Math.cos(r)*(R+14));
   }
-  /* 쓸 만한 구간 15~65도를 표시 */
-  cx.strokeStyle = 'rgba(29,110,110,.30)'; cx.lineWidth = 7;
-  for (const s of [1, -1]){
-    cx.beginPath();
-    cx.arc(cxp, cyp, R-4, -90*D2R + s*15*D2R, -90*D2R + s*65*D2R, s < 0);
-    cx.stroke();
+  /* 기준을 잡은 뒤에만 쓸 만한 구간 15~65도를 표시 */
+  if (zeroed){
+    cx.strokeStyle = 'rgba(29,110,110,.30)'; cx.lineWidth = 7;
+    for (const s of [1, -1]){
+      cx.beginPath();
+      cx.arc(cxp, cyp, R-4, -90*D2R + s*15*D2R, -90*D2R + s*65*D2R, s < 0);
+      cx.stroke();
+    }
   }
   cx.strokeStyle = '#AEB6AC'; cx.lineWidth = 1; cx.setLineDash([4,4]);
   cx.beginPath(); cx.moveTo(cxp, cyp - R); cx.lineTo(cxp, cyp + 8); cx.stroke();
   cx.setLineDash([]);
 
-  if (devNow != null){
-    const r = devNow*D2R;
-    cx.strokeStyle = '#B23A2E'; cx.lineWidth = 3; cx.lineCap = 'round';
+  /* 기준을 잡기 전에는 방위를 그대로, 잡은 뒤에는 편향각을 그립니다.
+     둘 다 없으면 센서가 아직 값을 안 준 것입니다. */
+  const shown = devNow != null ? devNow : (heading != null ? heading : null);
+  if (shown != null){
+    const r = shown*D2R;
+    cx.strokeStyle = devNow != null ? '#B23A2E' : '#AEB6AC';
+    cx.lineWidth = 3; cx.lineCap = 'round';
     cx.beginPath();
     cx.moveTo(cxp, cyp);
     cx.lineTo(cxp + Math.sin(r)*(R-6), cyp - Math.cos(r)*(R-6));
     cx.stroke();
+    /* 반대쪽 꼬리 */
+    cx.lineWidth = 1.5;
+    cx.beginPath();
+    cx.moveTo(cxp, cyp);
+    cx.lineTo(cxp - Math.sin(r)*(R*0.3), cyp + Math.cos(r)*(R*0.3));
+    cx.stroke();
+  } else if (sensorOn){
+    cx.fillStyle = '#6A726B'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    cx.font = '13px ' + getComputedStyle(document.body).fontFamily;
+    cx.fillText('방위 값을 기다리는 중', cxp, cyp);
   }
   cx.beginPath(); cx.arc(cxp, cyp, 5, 0, 6.2832);
   cx.fillStyle = '#1E2320'; cx.fill();
