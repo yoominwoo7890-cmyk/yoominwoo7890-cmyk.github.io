@@ -74,7 +74,13 @@ button:disabled{opacity:.35;cursor:default}
 .mg select,.mg input{width:100%;font-family:var(--sans);font-size:14px;padding:10px;
   border:1px solid var(--line);border-radius:4px;background:#fff;color:var(--ink)}
 .mg input{font-family:var(--mono)}
-.mg .btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:9px}
+button.go{width:100%;margin-top:11px;font-family:var(--sans);font-size:15px;font-weight:500;
+  padding:14px 8px;border-radius:4px;border:1px solid var(--ink);
+  background:var(--ink);color:#fff;cursor:pointer}
+button.go.live{background:var(--az);border-color:var(--az)}
+button.go:disabled{opacity:.35;cursor:default}
+.mg .how{font-size:11.5px;color:var(--ink-2);line-height:1.55;margin:7px 0 0}
+.mg .btns{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:9px}
 .mg .btns button{font-family:var(--sans);font-size:12.5px;font-weight:500;padding:11px 2px;
   border-radius:4px;border:1px solid var(--ink);background:transparent;color:var(--ink);cursor:pointer}
 .mg .btns button.solid{background:var(--ink);color:#fff}
@@ -140,7 +146,7 @@ button:disabled{opacity:.35;cursor:default}
     <button class="big ghost" id="cal">보정 안내</button>
   </div>
   <div class="mg">
-    <div class="hd"><b>자석의 자기장 재기</b><span class="st" id="mgSt">기준 미설정</span></div>
+    <div class="hd"><b>자기장 측정</b><span class="st" id="mgSt">꺼짐</span></div>
     <div class="big2">
       <div><div class="k">편향각</div><div class="n dim" id="mgT">—</div></div>
       <div><div class="k">자기장</div><div class="n dim" id="mgB">—</div></div>
@@ -149,9 +155,10 @@ button:disabled{opacity:.35;cursor:default}
     <select id="mgH"></select>
     <label for="mgD">자석까지 거리 (cm)</label>
     <input type="number" id="mgD" inputmode="decimal" step="0.5" min="0" placeholder="예: 15">
+    <button class="go" id="mgZero" disabled>자기장 측정 시작</button>
+    <p class="how" id="mgHow">자석을 치운 상태에서 누르세요. 지금 북쪽이 기준으로 저장됩니다.</p>
     <div class="btns">
-      <button class="solid" id="mgZero" disabled>기준 잡기</button>
-      <button id="mgAdd" disabled>기록</button>
+      <button id="mgAdd" disabled>이 값 기록</button>
       <button id="mgCsv" disabled>CSV</button>
     </div>
     <p class="warn hide" id="mgWarn"></p>
@@ -481,10 +488,59 @@ function draw2D(){
   const e  = [-dir[1]*w, dir[0]*w];
   SHAPE === 'needle' ? drawNeedle(pN, pS, e) : drawBar(pN, pS, e);
 
+  mgOverlay(r, th);
+
   c.fillStyle = '#8E968C'; c.font = FONTL(11);
   c.textAlign = 'center'; c.textBaseline = 'alphabetic';
   c.fillText('수평 성분만 보임 · 복각 ' + dipShown.toFixed(0) + '° 는 3D 에서', CX, H - 12);
   c.textAlign = 'left';
+}
+
+/* 측정을 켜면 기준 북쪽을 회색 점선으로 남기고, 지금 자북과의 사이에
+   호를 그립니다. 자석 때문에 북쪽이 밀려나는 것이 눈에 보여야 합니다. */
+function mgOverlay(r, th){
+  if (mgZero == null || mgDev == null) return;
+  const t0 = th + mgDev*D2R;                       /* 기준 북쪽 방향 */
+  const d0 = [Math.sin(t0), -Math.cos(t0)];
+  const L = r*0.82;
+
+  c.save();
+  c.strokeStyle = '#8E968C'; c.lineWidth = 1.5; c.setLineDash([6,5]);
+  c.beginPath();
+  c.moveTo(CX, CY);
+  c.lineTo(CX + d0[0]*L, CY + d0[1]*L);
+  c.stroke();
+  c.setLineDash([]);
+  c.fillStyle = '#8E968C'; c.font = FONTL(10.5);
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText('기준 북', CX + d0[0]*(L+16), CY + d0[1]*(L+16));
+
+  /* 두 방향 사이의 호 */
+  const a0 = Math.atan2(d0[1], d0[0]);
+  const a1 = Math.atan2(-Math.cos(th), Math.sin(th));
+  const rr = r*0.42;
+  const t = Math.abs(mgDev);
+  c.strokeStyle = (t >= 15 && t <= 65) ? '#1D6E6E' : '#8A5A00';
+  c.lineWidth = 2.5;
+  c.beginPath(); c.arc(CX, CY, rr, a0, a1, mgDev < 0); c.stroke();
+
+  if (t > 1.5){
+    let am = a0 + (a1 - a0);
+    let dd = a1 - a0;
+    while (dd > Math.PI) dd -= 2*Math.PI;
+    while (dd < -Math.PI) dd += 2*Math.PI;
+    am = a0 + dd/2;
+    const lx = CX + Math.cos(am)*(rr+20), ly = CY + Math.sin(am)*(rr+20);
+    const txt = t.toFixed(1) + '°';
+    c.font = FONT(13);
+    const w = c.measureText(txt).width + 12;
+    c.fillStyle = 'rgba(252,253,251,.92)';
+    c.fillRect(lx - w/2, ly - 11, w, 22);
+    c.fillStyle = (t >= 15 && t <= 65) ? '#1D6E6E' : '#8A5A00';
+    c.fillText(txt, lx, ly);
+  }
+  c.restore();
+  c.textAlign = 'left'; c.textBaseline = 'alphabetic';
 }
 
 /* ── 3D 구면 좌표계 ───────────────────────────────────────── */
@@ -630,13 +686,17 @@ $('mgH').addEventListener('change', () => {
   mgRedraw();
 });
 $('mgZero').addEventListener('click', () => {
+  if (mgZero != null){                       /* 끄기 */
+    mgZero = null; mgDev = null; mgB = null; mgHist.length = 0;
+    return;
+  }
   if (!sensorOn || !haveOri) return;
   mgZero = heading; mgHist.length = 0; mgDev = null; mgB = null;
 });
 
 /* 방위는 readouts()가 이미 계산해 둡니다. 여기서는 그 값만 씁니다. */
 function mgTick(){
-  $('mgZero').disabled = !(sensorOn && haveOri);
+  $('mgZero').disabled = !(sensorOn && haveOri) && mgZero == null;
   if (mgZero != null && sensorOn && haveOri){
     let d = heading - mgZero;
     while (d > 180) d -= 360;
@@ -654,9 +714,15 @@ function mgTick(){
   $('mgT').innerHTML = has ? mgDev.toFixed(1) + '<small>°</small>' : '—';
   $('mgB').innerHTML = mgB == null ? '—'
     : (mgB < 100 ? mgB.toFixed(1) : mgB.toFixed(0)) + '<small> μT</small>';
+  const live = mgZero != null;
+  $('mgZero').textContent = live ? '측정 끄기' : '자기장 측정 시작';
+  $('mgZero').classList.toggle('live', live);
+  $('mgHow').textContent = live
+    ? '기준 북쪽이 화면에 회색 점선으로 남았습니다. 자석을 동쪽이나 서쪽에서 가까이 가져오면 바늘이 벌어집니다.'
+    : '자석을 치운 상태에서 누르세요. 지금 북쪽이 기준으로 저장됩니다.';
   $('mgSt').textContent = !sensorOn ? '센서 꺼짐'
-    : mgZero == null ? '기준 미설정'
-    : '기준 ' + mgZero.toFixed(0) + '° · 지구 ' + mgH.toFixed(1) + ' μT · '
+    : !live ? '꺼짐'
+    : '기준 북 ' + mgZero.toFixed(0) + '° · 지구 ' + mgH.toFixed(1) + ' μT · '
       + (mgSteady ? '안정' : '흔들림');
 
   const w = $('mgWarn'), t = has ? Math.abs(mgDev) : 0;
