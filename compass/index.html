@@ -53,14 +53,14 @@ button.loc:disabled{opacity:.4;cursor:default}
 .v2 small{font-size:14px;color:var(--ink-2);font-weight:400}
 .src{font-size:10.5px;color:var(--ink-2);margin-top:4px}
 
-.ctrl{padding:12px;display:grid;gap:8px}
+.ctrl{padding:12px;display:grid;gap:8px;border-top:1px solid var(--line)}
 button.big{font-family:var(--sans);font-size:15px;font-weight:500;padding:16px 8px;
   border-radius:4px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer}
 button.ghost{background:transparent;color:var(--ink)}
 button:disabled{opacity:.35;cursor:default}
 .banner{background:#8A5A00;color:#fff;padding:11px 13px;border-radius:4px;
   font-size:13px;margin-bottom:10px;white-space:pre-wrap;line-height:1.55}
-.mg{padding:13px 14px;border-top:1px solid var(--line)}
+.mg{padding:13px 14px}
 .mg .hd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px}
 .mg .hd b{font-size:12px;font-weight:500;color:var(--ink-2)}
 .mg .hd .st{font-family:var(--mono);font-size:11px;color:var(--ink-2)}
@@ -125,6 +125,10 @@ button.go:disabled{opacity:.35;cursor:default}
     <div class="src" id="dsrc">기본값 · 아래 버튼으로 내 위치 값을 가져오세요</div>
     <button class="loc" id="loc">내 위치로 복각 설정</button>
   </div>
+  <div class="ctrl">
+    <button class="big" id="start">센서 켜기</button>
+    <button class="big ghost" id="cal">보정 안내</button>
+  </div>
 </div>
 
 <div class="card">
@@ -141,10 +145,6 @@ button.go:disabled{opacity:.35;cursor:default}
 </div>
 
 <div class="card">
-  <div class="ctrl">
-    <button class="big" id="start">센서 켜기</button>
-    <button class="big ghost" id="cal">보정 안내</button>
-  </div>
   <div class="mg">
     <div class="hd"><b>자기장 측정</b><span class="st" id="mgSt">꺼짐</span></div>
     <div class="big2">
