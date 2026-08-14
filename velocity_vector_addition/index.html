@@ -1,1 +1,618 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>속도 벡터의 합성</title>
+<style>
+  :root{
+    --ink:#16202b;
+    --ink-2:#5a6a78;
+    --ink-3:#8b9aa6;
+    --paper:#eef2f4;
+    --panel:#ffffff;
+    --line:#d5dee3;
+    --line-2:#bfcbd3;
+    --water:#378ADD;
+    --water-deep:#185FA5;
+    --boat:#1D9E75;
+    --boat-deep:#0F6E56;
+    --sum:#D85A30;
+    --sum-deep:#993C1D;
+    --grass:#97C459;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    padding:28px 20px 48px;
+  }
+  .shell{max-width:1000px;margin:0 auto}
 
+  header{margin:0 0 22px}
+  .eyebrow{
+    font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--ink-3);margin:0 0 8px;font-weight:600;
+  }
+  h1{
+    font-size:clamp(26px,4vw,38px);line-height:1.1;margin:0 0 8px;
+    font-weight:700;letter-spacing:-.02em;
+  }
+  .sub{margin:0;color:var(--ink-2);font-size:14px;line-height:1.6;max-width:52ch}
+  .formula{
+    font-family:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+    font-size:13px;color:var(--water-deep);
+    background:#dfeaf5;border-radius:5px;padding:1px 7px;white-space:nowrap;
+  }
+
+  .wrap{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;margin-top:22px}
+  .canvas{flex:1 1 380px;min-width:0}
+  .frame{
+    background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;overflow:hidden;
+  }
+  svg#stage{display:block;width:100%;touch-action:none;user-select:none}
+
+  .legend{
+    display:flex;gap:16px;flex-wrap:wrap;margin:12px 2px 0;
+    font-size:12px;color:var(--ink-2);align-items:center;
+  }
+  .swatch{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:3px;margin-right:6px}
+  .unit{color:var(--ink-3)}
+
+  #status{
+    font-size:13px;color:var(--ink-2);margin:12px 2px 0;min-height:20px;line-height:1.5;
+  }
+
+  aside{
+    flex:0 1 224px;min-width:200px;
+    background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;padding:16px;
+  }
+  .sec{
+    font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--ink-3);margin:0 0 10px;font-weight:600;
+  }
+  aside hr{border:none;border-top:1px solid var(--line);margin:16px 0}
+  .lab{display:flex;justify-content:space-between;align-items:baseline;margin:0 0 6px}
+  .lab .k{font-size:13px;color:var(--ink-2)}
+  .lab .v{
+    font-size:13px;font-weight:600;
+    font-family:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  }
+  input[type=range]{
+    width:100%;margin:0 0 14px;accent-color:var(--water);height:20px;
+  }
+  input[type=range]:focus-visible{outline:2px solid var(--water);outline-offset:3px}
+
+  .btns{display:grid;gap:7px}
+  .btns.two{grid-template-columns:1fr 1fr}
+  .btns.three{grid-template-columns:1fr 1fr 1fr}
+  .btns.three button{font-size:12px;min-height:34px;padding:0 2px}
+  .dot{
+    display:inline-block;width:8px;height:8px;border-radius:50%;
+    margin-right:5px;flex:none;background:currentColor;opacity:.35;
+  }
+  button.lit .dot{opacity:1}
+  button{
+    width:100%;min-height:38px;font:inherit;font-size:13px;
+    display:flex;align-items:center;justify-content:center;line-height:1;
+    background:#f4f7f9;color:var(--ink);
+    border:1px solid var(--line-2);border-radius:8px;
+    cursor:pointer;touch-action:manipulation;
+    transition:background .12s,border-color .12s;
+  }
+  button:hover{background:#e8eef2}
+  button:active{background:#dde5ea}
+  button:focus-visible{outline:2px solid var(--water);outline-offset:2px}
+  button.on{
+    background:var(--water);border-color:var(--water);color:#fff;font-weight:600;
+  }
+  button.on:hover{background:var(--water-deep)}
+  button.tog{background:#f4f7f9;font-weight:600}
+  button.tog:not(.lit){color:var(--ink-3);background:#fbfcfd;font-weight:400}
+
+  footer{
+    margin:32px auto 0;max-width:1000px;
+    font-size:12px;color:var(--ink-3);line-height:1.7;
+    border-top:1px solid var(--line);padding-top:16px;
+  }
+  footer b{color:var(--ink-2);font-weight:600}
+
+  @media (prefers-reduced-motion:reduce){
+    button{transition:none}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+<header>
+  <p class="eyebrow">속도 벡터의 합성</p>
+  <h1>강을 건너는 배, 바람에 실린 비</h1>
+  <p class="sub">두 속도가 동시에 작용하면 결과는 산술합이 아니라 벡터합입니다. 한 축으로만 작용하는 속도(강물·바람)와 목표를 향하는 속도(보트·비)를 조절하며, 합성 속도가 어떻게 결정되는지 확인해 보세요. 크기는 <span class="formula">v = √(v₁² + v₂² + 2v₁v₂cos θ)</span></p>
+</header>
+
+<div class="wrap">
+<div class="canvas">
+  <div class="frame">
+  <svg id="stage" viewBox="0 0 460 430" role="img" aria-label="속도 벡터 합성 시뮬레이션">
+    <defs>
+      <marker id="ah-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#378ADD"/></marker>
+      <marker id="ah-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1D9E75"/></marker>
+      <marker id="ah-s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#D85A30"/></marker>
+      <clipPath id="bandclip"><rect id="bandrect" x="0" y="60" width="460" height="270"/></clipPath>
+    </defs>
+
+    <g id="scn-river">
+      <rect x="0" y="0" width="460" height="60" fill="#97C459" opacity="0.32"/>
+      <rect x="0" y="330" width="460" height="100" fill="#97C459" opacity="0.32"/>
+      <rect x="0" y="60" width="460" height="270" fill="#378ADD" opacity="0.16"/>
+      <path d="M0 60 L460 60" stroke="#639922" stroke-width="2.5" opacity="0.55" fill="none"/>
+      <path d="M0 330 L460 330" stroke="#639922" stroke-width="2.5" opacity="0.55" fill="none"/>
+      <text x="8" y="52" font-size="12" fill="#5a6a78">건너편 기슭</text>
+      <text x="8" y="348" font-size="12" fill="#5a6a78">출발 기슭 · 강폭 100 m</text>
+    </g>
+
+    <g id="scn-rain" style="display:none">
+      <rect x="0" y="100" width="460" height="270" fill="#85B7EB" opacity="0.14"/>
+      <rect x="0" y="370" width="460" height="60" fill="#97C459" opacity="0.32"/>
+      <g fill="#B4B2A9" opacity="0.62">
+        <rect x="0" y="74" width="460" height="26"/>
+        <circle cx="26" cy="66" r="21"/><circle cx="62" cy="54" r="27"/><circle cx="100" cy="64" r="22"/>
+        <circle cx="140" cy="56" r="25"/><circle cx="178" cy="66" r="20"/><circle cx="214" cy="52" r="29"/>
+        <circle cx="254" cy="64" r="22"/><circle cx="292" cy="56" r="26"/><circle cx="330" cy="66" r="21"/>
+        <circle cx="366" cy="54" r="27"/><circle cx="404" cy="64" r="23"/><circle cx="440" cy="58" r="21"/>
+      </g>
+      <rect x="0" y="92" width="460" height="8" fill="#5F5E5A" opacity="0.18"/>
+      <path d="M0 100 L460 100" stroke="#5F5E5A" stroke-width="1" opacity="0.4" stroke-dasharray="4 5" fill="none"/>
+      <path d="M0 370 L460 370" stroke="#639922" stroke-width="2.5" opacity="0.55" fill="none"/>
+      <text x="8" y="118" font-size="12" fill="#5a6a78">구름 아랫면 · 지면까지 100 m</text>
+    </g>
+
+    <g clip-path="url(#bandclip)"><g id="streaks" stroke="#85B7EB" stroke-linecap="round" fill="none"></g></g>
+
+    <line id="axisv" x1="220" y1="20" x2="220" y2="410" stroke="#d5dee3" stroke-width="1" stroke-dasharray="3 5"/>
+    <g id="ticks" stroke="#bfcbd3" stroke-width="1"></g>
+
+    <path id="pathline2" fill="none" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="5 6" opacity="0.5"/>
+    <path id="pathline" fill="none" stroke="#D85A30" stroke-width="1.5" stroke-dasharray="5 6" opacity="0.55"/>
+    <line id="gap" stroke="#378ADD" stroke-width="2.5" opacity="0"/>
+    <text id="gaplbl" font-size="12" fill="#185FA5" text-anchor="middle" opacity="0"></text>
+    <path id="trail" fill="none" stroke="#D85A30" stroke-width="2.5" opacity="0.9"/>
+    <g id="landing2" opacity="0"><line x1="0" x2="0" y1="-8" y2="8" stroke="#1D9E75" stroke-width="2"/><text id="l2t" x="0" y="-16" font-size="12" fill="#0F6E56" text-anchor="middle">강물이 없다면</text></g>
+    <g id="landing" opacity="0"><line x1="0" x2="0" y1="-8" y2="8" stroke="#D85A30" stroke-width="2"/><text id="l1t" x="0" y="-32" font-size="12" fill="#993C1D" text-anchor="middle">도착 예상</text></g>
+
+    <g id="boatlayer" opacity="0.85">
+      <g id="vehicle" transform="translate(220,330)">
+        <g id="boat">
+          <g id="wake" transform="scale(1.23)" stroke="#E6F1FB" fill="none" stroke-linecap="round" opacity="0">
+            <path d="M -27 -6 Q -36 0 -27 6" stroke-width="2"/>
+            <path d="M -34 -10 Q -46 0 -34 10" stroke-width="1.6"/>
+          </g>
+          <g id="hull" transform="scale(1.23)">
+            <g id="oars">
+              <line id="oarL" stroke="#854F0B" stroke-width="2.4" stroke-linecap="round"/>
+              <line id="oarR" stroke="#854F0B" stroke-width="2.4" stroke-linecap="round"/>
+              <ellipse id="bladeL" rx="4" ry="2.4" fill="#854F0B"/>
+              <ellipse id="bladeR" rx="4" ry="2.4" fill="#854F0B"/>
+            </g>
+            <path d="M -22 0 Q -14 -9 0 -9 Q 15 -9 24 0 Q 15 9 0 9 Q -14 9 -22 0" fill="#BA7517"/>
+            <path d="M -16 0 Q -10 -6 0 -6 Q 11 -6 17 0 Q 11 6 0 6 Q -10 6 -16 0" fill="#FAC775"/>
+            <path d="M -9 -4.5 L 2 -4.5 L 2 4.5 L -9 4.5 Z" fill="#7F77DD"/>
+            <circle cx="-4" cy="0" r="4.2" fill="#534AB7"/>
+          </g>
+        </g>
+        <g id="drop" style="display:none">
+          <path d="M 13 0 Q 2 -6 -6 -4 Q -9.5 0 -6 4 Q 2 6 13 0 Z" fill="#185FA5"/>
+          <path d="M 3 -1.5 Q -2 -3 -5 -2 Q -7 0 -5 1 Q -1 1 3 -1.5 Z" fill="#B5D4F4" opacity="0.9"/>
+        </g>
+      </g>
+    </g>
+
+    <g id="rig">
+      <path id="arc" fill="none" stroke="#5F5E5A" stroke-width="1.2" opacity="0"/>
+      <text id="arclbl" font-size="12" fill="#444441" font-weight="500" text-anchor="middle" opacity="0"></text>
+      <line id="pp1" stroke="#888780" stroke-width="1" stroke-dasharray="4 4" opacity="0.75"/>
+      <line id="pp2" stroke="#888780" stroke-width="1" stroke-dasharray="4 4" opacity="0.75"/>
+      <line id="vr" stroke="#378ADD" stroke-width="3" marker-end="url(#ah-r)"/>
+      <line id="vb" stroke="#1D9E75" stroke-width="3" marker-end="url(#ah-b)"/>
+      <line id="vs" stroke="#D85A30" stroke-width="3.5" marker-end="url(#ah-s)"/>
+      <circle id="odot" r="3" fill="#16202b"/>
+      <circle id="grab" r="9" fill="#1D9E75" fill-opacity="0.18" stroke="#1D9E75" stroke-width="3" style="cursor:grab"/>
+      <circle id="grabhit" r="17" fill="#000" fill-opacity="0" style="cursor:grab"/>
+      <text id="lr" font-size="12" fill="#185FA5" font-weight="500" text-anchor="middle"></text>
+      <text id="lb" font-size="12" fill="#0F6E56" font-weight="500" text-anchor="middle"></text>
+      <text id="ls" font-size="12" fill="#993C1D" font-weight="500" text-anchor="middle"></text>
+    </g>
+
+    <text id="hint" x="230" y="418" font-size="12" fill="#8b9aa6" text-anchor="middle">초록 손잡이를 끌어 조절할 수도 있습니다</text>
+  </svg>
+  </div>
+
+  <div class="legend">
+    <span><span class="swatch" style="background:#378ADD"></span><span id="lg1">강물 속도</span></span>
+    <span><span class="swatch" style="background:#1D9E75"></span><span id="lg2">보트 속도</span></span>
+    <span><span class="swatch" style="background:#D85A30"></span>합성 속도</span>
+    <span class="unit">화살표 옆 숫자는 m/s</span>
+  </div>
+  <p id="status"></p>
+</div>
+
+<aside>
+  <p class="sec">모드</p>
+  <div class="btns two" style="margin-bottom:16px">
+    <button id="m-river" class="on">강물</button>
+    <button id="m-rain">비</button>
+  </div>
+
+  <p class="sec" id="h1">강물 속도</p>
+  <div class="lab"><span class="k">크기</span><span class="v" id="o-r">2.0 m/s</span></div>
+  <input type="range" id="s-r" min="-4" max="4" step="0.1" value="2" aria-label="강물 속도 크기">
+
+  <hr>
+  <p class="sec" id="h2">보트 속도</p>
+  <div class="lab" id="sizelab"><span class="k" id="blab">크기</span><span class="v" id="o-b">3.0 m/s</span></div>
+  <input type="range" id="s-b" min="0" max="5" step="0.1" value="3" aria-label="보트 속도 크기">
+  <div class="lab" id="dirlab"><span class="k" id="tlab">방향</span><span class="v" id="o-t">90°</span></div>
+  <input type="range" id="s-t" min="0" max="180" step="1" value="90" aria-label="보트 속도 방향">
+  <div class="btns">
+    <button id="b-perp">강물에 직각으로</button>
+    <button id="b-up">기슭에 수직 도착</button>
+  </div>
+
+  <hr>
+  <p class="sec">벡터 표시</p>
+  <div class="btns three" style="margin-bottom:7px">
+    <button id="t-r" class="tog lit" style="color:#185FA5" aria-pressed="true"><span class="dot"></span><span id="tn1">강물</span></button>
+    <button id="t-b" class="tog lit" style="color:#0F6E56" aria-pressed="true"><span class="dot"></span><span id="tn2">보트</span></button>
+    <button id="t-s" class="tog lit" style="color:#993C1D" aria-pressed="true"><span class="dot"></span>합성</button>
+  </div>
+  <div class="btns two">
+    <button id="t-g" class="tog lit" style="color:#5a6a78" aria-pressed="true"><span class="dot"></span>보조선</button>
+    <button id="t-a" class="tog lit" style="color:#5a6a78" aria-pressed="true"><span class="dot"></span>각도</button>
+  </div>
+
+  <hr id="hr2">
+  <div class="btns" id="runbtns">
+    <button id="b-go">출발</button>
+    <button id="b-reset">처음으로</button>
+  </div>
+</aside>
+</div>
+
+<footer>
+  <p><b>강물 모드</b> — 보트 속도는 정지한 물에 대한 속도이고, 합성 속도가 땅에 대한 실제 속도입니다. 도하 시간은 합성 속도의 세로 성분만으로 정해지므로, 강물 속도를 아무리 바꿔도 직각으로 저으면 시간은 변하지 않고 떠내려간 거리만 늘어납니다.</p>
+  <p><b>비 모드</b> — 비의 낙하 속도는 종단속도 6.0 m/s로, 방향은 중력 방향으로 고정입니다. 조절할 수 있는 건 바람뿐이며, 하늘 위에 커서를 올리면 그 지점 빗방울의 속도 벡터와 착지 예상 지점이 나타납니다.</p>
+</footer>
+
+</div>
+
+<script>
+(function(){
+  var OX=220, WIDTH=100, MPX=2.7, SPEED=4, LX=-68, RX=76, RAINV=6;
+  var el=function(i){return document.getElementById(i)};
+  var svg=el('stage'), sr=el('s-r'), sb=el('s-b'), stg=el('s-t');
+  var mode='river', OY=330, TG=60, DIR=1, S=24, hover=false;
+
+  var CFG={
+    river:{OY:330,TG:60,DIR:1,S:24,band:[60,270],probe:false,
+      bmin:0,bmax:5,bdef:3,amin:0,amax:180,adef:90,
+      h1:'강물 속도',h2:'보트 속도',n1:'강물',n2:'보트',
+      p1:'강물에 직각으로',p2:'기슭에 수직 도착',
+      l1:'도착 예상',l2:'강물이 없다면',
+      hint:'초록 손잡이를 끌어 조절할 수도 있습니다'},
+    rain:{OY:100,TG:370,DIR:-1,S:14,band:[100,270],probe:true,
+      bmin:0,bmax:8,bdef:RAINV,amin:180,amax:360,adef:270,
+      h1:'바람 속도',h2:'비의 속도',n1:'바람',n2:'비',
+      p1:'바람 없음',p2:'강한 바람',
+      l1:'착지점',l2:'바람이 없다면',
+      hint:'하늘 위에 커서를 올리면 그 지점의 속도 벡터가 보입니다'}
+  };
+
+  var N=70, ps=[], sh='';
+  for(var k=0;k<N;k++){ps.push({x:0,y:0,l:10,o:0.5,p:Math.random()*6.28}); sh+='<line class="sk"/>';}
+  el('streaks').innerHTML=sh;
+  var skn=el('streaks').querySelectorAll('.sk');
+  function seed(){var c=CFG[mode];for(var i=0;i<N;i++){ps[i].x=Math.random()*460;ps[i].y=c.band[0]+4+Math.random()*(c.band[1]-8);ps[i].l=(mode==='river'?8+Math.random()*30:7+Math.random()*10);ps[i].o=0.3+Math.random()*0.5;}}
+
+  function setL(id,x1,y1,x2,y2){var e=el(id);e.setAttribute('x1',x1);e.setAttribute('y1',y1);e.setAttribute('x2',x2);e.setAttribute('y2',y2)}
+  function put(id,x,y,t){
+    var e=el(id);
+    e.setAttribute('x',Math.max(42,Math.min(418,x)));
+    e.setAttribute('y',Math.max(18,Math.min(406,y)));
+    e.textContent=t;
+  }
+  function clearPred(){
+    el('pathline').setAttribute('d',''); el('pathline2').setAttribute('d','');
+    el('landing').setAttribute('opacity','0'); el('landing2').setAttribute('opacity','0');
+    el('gap').setAttribute('opacity',0); el('gaplbl').setAttribute('opacity',0);
+  }
+
+  var stv={vx:0,vy:0,B:3};
+  var sailing=false, done=false, px=0, py=0, et=0, pts=[];
+  var show={r:true,b:true,s:true,g:true,a:true};
+
+  function applyMode(){
+    var c=CFG[mode]; OY=c.OY; TG=c.TG; DIR=c.DIR; S=c.S; hover=false;
+    el('scn-river').style.display = mode==='river'?'':'none';
+    el('scn-rain').style.display = mode==='rain'?'':'none';
+    el('boat').style.display = mode==='river'?'':'none';
+    el('drop').style.display = mode==='rain'?'':'none';
+    el('m-river').className = mode==='river'?'on':'';
+    el('m-rain').className = mode==='rain'?'on':'';
+    el('bandrect').setAttribute('y',c.band[0]);
+    el('h1').textContent=c.h1; el('h2').textContent=c.h2;
+    el('lg1').textContent=c.h1; el('lg2').textContent=c.h2;
+    el('b-perp').textContent=c.p1; el('b-up').textContent=c.p2;
+    el('tn1').textContent=c.n1; el('tn2').textContent=c.n2;
+    el('l1t').textContent=c.l1; el('l2t').textContent=c.l2;
+    el('l1t').setAttribute('y',DIR>0?-18:-14);
+    el('l2t').setAttribute('y',DIR>0?-34:-30);
+    el('hint').textContent=c.hint;
+    el('tlab').textContent = c.probe?'방향 (중력 고정)':'방향';
+    el('blab').textContent = c.probe?'크기 (종단속도 고정)':'크기';
+    sb.style.display=c.probe?'none':'';
+    stg.style.display=c.probe?'none':'';
+    el('sizelab').style.marginBottom=c.probe?'12px':'6px';
+    el('dirlab').style.marginBottom=c.probe?'14px':'6px';
+    el('hr2').style.display=c.probe?'none':'';
+    el('runbtns').style.display=c.probe?'none':'';
+    el('grab').style.display=c.probe?'none':'';
+    el('grabhit').style.display=c.probe?'none':'';
+    el('trail').style.display=c.probe?'none':'';
+    sb.min=c.bmin; sb.max=c.bmax; sb.value=c.bdef;
+    stg.min=c.amin; stg.max=c.amax; stg.value=c.adef;
+    var tk='';
+    for(var i=-9;i<=9;i++){var tx=OX+i*S; if(tx>4&&tx<456&&i!==0) tk+='<line x1="'+tx+'" y1="'+(OY-4)+'" x2="'+tx+'" y2="'+(OY+4)+'"/>';}
+    el('ticks').innerHTML=tk;
+    el('ticks').style.display=c.probe?'none':'';
+    el('axisv').style.display=c.probe?'none':'';
+    px=0; py=c.probe?40:0;
+    seed(); reset();
+  }
+
+  function draw(){
+    var c=CFG[mode];
+    var R=+sr.value, B=+sb.value, T=+stg.value, rad=T*Math.PI/180;
+    var bx=B*Math.cos(rad), by=B*Math.sin(rad), vx=R+bx, vy=by;
+    var mag=Math.hypot(vx,vy), angR=Math.atan2(vy,vx);
+    stv={vx:vx,vy:vy,B:B};
+
+    el('o-r').textContent=R.toFixed(1)+' m/s';
+    el('o-b').textContent=B.toFixed(1)+' m/s';
+    el('o-t').textContent=Math.round(T)+'\u00B0';
+
+    var visible = !c.probe || hover;
+    el('rig').style.display = visible?'':'none';
+    el('boatlayer').style.display = visible?'':'none';
+    if(!visible){ clearPred(); el('status').textContent=''; return; }
+
+    var CX=OX+px*MPX, CY=OY-DIR*py*MPX;
+    var Rx=CX+R*S, Bx=CX+bx*S, By=CY-by*S, Sx=CX+vx*S, Sy=CY-vy*S;
+    setL('vr',CX,CY,Rx,CY); setL('vb',CX,CY,Bx,By); setL('vs',CX,CY,Sx,Sy);
+    setL('pp1',Rx,CY,Sx,Sy); setL('pp2',Bx,By,Sx,Sy);
+    el('odot').setAttribute('cx',CX); el('odot').setAttribute('cy',CY);
+    var hasR=Math.abs(R)>0.05&&show.r, hasB=B>0.05&&show.b, hasS=mag>0.05&&show.s;
+    el('vr').style.opacity=hasR?1:0;
+    el('vb').style.opacity=hasB?1:0;
+    el('vs').style.opacity=hasS?1:0;
+    var pop=(hasR&&hasB&&show.g)?0.75:0;
+    el('pp1').style.opacity=pop; el('pp2').style.opacity=pop;
+
+    if(c.probe){
+      var sgn = R>=0 ? 1 : -1;
+      put('lr',(CX+Rx)/2,CY-14,hasR?c.n1+' '+Math.abs(R).toFixed(1):'');
+      put('lb',CX-36*sgn,CY-by*S/2+4,hasB?c.n2+' '+B.toFixed(1):'');
+      put('ls',(CX+Sx)/2+40*sgn,(CY+Sy)/2+4,hasS?'합성 '+mag.toFixed(1):'');
+    } else {
+      put('lr',Rx+(R>0?30:-30),CY+20,hasR?c.n1+' '+Math.abs(R).toFixed(1):'');
+      put('lb',Bx+28*Math.cos(rad),By-28*Math.sin(rad)+4,hasB?c.n2+' '+B.toFixed(1):'');
+      put('ls',Sx+32*Math.cos(angR),Sy-32*Math.sin(angR)+4,hasS?'합성 '+mag.toFixed(1):'');
+    }
+
+    if(hasR&&hasB&&show.a){
+      var a1=R>0?0:Math.PI, dd=rad-a1;
+      while(dd>Math.PI) dd-=2*Math.PI;
+      while(dd<-Math.PI) dd+=2*Math.PI;
+      var between=Math.abs(dd)*180/Math.PI, r0=c.probe?34:42;
+      el('arc').setAttribute('d','M '+(CX+r0*Math.cos(a1))+' '+(CY-r0*Math.sin(a1))+' A '+r0+' '+r0+' 0 0 '+(dd>0?0:1)+' '+(CX+r0*Math.cos(a1+dd))+' '+(CY-r0*Math.sin(a1+dd)));
+      el('arc').setAttribute('opacity',0.55);
+      var am=a1-dd*0.26, rl=r0+18;
+      put('arclbl',CX+rl*Math.cos(am),CY-rl*Math.sin(am)+4,between.toFixed(0)+'\u00B0');
+      el('arclbl').setAttribute('opacity',1);
+    } else {
+      el('arc').setAttribute('opacity',0); el('arclbl').setAttribute('opacity',0);
+    }
+
+    if(!c.probe){
+      el('grab').setAttribute('cx',Bx); el('grab').setAttribute('cy',By);
+      el('grabhit').setAttribute('cx',Bx); el('grabhit').setAttribute('cy',By);
+      el('grab').style.opacity=show.b?(sailing?0.3:1):0;
+      el('grabhit').style.pointerEvents=(sailing||!show.b)?'none':'all';
+      el('vehicle').setAttribute('transform','translate('+OX+','+OY+') rotate('+(-T)+')');
+    } else {
+      el('vehicle').setAttribute('transform','translate('+CX+','+CY+') rotate('+(-angR*180/Math.PI)+')');
+    }
+
+    if(!dragging) el('hint').textContent = (!c.probe && !show.b) ? '보트 벡터를 켜면 손잡이로 끌어 조절할 수 있습니다' : c.hint;
+
+    var rem=WIDTH-py, prog=DIR*vy;
+
+    if(prog>0.01&&rem>0&&!done){
+      var tr=rem/prog, xr=px+vx*tr, xb=px+bx*tr;
+      var lx=CX+vx*tr*MPX, lx2=CX+bx*tr*MPX;
+      el('pathline').setAttribute('d','M '+CX+' '+CY+' L '+lx+' '+TG);
+      el('pathline2').setAttribute('d','M '+CX+' '+CY+' L '+lx2+' '+TG);
+      el('landing').setAttribute('opacity','1');
+      el('landing').setAttribute('transform','translate('+lx+','+TG+')');
+      el('landing2').setAttribute('opacity',hasR?'1':'0');
+      el('landing2').setAttribute('transform','translate('+lx2+','+TG+')');
+      el('l1t').setAttribute('x',Math.max(38,Math.min(422,lx))-lx);
+      el('l2t').setAttribute('x',Math.max(38,Math.min(422,lx2))-lx2);
+      el('pathline2').style.opacity=hasR?0.5:0;
+      setL('gap',Math.min(lx,lx2),TG,Math.max(lx,lx2),TG);
+      el('gap').setAttribute('opacity',hasR?0.85:0);
+      put('gaplbl',(lx+lx2)/2,TG+(DIR>0?18:19),hasR?Math.abs(xr-xb).toFixed(1)+' m':'');
+      el('gaplbl').setAttribute('opacity',hasR?1:0);
+      if(c.probe) el('status').textContent='이 지점 — 남은 높이 '+rem.toFixed(0)+' m, 착지까지 '+tr.toFixed(1)+' 초, 바람에 '+(xr-xb).toFixed(1)+' m 밀려남';
+    } else clearPred();
+  }
+
+  function stopWith(msg){
+    sailing=false; done=true;
+    el('status').textContent=msg;
+    el('b-go').textContent='다시 출발';
+    draw();
+  }
+
+  function reset(){
+    sailing=false; done=false; et=0; pts=[];
+    if(!CFG[mode].probe){px=0; py=0;}
+    el('rig').setAttribute('transform','translate(0,0)');
+    el('boatlayer').setAttribute('transform','translate(0,0)');
+    el('trail').setAttribute('d','');
+    el('b-go').textContent='출발';
+    el('status').textContent='';
+    draw();
+  }
+
+  var last=null, u=0;
+  function frame(now){
+    if(last===null) last=now;
+    var dt=Math.min((now-last)/1000,0.05); last=now;
+    var c=CFG[mode], R=+sr.value, B=+sb.value;
+    var fx, fy;
+    if(mode==='river'){fx=R*S; fy=0;} else {fx=stv.vx*18; fy=-stv.vy*18;}
+
+    for(var i=0;i<N;i++){
+      var s=ps[i]; s.x+=fx*dt; s.y+=fy*dt;
+      if(s.x>480) s.x=-20; if(s.x<-40) s.x=470;
+      if(s.y>c.band[0]+c.band[1]) {s.y=c.band[0]; s.x=Math.random()*460;}
+      if(s.y<c.band[0]) {s.y=c.band[0]+c.band[1]; s.x=Math.random()*460;}
+      var n=skn[i], dx2, dy2, op;
+      if(mode==='river'){s.p+=dt*1.6; dx2=s.l; dy2=Math.cos(s.p)*1.2; op=s.o*Math.min(1,Math.abs(R)/1.2+0.25);
+        n.setAttribute('y1',s.y+Math.sin(s.p)*1.8);}
+      else{var m2=Math.hypot(stv.vx,stv.vy)||1; dx2=s.l*stv.vx/m2; dy2=-s.l*stv.vy/m2; op=s.o*0.85;
+        n.setAttribute('y1',s.y);}
+      n.setAttribute('x1',s.x);
+      n.setAttribute('x2',s.x+dx2); n.setAttribute('y2',s.y+dy2);
+      n.setAttribute('stroke-width',1.4);
+      n.setAttribute('opacity',op);
+    }
+
+    if(mode==='river'){
+      var cad=0.25+B*0.42;
+      u=(u+dt*cad)%1;
+      var drive=u<0.42;
+      var s2=drive?Math.cos(Math.PI*u/0.42):Math.cos(Math.PI+Math.PI*(u-0.42)/0.58);
+      var amp=(6+B*9)*Math.PI/180, a=amp*s2, len=16;
+      var ox2=len*Math.sin(a), oly=-6-len*Math.cos(a), ory=6+len*Math.cos(a);
+      setL('oarL',0,-6,ox2,oly); setL('oarR',0,6,ox2,ory);
+      el('bladeL').setAttribute('cx',ox2); el('bladeL').setAttribute('cy',oly);
+      el('bladeR').setAttribute('cx',ox2); el('bladeR').setAttribute('cy',ory);
+      el('bladeL').setAttribute('transform','rotate('+(a*180/Math.PI)+','+ox2+','+oly+')');
+      el('bladeR').setAttribute('transform','rotate('+(-a*180/Math.PI)+','+ox2+','+ory+')');
+      el('oars').setAttribute('opacity',B<0.05?0.35:(drive?1:0.5));
+      el('hull').setAttribute('transform','scale(1.23) translate('+(-1.4*(B/5)*s2)+','+(Math.cos(u*6.28)*0.7)+')');
+      el('wake').setAttribute('opacity',Math.min(0.8,B/5)*(drive?0.9:0.45));
+    }
+
+    if(sailing){
+      var d=dt*SPEED, nx=px+stv.vx*d, ny=py+DIR*stv.vy*d;
+      var f=1, why=null;
+      if(ny>WIDTH){var t1=(WIDTH-py)/(ny-py); if(t1<f){f=t1; why='arrive';}}
+      if(nx<LX){var t3=(LX-px)/(nx-px); if(t3<f){f=t3; why='edge';}}
+      if(nx>RX){var t4=(RX-px)/(nx-px); if(t4<f){f=t4; why='edge';}}
+      px=px+(nx-px)*f; py=py+(ny-py)*f; et+=d*f;
+      pts.push((OX+px*MPX).toFixed(1)+','+(OY-DIR*py*MPX).toFixed(1));
+      el('trail').setAttribute('d','M '+pts.join(' L '));
+      el('boatlayer').setAttribute('transform','translate('+(px*MPX)+','+(-DIR*py*MPX)+')');
+
+      if(why==='arrive') stopWith('도착 — 걸린 시간 '+et.toFixed(1)+' 초, 출발점에서 x축으로 '+px.toFixed(1)+' m 지점');
+      else if(why==='edge') stopWith('강의 끝에 닿았습니다 — '+et.toFixed(1)+' 초 동안 '+py.toFixed(1)+' m 건넜습니다');
+      else {
+        el('status').textContent='항해 중 — '+et.toFixed(1)+' 초 경과, '+py.toFixed(1)+' m 건넘 (남은 거리 '+(WIDTH-py).toFixed(1)+' m)';
+        draw();
+      }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  var pt=svg.createSVGPoint();
+  function toSvg(e){pt.x=e.clientX; pt.y=e.clientY; return pt.matrixTransform(svg.getScreenCTM().inverse());}
+  function setFrom(x,y){
+    var bx=(x-(OX+px*MPX))/S, by=((OY-DIR*py*MPX)-y)/S;
+    var ang=(Math.atan2(by,bx)*180/Math.PI+360)%360;
+    if(ang>180) ang = ang<270?180:0;
+    sb.value=Math.min(5,Math.hypot(bx,by)).toFixed(1);
+    stg.value=Math.round(ang);
+    draw();
+  }
+  var dragging=false, gx=0, gy=0;
+  el('grabhit').addEventListener('pointerdown',function(e){
+    if(sailing||CFG[mode].probe)return;
+    var p=toSvg(e);
+    var Bx=OX+px*MPX+(+sb.value)*Math.cos((+stg.value)*Math.PI/180)*S;
+    var By=OY-DIR*py*MPX-(+sb.value)*Math.sin((+stg.value)*Math.PI/180)*S;
+    dragging=true; gx=p.x-Bx; gy=p.y-By;
+    el('hint').textContent='끌어서 조절하는 중'; e.preventDefault();
+  });
+  el('vehicle').addEventListener('pointerdown',function(e){
+    if(sailing||CFG[mode].probe)return;
+    var p=toSvg(e); dragging=true; gx=0; gy=0; setFrom(p.x,p.y);
+    el('hint').textContent='끌어서 조절하는 중'; e.preventDefault();
+  });
+  svg.addEventListener('pointermove',function(e){
+    if(!CFG[mode].probe)return;
+    var p=toSvg(e);
+    var ymax=370-(+sb.value)*CFG.rain.S-16;
+    var x=Math.max(74,Math.min(386,p.x)), y=Math.max(114,Math.min(ymax,p.y));
+    px=(x-OX)/MPX; py=(y-OY)/MPX; hover=true;
+    draw();
+  });
+  svg.addEventListener('pointerenter',function(){if(CFG[mode].probe){hover=true; draw();}});
+  svg.addEventListener('pointerleave',function(){if(CFG[mode].probe){hover=false; draw();}});
+  svg.addEventListener('pointercancel',function(){if(CFG[mode].probe){hover=false; draw();}});
+  window.addEventListener('pointermove',function(e){if(dragging){var p=toSvg(e); setFrom(p.x-gx,p.y-gy);}});
+  window.addEventListener('pointerup',function(){if(dragging){dragging=false; el('hint').textContent=CFG[mode].hint;}});
+
+  [sr,sb,stg].forEach(function(s){s.addEventListener('input',draw)});
+  el('b-go').addEventListener('click',function(){
+    if(done||sailing){reset(); return;}
+    sailing=true; done=false; et=0; px=0; py=0; pts=[OX+','+OY];
+    el('b-go').textContent='정지';
+    draw();
+  });
+  el('b-reset').addEventListener('click',reset);
+  el('b-perp').addEventListener('click',function(){
+    if(mode==='rain'){sr.value=0; draw(); return;}
+    if(!sailing){stg.value=90;draw()}
+  });
+  el('b-up').addEventListener('click',function(){
+    if(mode==='rain'){sr.value=4; draw(); return;}
+    if(sailing)return;
+    var R=+sr.value, B=+sb.value;
+    stg.value = B<=Math.abs(R) ? 90 : Math.round(Math.acos(-R/B)*180/Math.PI);
+    draw();
+  });
+  el('m-river').addEventListener('click',function(){if(mode!=='river'){mode='river';sr.value=2;applyMode();}});
+  el('m-rain').addEventListener('click',function(){if(mode!=='rain'){mode='rain';sr.value=2;applyMode();}});
+
+  [['t-r','r'],['t-b','b'],['t-s','s'],['t-g','g'],['t-a','a']].forEach(function(p){
+    el(p[0]).addEventListener('click',function(){
+      show[p[1]]=!show[p[1]];
+      this.classList.toggle('lit',show[p[1]]);
+      this.setAttribute('aria-pressed',show[p[1]]?'true':'false');
+      draw();
+    });
+  });
+
+  applyMode(); requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
