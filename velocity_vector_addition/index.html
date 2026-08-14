@@ -124,7 +124,6 @@
 
   .blk + .blk{border-top:1px solid var(--line);margin-top:16px;padding-top:16px}
   .blk .sec:not(:first-child){margin-top:16px}
-  .runsep{border-top:1px solid var(--line);margin:16px 0}
 
   /* ---- 세로 모드 (좁은 화면) ---- */
   @media (max-width:760px){
@@ -139,6 +138,7 @@
       display:grid;grid-template-columns:1fr 1fr;gap:0 16px;align-items:start;
     }
     .blk-mode{grid-column:1 / -1}
+    .blk-run{grid-column:1 / -1}
     .blk + .blk{border-top:1px solid var(--line);margin-top:14px;padding-top:14px}
     .blk-out{border-left:0}
     .legend{font-size:11px;gap:12px}
@@ -151,6 +151,7 @@
   @media (max-width:430px){
     aside{grid-template-columns:1fr;gap:0}
     .blk-mode{grid-column:auto}
+    .blk-run{grid-column:auto}
   }
 
   /* ---- 가로 모드 (낮고 넓은 화면) ---- */
@@ -173,7 +174,6 @@
     .sec{margin-bottom:6px}
     .blk + .blk{margin-top:11px;padding-top:11px}
     .blk .sec:not(:first-child){margin-top:11px}
-    .runsep{margin:11px 0}
     input[type=range]{margin-bottom:9px}
     button{min-height:34px}
     .btns.three button{min-height:32px}
@@ -301,6 +301,13 @@
 </div>
 
 <aside>
+  <div class="blk blk-run">
+    <div class="btns two" id="runbtns">
+      <button id="b-go">출발</button>
+      <button id="b-reset">처음으로</button>
+    </div>
+  </div>
+
   <div class="blk blk-mode">
     <p class="sec">모드</p>
     <div class="btns two">
@@ -335,12 +342,6 @@
     <div class="btns two">
       <button id="t-g" class="tog lit" style="color:#5a6a78" aria-pressed="true"><span class="dot"></span>보조선</button>
       <button id="t-a" class="tog lit" style="color:#5a6a78" aria-pressed="true"><span class="dot"></span>각도</button>
-    </div>
-
-    <div id="hr2" class="runsep"></div>
-    <div class="btns" id="runbtns">
-      <button id="b-go">출발</button>
-      <button id="b-reset">처음으로</button>
     </div>
   </div>
 </aside>
@@ -423,8 +424,7 @@
     stg.style.display=c.probe?'none':'';
     el('sizelab').style.marginBottom=c.probe?'12px':'6px';
     el('dirlab').style.marginBottom=c.probe?'14px':'6px';
-    el('hr2').style.display=c.probe?'none':'';
-    el('runbtns').style.display=c.probe?'none':'';
+    document.querySelector('.blk-run').style.display=c.probe?'none':'';
     el('grab').style.display=c.probe?'none':'';
     el('grabhit').style.display=c.probe?'none':'';
     el('trail').style.display=c.probe?'none':'';
