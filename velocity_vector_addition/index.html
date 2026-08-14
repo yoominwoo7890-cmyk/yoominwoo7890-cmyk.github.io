@@ -335,13 +335,12 @@
   <div class="blk blk-out">
     <p class="sec">벡터 표시</p>
     <div class="btns three" style="margin-bottom:7px">
-      <button id="t-r" class="tog lit" style="color:#185FA5" aria-pressed="true"><span class="dot"></span><span id="tn1">강물</span></button>
-      <button id="t-b" class="tog lit" style="color:#0F6E56" aria-pressed="true"><span class="dot"></span><span id="tn2">보트</span></button>
-      <button id="t-s" class="tog lit" style="color:#993C1D" aria-pressed="true"><span class="dot"></span>합성</button>
+      <button id="t-r" class="tog" style="color:#185FA5" aria-pressed="false"><span class="dot"></span><span id="tn1">강물</span></button>
+      <button id="t-b" class="tog" style="color:#0F6E56" aria-pressed="false"><span class="dot"></span><span id="tn2">보트</span></button>
+      <button id="t-s" class="tog" style="color:#993C1D" aria-pressed="false"><span class="dot"></span>합성</button>
     </div>
-    <div class="btns two">
-      <button id="t-g" class="tog lit" style="color:#5a6a78" aria-pressed="true"><span class="dot"></span>보조선</button>
-      <button id="t-a" class="tog lit" style="color:#5a6a78" aria-pressed="true"><span class="dot"></span>각도</button>
+    <div class="btns">
+      <button id="t-a" class="tog" style="color:#5a6a78" aria-pressed="false"><span class="dot"></span>사잇각 표시</button>
     </div>
   </div>
 </aside>
@@ -399,7 +398,7 @@
 
   var stv={vx:0,vy:0,B:3};
   var sailing=false, done=false, px=0, py=0, et=0, pts=[];
-  var show={r:true,b:true,s:true,g:true,a:true};
+  var show={r:false,b:false,s:false,a:false};
 
   function applyMode(){
     var c=CFG[mode]; OY=c.OY; TG=c.TG; DIR=c.DIR; S=c.S; hover=false;
@@ -464,8 +463,8 @@
     el('vr').style.opacity=hasR?1:0;
     el('vb').style.opacity=hasB?1:0;
     el('vs').style.opacity=hasS?1:0;
-    var pop=(hasR&&hasB&&show.g)?0.75:0;
-    el('pp1').style.opacity=pop; el('pp2').style.opacity=pop;
+    el('pp1').style.opacity=hasR?0.75:0;
+    el('pp2').style.opacity=hasB?0.75:0;
 
     if(c.probe){
       var sgn = R>=0 ? 1 : -1;
@@ -506,22 +505,23 @@
 
     var rem=WIDTH-py, prog=DIR*vy;
 
-    if(prog>0.01&&rem>0&&!done){
+    if(prog>0.01&&rem>0&&!done&&hasS){
       var tr=rem/prog, xr=px+vx*tr, xb=px+bx*tr;
       var lx=CX+vx*tr*MPX, lx2=CX+bx*tr*MPX;
       el('pathline').setAttribute('d','M '+CX+' '+CY+' L '+lx+' '+TG);
       el('pathline2').setAttribute('d','M '+CX+' '+CY+' L '+lx2+' '+TG);
       el('landing').setAttribute('opacity','1');
       el('landing').setAttribute('transform','translate('+lx+','+TG+')');
-      el('landing2').setAttribute('opacity',hasR?'1':'0');
+      var alt=hasR&&hasB;
+      el('landing2').setAttribute('opacity',alt?'1':'0');
       el('landing2').setAttribute('transform','translate('+lx2+','+TG+')');
       el('l1t').setAttribute('x',Math.max(38,Math.min(422,lx))-lx);
       el('l2t').setAttribute('x',Math.max(38,Math.min(422,lx2))-lx2);
-      el('pathline2').style.opacity=hasR?0.5:0;
+      el('pathline2').style.opacity=alt?0.5:0;
       setL('gap',Math.min(lx,lx2),TG,Math.max(lx,lx2),TG);
-      el('gap').setAttribute('opacity',hasR?0.85:0);
-      put('gaplbl',(lx+lx2)/2,TG+(DIR>0?18:19),hasR?Math.abs(xr-xb).toFixed(1)+' m':'');
-      el('gaplbl').setAttribute('opacity',hasR?1:0);
+      el('gap').setAttribute('opacity',alt?0.85:0);
+      put('gaplbl',(lx+lx2)/2,TG+(DIR>0?18:19),alt?Math.abs(xr-xb).toFixed(1)+' m':'');
+      el('gaplbl').setAttribute('opacity',alt?1:0);
       if(c.probe) el('status').textContent='이 지점 — 남은 높이 '+rem.toFixed(0)+' m, 착지까지 '+tr.toFixed(1)+' 초, 바람에 '+(xr-xb).toFixed(1)+' m 밀려남';
     } else clearPred();
   }
@@ -672,7 +672,7 @@
   el('m-river').addEventListener('click',function(){if(mode!=='river'){mode='river';sr.value=2;applyMode();}});
   el('m-rain').addEventListener('click',function(){if(mode!=='rain'){mode='rain';sr.value=2;applyMode();}});
 
-  [['t-r','r'],['t-b','b'],['t-s','s'],['t-g','g'],['t-a','a']].forEach(function(p){
+  [['t-r','r'],['t-b','b'],['t-s','s'],['t-a','a']].forEach(function(p){
     el(p[0]).addEventListener('click',function(){
       show[p[1]]=!show[p[1]];
       this.classList.toggle('lit',show[p[1]]);
