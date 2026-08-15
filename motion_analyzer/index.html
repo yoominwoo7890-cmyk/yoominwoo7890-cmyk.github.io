@@ -194,6 +194,15 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
   background:var(--amber-soft);border:1px solid #f0e3c2;color:#7d5606;}
 .callout.ok{background:var(--green-soft);border-color:#cfe8dd;color:#14663f}
 /* 구간 막대 */
+/* 미세 조정 방향 패드 */
+.dpad{display:grid;grid-template-columns:repeat(3,46px);grid-template-rows:repeat(3,42px);gap:4px}
+.dpad button{min-height:42px;padding:0;font-size:15px;line-height:1}
+.dpad .u{grid-column:2;grid-row:1}
+.dpad .l{grid-column:1;grid-row:2}
+.dpad .r{grid-column:3;grid-row:2}
+.dpad .d{grid-column:2;grid-row:3}
+#fineBox{align-items:flex-start;gap:14px}
+#selInfo{min-width:190px}
 .seekwrap{position:relative;flex:1 1 300px;min-width:220px;height:30px;display:flex;align-items:center}
 .seekwrap input[type=range]{width:100%;position:relative;z-index:2;background:transparent}
 .track{position:absolute;left:0;right:0;top:12px;height:6px;border-radius:3px;background:var(--surface2);z-index:0}
@@ -401,6 +410,23 @@ td.est{color:var(--green)}
       </div>
       <div class="note">화살표의 <b>가운데를 끌면 위치가</b>, <b>끝의 동그라미를 끌면 길이가</b> 바뀝니다.
       길이를 아는 물건(사람의 키, 바닥 타일, 자 등)에 맞추고 그 길이를 <b>센티미터(cm)</b>로 적으세요.</div>
+      <div class="grp" id="fineBox">
+        <span class="tag">미세 조정</span>
+        <div class="dpad">
+          <button class="b sm u" data-n="0,-1">▲</button>
+          <button class="b sm l" data-n="-1,0">◀</button>
+          <button class="b sm r" data-n="1,0">▶</button>
+          <button class="b sm d" data-n="0,1">▼</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <span class="val q" id="selInfo">화살표 끝의 동그라미를 눌러 고르세요</span>
+          <label class="f"><span class="k">한 번에</span>
+            <select id="nudgeStep"><option value="1">1픽셀</option><option value="5">5픽셀</option><option value="20">20픽셀</option></select>
+          </label>
+        </div>
+      </div>
+      <div class="note">끌어서 대충 맞춘 뒤, 화살표 끝을 한 번 눌러 고르고 <b>화살표 버튼으로 1픽셀씩</b> 미세하게 맞추세요.
+      손가락에 가리지 않아 마지막 몇 픽셀을 정확히 맞출 수 있습니다. 키보드 방향키도 같은 역할을 합니다.</div>
       <div class="callout" id="scaleWarn" style="display:none"></div>
       <div class="row end">
         <button class="b" id="hideArrows" disabled>화살표 숨기기</button>
@@ -545,7 +571,7 @@ const S={
   frames:[],fs:1,fw:0,fh:0,dtMed:0,
   scale:{ax:null,ay:null,lx:100,ly:100,hidden:false,link:false,tilt:false},
   ivl:4,smode:'bgsub',thr:30,strobe:null,strobeTimes:[],
-  points:[],step:0,maxStep:0,mode:'idle',drag:null,dragStart:null,
+  points:[],step:0,maxStep:0,mode:'idle',drag:null,dragStart:null,sel:null,
   rows:[],fits:null,modalKey:null
 };
 const CAN=$('#mainCanvas'), CTX=CAN.getContext('2d');
@@ -620,7 +646,7 @@ function loadVideo(file){
     S.video=v;S.vw=v.videoWidth;S.vh=v.videoHeight;S.dur=v.duration;
     S.trim={a:0,b:v.duration};S.crop={x:0,y:0,w:S.vw,h:S.vh};S.ar=0;
     S.frames=[];S.strobe=null;S.strobeTimes=[];S.points=[];S.rows=[];S.fits=null;
-    S.scale={ax:null,ay:null,lx:100,ly:100,hidden:false,link:$('#linkChk').checked,tilt:$('#tiltChk').checked};S.dtMed=0;S.maxStep=0;
+    S.scale={ax:null,ay:null,lx:100,ly:100,hidden:false,link:$('#linkChk').checked,tilt:$('#tiltChk').checked};S.sel=null;S.dtMed=0;S.maxStep=0;
     $('#tableBlock').style.display='none';$('#graphBlock').style.display='none';
     $('#extractInfo').style.display='none';$('#ptCount').style.display='none';
     ['#toPoint','#saveTraj','#saveTraj2','#saveGraph','#undoPt','#clearPt','#hideArrows','#toAnalyze']
@@ -763,6 +789,7 @@ async function extractFrames(){
   S.scale.ax={x1:c.x+c.w*0.16,y1:c.y+c.h*0.86,x2:c.x+c.w*0.16+L,y2:c.y+c.h*0.86};
   S.scale.ay={x1:c.x+c.w*0.80,y1:c.y+c.h*0.86,x2:c.x+c.w*0.80,y2:c.y+c.h*0.86-L};
   S.scale.lx=+$('#lx').value||100;S.scale.ly=+$('#ly').value||100;
+  S.sel={a:'ax',k:2};updateSelInfo();
   updateScaleLabels();setStep(3);
 }
 
@@ -771,6 +798,41 @@ async function extractFrames(){
 const alen=a=>Math.hypot(a.x2-a.x1,a.y2-a.y1);
 const sx=()=>S.scale.lx/Math.max(1,alen(S.scale.ax));   // cm/픽셀
 const sy=()=>S.scale.ly/Math.max(1,alen(S.scale.ay));
+/* 화살표 끝점을 골라 1픽셀씩 옮기는 미세 조정 */
+function selectHandle(a,k){ S.sel={a,k}; updateSelInfo(); render(); }
+function updateSelInfo(){
+  const el=$('#selInfo');
+  if(!S.sel||!S.scale.ax){ el.textContent='화살표 끝의 동그라미를 눌러 고르세요'; return; }
+  const A=S.scale[S.sel.a], x=S.sel.k===1?A.x1:A.x2, y=S.sel.k===1?A.y1:A.y2;
+  el.innerHTML=`<b style="color:${S.sel.a==='ax'?'var(--red)':'var(--blue)'}">`
+    +`${S.sel.a==='ax'?'가로':'세로'} ${S.sel.k===1?'시작점':'끝점'}</b>`
+    +` &nbsp;(${Math.round(x)}, ${Math.round(y)})`;
+}
+function nudge(dx,dy){
+  if(!S.sel||!S.scale.ax){ alert('먼저 화살표 끝의 동그라미를 눌러 고르세요.'); return; }
+  const st=+$('#nudgeStep').value||1;
+  const a=S.scale[S.sel.a];
+  if(S.sel.k===1){a.x1+=dx*st;a.y1+=dy*st;}else{a.x2+=dx*st;a.y2+=dy*st;}
+  if(!S.scale.tilt){ if(S.sel.a==='ax')a.y2=a.y1;else a.x2=a.x1; }
+  clampArrow(S.sel.a);
+  if(S.scale.tilt)makePerp();
+  syncArrows(S.sel.a);
+  invalidate(3);updateScaleLabels();updateSelInfo();render();
+}
+$$('.dpad button').forEach(b=>{
+  const [dx,dy]=b.dataset.n.split(',').map(Number);
+  let hold=null,rep=null;
+  const start=e=>{e.preventDefault();nudge(dx,dy);
+    hold=setTimeout(()=>{rep=setInterval(()=>nudge(dx,dy),70);},420);};
+  const stop=()=>{clearTimeout(hold);clearInterval(rep);hold=rep=null;};
+  b.addEventListener('pointerdown',start);
+  ['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,stop));
+});
+document.addEventListener('keydown',e=>{
+  if(S.mode!=='scale'||!S.sel)return;
+  const map={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
+  if(map[e.key]){e.preventDefault();nudge(...map[e.key]);}
+});
 /* 화살표가 가리키는 방향이 곧 +축 방향이다 */
 const dirOf=a=>{const L=Math.max(1,alen(a));return{x:(a.x2-a.x1)/L,y:(a.y2-a.y1)/L};};
 /* 세로 화살표를 가로 화살표와 직각으로 맞춘다 (지금 놓인 쪽을 유지) */
@@ -840,7 +902,8 @@ function updateScaleLabels(){
 }
 $('#hideArrows').onclick=()=>{
   S.scale.hidden=!S.scale.hidden;
-  $('#hideArrows').textContent=S.scale.hidden?'화살표 보이기':'화살표 숨기기';render();
+  $('#hideArrows').textContent=S.scale.hidden?'화살표 보이기':'화살표 숨기기';
+  $('#fineBox').style.opacity=S.scale.hidden?'.45':'1';render();
 };
 $('#toStrobe').onclick=()=>{
   S.scale.hidden=true;                       // 축척을 정했으면 화살표는 화면에서 치운다
@@ -974,7 +1037,10 @@ CAN.addEventListener('pointerdown',e=>{
   }
   if(S.mode==='scale'&&!S.scale.hidden){
     const h=hitArrow(p);
-    if(h){S.drag=h;S.dragStart={p,arr:{...S.scale[h.a]}};CAN.setPointerCapture(e.pointerId);}
+    if(h){
+      if(h.k===1||h.k===2)selectHandle(h.a,h.k);   // 누른 끝점을 미세 조정 대상으로
+      S.drag=h;S.dragStart={p,arr:{...S.scale[h.a]}};CAN.setPointerCapture(e.pointerId);
+    }
     return;
   }
   if(S.mode==='crop'){const h=hitCrop(p);if(h){S.drag=h;S.dragStart={p,crop:{...S.crop}};CAN.setPointerCapture(e.pointerId);}}
@@ -1192,6 +1258,20 @@ function drawArrows(){
     CTX.restore();
   }
   arrow(A.x,A.y,B.x,B.y,'#d13c36');arrow(C.x,C.y,D.x,D.y,'#2b57b5');
+  // 미세 조정으로 고른 끝점을 표시
+  if(S.sel){
+    const A2=S.scale[S.sel.a];
+    const q=toCanvas(S.sel.k===1?A2.x1:A2.x2, S.sel.k===1?A2.y1:A2.y2);
+    const col=S.sel.a==='ax'?'#d13c36':'#2b57b5';
+    CTX.save();
+    CTX.setLineDash([4,3]);CTX.lineWidth=2;CTX.strokeStyle=col;
+    CTX.beginPath();CTX.arc(q.x,q.y,14,0,7);CTX.stroke();
+    CTX.setLineDash([]);CTX.lineWidth=3;CTX.strokeStyle='rgba(255,255,255,.9)';
+    CTX.beginPath();CTX.arc(q.x,q.y,14,0,7);CTX.stroke();
+    CTX.setLineDash([4,3]);CTX.lineWidth=2;CTX.strokeStyle=col;
+    CTX.beginPath();CTX.arc(q.x,q.y,14,0,7);CTX.stroke();
+    CTX.restore();
+  }
   tagBox(B.x+10,B.y-11,'+x  '+S.scale.lx+' cm','#d13c36');
   tagBox(D.x+10,D.y-11,'+y  '+S.scale.ly+' cm','#2b57b5');
 }
