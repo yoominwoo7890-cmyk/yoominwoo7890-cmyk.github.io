@@ -1,1 +1,1455 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>운동 분석기 — 동영상으로 물체의 운동 측정하기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#ffffff;
+  --surface:#f7f8fa;
+  --surface2:#eef1f5;
+  --rule:#dde2ea;
+  --rule-soft:#ebeef3;
+  --ink:#141922;
+  --body:#3e4653;
+  --muted:#7b8492;
+  --faint:#a6adb9;
+  --red:#d13c36;
+  --red-soft:#fdf0ef;
+  --blue:#2b57b5;
+  --blue-soft:#eef2fb;
+  --green:#1b8358;
+  --green-soft:#edf7f2;
+  --amber-soft:#fdf6e8;
+  --ui:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,-apple-system,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,'SF Mono',monospace;
+  --stage:940px;
+  --shadow:0 1px 2px rgba(20,25,34,.04),0 4px 12px rgba(20,25,34,.05);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);color:var(--body);font-family:var(--ui);
+  font-size:14.5px;line-height:1.6;-webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{color:var(--ink);margin:0}
 
+header{border-bottom:1px solid var(--rule);background:var(--paper)}
+.hd{max-width:1200px;margin:0 auto;padding:16px 22px}
+.brand{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap}
+.brand h1{font-size:19px;font-weight:700;letter-spacing:-.02em}
+.brand span{font-size:12.5px;color:var(--muted)}
+
+/* 작업 영역 + 오른쪽 단계 사이드바 */
+.shell{
+  display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:26px;
+  max-width:1200px;margin:0 auto;padding:20px 22px 90px;align-items:start;
+}
+main{max-width:none;margin:0;padding:0;min-width:0}
+
+.rail{position:sticky;top:18px;display:flex;flex-direction:column;border-left:2px solid var(--rule)}
+.rail .rt{
+  font-size:10.5px;font-weight:700;letter-spacing:.14em;color:var(--faint);
+  padding:0 0 9px 16px;text-transform:uppercase;
+}
+.rail button{
+  position:relative;display:flex;align-items:center;gap:11px;width:100%;
+  background:none;border:0;padding:12px 12px 12px 16px;cursor:pointer;text-align:left;
+  font-family:var(--ui);font-size:13.5px;font-weight:600;color:var(--faint);
+  transition:.15s;min-height:52px;border-radius:0 7px 7px 0;
+}
+.rail button::before{
+  content:'';position:absolute;left:-2px;top:50%;transform:translateY(-50%);
+  width:8px;height:1px;background:var(--rule);transition:.15s;
+}
+.rail button b{
+  flex:0 0 auto;width:27px;height:27px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:11px;font-weight:600;
+  border:1px solid var(--rule);color:var(--faint);background:var(--paper);transition:.15s;
+}
+.rail button:not(:disabled):hover{color:var(--body);background:var(--surface)}
+.rail button.done{color:var(--muted)}
+.rail button.done b{border-color:#bfd0ec;color:var(--blue);background:var(--blue-soft)}
+.rail button.on{color:var(--blue);background:var(--blue-soft)}
+.rail button.on b{background:var(--blue);border-color:var(--blue);color:#fff}
+.rail button.on::before{width:15px;height:3px;background:var(--blue);border-radius:2px}
+.rail button:disabled{opacity:.4;cursor:not-allowed}
+
+/* 세로 화면 태블릿·좁은 창에서는 위쪽 가로 배치로 */
+@media(max-width:900px){
+  .shell{grid-template-columns:1fr;gap:14px;padding:16px 16px 80px}
+  .rail{position:static;order:-1;flex-direction:row;overflow-x:auto;
+    border-left:0;border-bottom:2px solid var(--rule);}
+  .rail::-webkit-scrollbar{height:0}
+  .rail .rt{display:none}
+  .rail button{flex:0 0 auto;min-height:46px;border-radius:7px 7px 0 0;padding:8px 13px;font-size:13px}
+  .rail button::before{left:50%;top:auto;bottom:-2px;transform:translateX(-50%);width:8px;height:1px}
+  .rail button.on::before{width:100%;height:3px;transform:translateX(-50%)}
+}
+
+.guide{
+  display:flex;gap:13px;align-items:flex-start;
+  background:var(--blue-soft);border:1px solid #d5dff5;border-radius:7px;
+  padding:13px 15px;margin-bottom:16px;
+}
+.guide .n{
+  flex:0 0 auto;width:23px;height:23px;border-radius:50%;background:var(--blue);
+  color:#fff;font-family:var(--mono);font-size:12px;font-weight:600;
+  display:flex;align-items:center;justify-content:center;margin-top:2px;
+}
+.guide strong{display:block;color:var(--ink);font-size:14.5px;font-weight:600;margin-bottom:1px}
+.guide p{margin:0;font-size:13px;color:#4b5567;line-height:1.55}
+
+.stage{
+  position:relative;background:var(--surface2);border:1px solid var(--rule);
+  border-radius:8px 8px 0 0;overflow:hidden;
+}
+#mainCanvas{display:block;width:100%;height:auto;touch-action:none}
+.empty{
+  aspect-ratio:16/9;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:16px;text-align:center;padding:28px;
+  background-image:linear-gradient(var(--rule-soft) 1px,transparent 1px),
+                   linear-gradient(90deg,var(--rule-soft) 1px,transparent 1px);
+  background-size:22px 22px;background-color:#fbfcfd;
+}
+.empty h3{font-size:17px;font-weight:700}
+.empty p{margin:0;font-size:13px;color:var(--muted);max-width:400px;line-height:1.6}
+.badge{
+  position:absolute;top:10px;left:10px;font-family:var(--mono);font-size:11px;
+  background:rgba(255,255,255,.94);border:1px solid var(--rule);color:var(--body);
+  padding:3px 9px;border-radius:4px;pointer-events:none;box-shadow:var(--shadow);
+}
+.hint{
+  position:absolute;bottom:10px;left:10px;right:10px;font-size:12.5px;
+  background:rgba(255,255,255,.95);border:1px solid var(--rule);border-radius:5px;
+  padding:7px 11px;pointer-events:none;color:var(--body);box-shadow:var(--shadow);
+}
+.spin{
+  position:absolute;inset:0;background:rgba(255,255,255,.9);display:none;
+  align-items:center;justify-content:center;flex-direction:column;gap:11px;z-index:5;
+}
+.spin.on{display:flex}
+.spin .t{font-size:13px;font-weight:600;color:var(--ink)}
+.bar{width:210px;height:4px;background:var(--surface2);border-radius:2px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--blue);width:0%;transition:width .12s}
+
+.console{
+  background:var(--surface);border:1px solid var(--rule);border-top:0;
+  border-radius:0 0 8px 8px;padding:15px 16px;
+}
+.panel{display:none;flex-direction:column;gap:13px}
+.panel.on{display:flex}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row.end{margin-top:2px;padding-top:12px;border-top:1px solid var(--rule-soft)}
+label.f{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--body);white-space:nowrap}
+label.f>span.k{color:var(--muted);font-size:12.5px}
+
+button.b{
+  font-family:var(--ui);font-size:14px;font-weight:600;
+  background:var(--paper);color:var(--ink);border:1px solid var(--rule);
+  padding:11px 17px;min-height:46px;border-radius:7px;cursor:pointer;
+  transition:.13s;box-shadow:var(--shadow);touch-action:manipulation;
+}
+button.b:hover:not(:disabled){border-color:#c3cbd8;background:#fdfdfe}
+button.b:active:not(:disabled){transform:translateY(1px)}
+button.b:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
+button.b.pri{background:var(--blue);color:#fff;border-color:var(--blue)}
+button.b.pri:hover:not(:disabled){background:#2449a0;border-color:#2449a0}
+button.b.danger{color:var(--red);border-color:#f0cfcd}
+button.b.danger:hover:not(:disabled){background:var(--red-soft);border-color:var(--red)}
+button.b.on{background:var(--red);color:#fff;border-color:var(--red)}
+button.b.on:hover:not(:disabled){background:#b93531;border-color:#b93531}
+button.b.sm{font-size:13px;padding:8px 13px;min-height:40px}
+button.b.sm.sel{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+input[type=range]{
+  -webkit-appearance:none;appearance:none;height:6px;background:var(--surface2);
+  border-radius:3px;outline:none;width:150px;touch-action:manipulation;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:var(--paper);
+  cursor:pointer;border:2px solid var(--blue);box-shadow:0 1px 4px rgba(20,25,34,.22);
+}
+input[type=range]::-moz-range-thumb{
+  width:24px;height:24px;border-radius:50%;background:var(--paper);
+  cursor:pointer;border:2px solid var(--blue);box-shadow:0 1px 4px rgba(20,25,34,.22);
+}
+input[type=checkbox]{width:20px;height:20px;accent-color:var(--blue)}
+input[type=number],input[type=text],select{
+  font-family:var(--mono);font-size:14px;background:var(--paper);color:var(--ink);
+  border:1px solid var(--rule);border-radius:6px;padding:10px 11px;width:92px;min-height:44px;
+}
+select{font-family:var(--ui);width:auto;min-width:134px;cursor:pointer}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.val{font-family:var(--mono);font-size:12.5px;color:var(--ink);min-width:48px}
+.val.q{color:var(--muted)}
+.note{font-size:12.5px;color:var(--muted);line-height:1.55}
+.note b{color:var(--body)}
+.callout{font-size:12.5px;border-radius:6px;padding:9px 12px;line-height:1.55;
+  background:var(--amber-soft);border:1px solid #f0e3c2;color:#7d5606;}
+.callout.ok{background:var(--green-soft);border-color:#cfe8dd;color:#14663f}
+/* 구간 막대 */
+.seekwrap{position:relative;flex:1 1 300px;min-width:220px;height:30px;display:flex;align-items:center}
+.seekwrap input[type=range]{width:100%;position:relative;z-index:2;background:transparent}
+.track{position:absolute;left:0;right:0;top:12px;height:6px;border-radius:3px;background:var(--surface2);z-index:0}
+.track .sel{position:absolute;top:0;bottom:0;left:0;width:100%;background:#c3d5f2;border-radius:3px}
+.pin{position:absolute;top:-8px;width:2px;height:22px;background:var(--blue);z-index:1;border-radius:1px;display:none}
+.pin.show{display:block}
+.pin::after{
+  content:attr(data-l);position:absolute;top:-15px;left:50%;transform:translateX(-50%);
+  font-size:9.5px;font-weight:700;color:var(--blue);background:#fff;padding:0 3px;
+  border-radius:2px;white-space:nowrap;
+}
+.pin.out{background:var(--red)}
+.pin.out::after{color:var(--red)}
+.adv{display:none;flex-direction:column;gap:11px;
+  border-left:2px solid var(--rule);padding-left:12px;margin-left:2px;}
+.adv.on{display:flex}
+button.link{
+  background:none;border:0;box-shadow:none;padding:2px 0;cursor:pointer;
+  font-family:var(--ui);font-size:12.5px;font-weight:600;color:var(--blue);
+  align-self:flex-start;
+}
+button.link:hover{text-decoration:underline}
+.grp{border:1px solid var(--rule);background:var(--paper);border-radius:6px;
+  padding:10px 12px;display:flex;gap:9px;align-items:center;flex-wrap:wrap;}
+.grp .tag{font-size:12px;color:var(--muted);font-weight:600;margin-right:2px}
+.pen{font-family:var(--mono);font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:7px;min-width:64px}
+.pen i{display:block;border-radius:2px}
+.pen.x{color:var(--red)} .pen.x i{background:var(--red);width:16px;height:3px}
+.pen.y{color:var(--blue)} .pen.y i{background:var(--blue);width:3px;height:16px}
+
+.block{margin-top:30px}
+.blockhd{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+  border-bottom:1px solid var(--rule);padding-bottom:8px;margin-bottom:12px;}
+.blockhd h2{font-size:15px;font-weight:700;letter-spacing:-.01em}
+.blockhd .meta{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+
+.twrap{width:100%;overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-family:var(--mono);
+  font-size:clamp(10px,1.3vw,12.5px);table-layout:fixed;}
+th,td{padding:6px 4px;text-align:right;border-bottom:1px solid var(--rule-soft);white-space:nowrap}
+th{color:var(--muted);font-weight:500;font-size:.92em;border-bottom:1px solid var(--rule)}
+th:first-child,td:first-child{text-align:center;color:var(--faint);width:2.6em}
+td.x{color:var(--red)} td.y{color:var(--blue)}
+tbody tr:hover{background:var(--surface)}
+.emptyrow{text-align:center;color:var(--faint);padding:24px 0;font-family:var(--ui);font-size:13px}
+
+.ggrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:640px){.ggrid{grid-template-columns:1fr}}
+.gcard{background:var(--paper);border:1px solid var(--rule);border-radius:7px;
+  padding:11px 11px 8px;cursor:pointer;transition:.13s;box-shadow:var(--shadow);}
+.gcard:hover{border-color:var(--blue);box-shadow:0 2px 10px rgba(43,87,181,.1)}
+.gcard canvas{display:block;width:100%;height:auto}
+.gcard .cap{display:flex;justify-content:space-between;align-items:baseline;padding:0 1px 7px}
+.gcard .cap b{font-size:13px;font-weight:600;color:var(--ink)}
+.gcard .cap span{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.gcard .zoom{font-size:11.5px;color:var(--blue);text-align:right;padding-top:5px}
+
+.modal{position:fixed;inset:0;background:rgba(20,25,34,.42);display:none;
+  align-items:center;justify-content:center;padding:20px;z-index:50;}
+.modal.on{display:flex}
+.mbox{background:var(--paper);border-radius:10px;max-width:980px;width:100%;
+  max-height:94vh;overflow:auto;box-shadow:0 12px 48px rgba(20,25,34,.22);}
+.mhd{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  padding:15px 18px;border-bottom:1px solid var(--rule);position:sticky;top:0;
+  background:var(--paper);z-index:2;}
+.mhd h3{font-size:15.5px;font-weight:700}
+.mbody{padding:16px 18px 22px}
+#modalCanvas{display:block;width:100%;height:auto;background:var(--paper);
+  border:1px solid var(--rule);border-radius:6px;}
+.eq{font-family:var(--mono);font-size:12.5px;color:var(--ink);line-height:1.75;
+  background:var(--surface);border:1px solid var(--rule);border-radius:6px;
+  padding:10px 13px;margin-top:12px;}
+.eq em{font-style:normal;color:var(--blue);font-weight:600}
+.readout{margin-top:12px;max-height:250px;overflow-y:auto;border:1px solid var(--rule-soft);border-radius:6px}
+.readout table{font-size:12px}
+.readout th{position:sticky;top:0;background:var(--paper)}
+.readout th,.readout td{padding:5px 10px}
+td.est{color:var(--green)}
+.legend{display:inline-block;width:9px;height:9px;border-radius:2px;background:var(--green);margin-right:5px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="hd">
+    <div class="brand">
+      <h1>운동 분석기</h1>
+      <span>동영상 속 물체의 위치 · 속도 · 가속도 측정</span>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+<main>
+  <div class="guide">
+    <div class="n" id="gNum">1</div>
+    <div>
+      <strong id="gTitle">분석할 동영상을 엽니다</strong>
+      <p id="gText">삼각대나 책상에 카메라를 고정하고 찍은 영상일수록 결과가 정확합니다.</p>
+    </div>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="empty" id="empty">
+      <h3>동영상을 선택하세요</h3>
+      <p>영상은 내 기기 안에서만 처리되며 어디로도 전송되지 않습니다.<br>mp4 형식을 권장합니다.</p>
+      <button class="b pri" id="pick">동영상 파일 선택</button>
+    </div>
+    <canvas id="mainCanvas" style="display:none"></canvas>
+    <div class="badge" id="badge" style="display:none"></div>
+    <div class="hint" id="hint" style="display:none"></div>
+    <div class="spin" id="spin"><div class="t" id="spinT">처리 중</div><div class="bar"><i id="spinB"></i></div></div>
+  </div>
+
+  <div class="console" id="console" style="display:none">
+
+    <div class="panel" id="p-open">
+      <div class="row">
+        <button class="b pri" id="changeVid2">다른 영상 열기</button>
+        <button class="b" id="backToEdit">이어서 하기</button>
+      </div>
+      <div class="note">다른 영상을 열면 지금까지의 구간·축척·점은 모두 지워지고 처음부터 다시 시작합니다.</div>
+    </div>
+
+    <div class="panel" id="p-edit">
+      <div class="row">
+        <label class="f"><span class="k">화면 밝기</span><input type="range" id="expo" min="0.4" max="3.2" step="0.05" value="1"></label>
+        <span class="val" id="expoV">보통</span>
+      </div>
+      <div class="row">
+        <button class="b sm" id="playBtn">▶ 재생</button>
+        <div class="seekwrap">
+          <div class="track"><span class="sel" id="tSel"></span><i class="pin" id="pinIn" data-l="시작"></i><i class="pin out" id="pinOut" data-l="끝"></i></div>
+          <input type="range" id="seek" min="0" max="100" step="0.01" value="0">
+        </div>
+        <span class="val" id="seekV">0.00초</span>
+      </div>
+      <div class="row">
+        <button class="b sm" id="setIn">⟦ 여기가 시작</button>
+        <button class="b sm" id="setOut">여기가 끝 ⟧</button>
+        <span class="val q" id="trimV">전체</span>
+        <button class="b sm" id="changeVid">다른 영상 열기</button>
+      </div>
+      <button class="link adv-t" data-t="adv-edit">＋ 세부 설정 (화면 비율, 선명도)</button>
+      <div class="adv" id="adv-edit">
+      <div class="row">
+        <label class="f"><span class="k">선명도</span><input type="range" id="contr" min="0.6" max="2.4" step="0.05" value="1"></label>
+        <span class="val" id="contrV">보통</span>
+      </div>
+      <div class="grp">
+        <span class="tag">화면 비율</span>
+        <button class="b sm ar sel" data-ar="0">원본</button>
+        <button class="b sm ar" data-ar="1.7778">16:9</button>
+        <button class="b sm ar" data-ar="1.3333">4:3</button>
+        <button class="b sm ar" data-ar="1">1:1</button>
+        <button class="b sm ar" data-ar="0.7143">5:7</button>
+        <button class="b sm ar" data-ar="0.5625">9:16</button>
+        <button class="b sm ar" data-ar="-1">자유</button>
+        <button class="b sm" id="cropReset">전체로</button>
+      </div>
+      </div>
+      <div class="note">파란 사각형 <b>안쪽을 끌면 이동</b>, <b>모서리를 끌면 크기</b>가 바뀝니다. 물체가 지나가는 길 전체가 사각형 안에 들어와야 합니다.</div>
+      <div class="row end"><button class="b pri" id="toExtract">다음 — 프레임 뽑기</button></div>
+    </div>
+
+    <div class="panel" id="p-extract">
+      <div class="note">구간을 정하면 <b>자동으로 시작됩니다.</b> 영상이 한 번 재생되면서 각 장면과 그 시각을 함께 저장합니다.
+      끝날 때까지 <b>다른 탭으로 이동하지 마세요.</b></div>
+      <div class="row"><button class="b" id="extract">다시 뽑기</button></div>
+      <button class="link adv-t" data-t="adv-ext">＋ 세부 설정 (화질, 속도)</button>
+      <div class="adv" id="adv-ext">
+        <div class="row">
+          <label class="f"><span class="k">화질</span>
+            <select id="res"><option value="640">낮음 (빠름)</option><option value="800" selected>보통</option><option value="1024">높음 (느림)</option></select>
+          </label>
+          <label class="f"><span class="k">뽑는 속도</span>
+            <select id="rate"><option value="1">빠르게</option><option value="0.5" selected>보통</option><option value="0.25">천천히 (정확)</option></select>
+          </label>
+        </div>
+        <div class="note">장면이 자꾸 빠진다면 뽑는 속도를 「천천히」로 바꿔 보세요.</div>
+      </div>
+      <div class="callout ok" id="extractInfo" style="display:none"></div>
+    </div>
+
+    <div class="panel" id="p-scale">
+      <div class="grp">
+        <span class="pen x"><i></i>가로</span>
+        <label class="f">실제 길이 <input type="number" id="lx" value="1" step="0.01" min="0.001"> m</label>
+        <span class="val q" id="sxV">—</span>
+      </div>
+      <div class="grp">
+        <span class="pen y"><i></i>세로</span>
+        <label class="f">실제 길이 <input type="number" id="ly" value="1" step="0.01" min="0.001"> m</label>
+        <span class="val q" id="syV">—</span>
+      </div>
+      <div class="grp">
+        <label class="f"><input type="checkbox" id="linkChk"> <b>가로·세로 함께 조절</b></label>
+        <span class="note" style="margin:0">켜면 두 화살표의 길이와 숫자가 항상 같아집니다. 정면에서 찍은 영상이라면 켜 두는 편이 편합니다.</span>
+      </div>
+      <div class="note">화살표의 <b>가운데를 끌면 위치가</b>, <b>끝의 동그라미를 끌면 길이가</b> 바뀝니다.
+      길이를 아는 물건(사람의 키, 바닥 타일, 자 등)에 맞추고 그 길이를 미터 단위로 적으세요.</div>
+      <div class="callout" id="scaleWarn" style="display:none"></div>
+      <div class="row end">
+        <button class="b" id="hideArrows" disabled>화살표 숨기기</button>
+        <button class="b pri" id="toStrobe">다음 — 궤적 만들기</button>
+      </div>
+    </div>
+
+    <div class="panel" id="p-strobe">
+      <div class="row">
+        <label class="f"><span class="k">몇 장마다 찍을까</span><input type="range" id="ivl" min="1" max="30" step="1" value="4"></label>
+        <span class="val" id="ivlV">4장</span>
+        <span class="val q" id="ivlT">—</span>
+      </div>
+      <div class="note">물체가 잘 안 보이거나 배경이 지저분하면 아래 세부 설정에서 감도를 조절한 뒤 <b>궤적 분석</b>을 다시 누르세요.</div>
+      <button class="link adv-t" data-t="adv-str">＋ 세부 설정 (합성 방식, 감도)</button>
+      <div class="adv" id="adv-str">
+        <div class="row">
+          <label class="f"><span class="k">합성 방식</span>
+            <select id="smode">
+              <option value="bgsub" selected>자동 — 보통 밝기의 교실</option>
+              <option value="lighten">어두운 배경 전용</option>
+            </select>
+          </label>
+          <label class="f"><span class="k">감지 감도</span><input type="range" id="thr" min="8" max="90" step="1" value="30"></label>
+          <span class="val" id="thrV">30</span>
+        </div>
+        <div class="note">감도를 낮추면 물체가 더 잘 잡히지만 배경 얼룩도 늘어납니다.</div>
+      </div>
+      <div class="row end">
+        <button class="b pri" id="runStrobe">궤적 분석</button>
+        <button class="b" id="saveTraj" disabled>궤적 저장</button>
+        <button class="b rescale">축척 다시 잡기</button>
+        <button class="b pri" id="toPoint" disabled>다음 — 점 찍기</button>
+      </div>
+    </div>
+
+    <div class="panel" id="p-point">
+      <div class="row">
+        <button class="b" id="undoPt" disabled>한 개 취소</button>
+        <button class="b danger" id="clearPt" disabled>모두 지우기</button>
+        <button class="b" id="saveTraj2" disabled>궤적 저장</button>
+        <button class="b rescale">축척 다시 잡기</button>
+      </div>
+      <div class="callout" id="ptCount" style="display:none"></div>
+      <div class="note">궤적 위에 겹쳐 보이는 물체를 <b>시간 순서대로</b> 눌러 점을 찍으세요.
+      첫 번째 점이 원점(0, 0)이 됩니다. 물체의 같은 지점(예: 공의 한가운데)을 매번 찍어야 정확합니다.
+      잘못 찍었으면 <b>한 개 취소</b> 또는 Ctrl+Z를 쓰세요.</div>
+      <div class="callout" id="ptWarn" style="display:none"></div>
+      <div class="row end">
+        <button class="b pri" id="toAnalyze" disabled>다음 — 결과 보기</button>
+      </div>
+    </div>
+
+    <div class="panel" id="p-analyze">
+      <div class="row">
+        <button class="b" id="showGraph">그래프 다시 그리기</button>
+        <button class="b" id="saveGraph" disabled>그래프 저장</button>
+        <button class="b" id="exportCsv" disabled>표 내려받기 (CSV)</button>
+        <button class="b" id="backPoint">점 다시 찍기</button>
+        <button class="b rescale">축척 다시 잡기</button>
+      </div>
+      <div class="note">그래프는 아래에 자동으로 표시됩니다. <b>그래프를 클릭하면 크게 열리고</b>, 원하는 시간 간격이나 측정한 점마다 값을 읽어낼 수 있습니다.</div>
+    </div>
+  </div>
+
+  <div class="block" id="tableBlock" style="display:none">
+    <div class="blockhd"><h2>측정값</h2><span class="meta" id="tableMeta"></span></div>
+    <div class="twrap">
+      <table>
+        <colgroup><col style="width:2.6em"><col><col><col><col><col><col><col></colgroup>
+        <thead><tr>
+          <th>#</th><th>시각 t (s)</th><th>x (m)</th><th>y (m)</th>
+          <th>중간 시각 (s)</th><th>v<sub>x</sub></th><th>v<sub>y</sub></th><th>속력 (m/s)</th>
+        </tr></thead>
+        <tbody id="tbody"><tr><td colspan="8" class="emptyrow">점을 찍으면 값이 채워집니다</td></tr></tbody>
+      </table>
+    </div>
+    <div class="note" style="margin-top:9px">
+      속도는 이웃한 두 점 사이의 <b>평균 속도</b>라서, 두 시각의 한가운데 시각에 적어 두었습니다.
+      등가속도 운동에서는 이 값이 그 시각의 순간 속도와 정확히 같습니다.
+    </div>
+  </div>
+
+  <div class="block" id="graphBlock" style="display:none">
+    <div class="blockhd"><h2>그래프</h2><span class="meta">카드를 클릭하면 크게 열립니다</span></div>
+    <div class="ggrid" id="ggrid"></div>
+  </div>
+</main>
+
+<nav class="rail" id="rail">
+  <div class="rt">진행 단계</div>
+  <button data-s="0" class="on"><b>01</b>영상 열기</button>
+  <button data-s="1" disabled><b>02</b>구간 자르기</button>
+  <button data-s="2" disabled><b>03</b>프레임 뽑기</button>
+  <button data-s="3" disabled><b>04</b>실제 길이</button>
+  <button data-s="4" disabled><b>05</b>궤적 만들기</button>
+  <button data-s="5" disabled><b>06</b>점 찍기</button>
+  <button data-s="6" disabled><b>07</b>결과 보기</button>
+</nav>
+</div>
+
+<div class="modal" id="modal">
+  <div class="mbox">
+    <div class="mhd">
+      <h3 id="mTitle">그래프</h3>
+      <div class="row">
+        <label class="f"><span class="k">읽는 방식</span>
+          <select id="rMode">
+            <option value="interval" selected>일정한 시간 간격으로</option>
+            <option value="points">측정한 점마다</option>
+          </select>
+        </label>
+        <label class="f" id="rIntWrap"><span class="k">간격</span><input type="number" id="rInt" value="0.1" step="0.01" min="0.01"> 초</label>
+        <label class="f" id="tanWrap"><input type="checkbox" id="tanChk"> 접선 그리기</label>
+        <button class="b sm" id="mSave">이미지 저장</button>
+        <button class="b sm danger" id="mClose">닫기</button>
+      </div>
+    </div>
+    <div class="mbody">
+      <canvas id="modalCanvas" width="1240" height="640"></canvas>
+      <div class="eq" id="mEq"></div>
+      <div class="readout"><table><thead id="mThead"></thead><tbody id="mTbody"></tbody></table></div>
+      <div class="note" style="margin-top:9px" id="mNote">
+        <span class="legend"></span>초록색 숫자는 측정한 점이 아니라 <b>추세선에서 읽어낸 추정값</b>입니다.
+        측정한 시간 범위 밖은 읽을 수 없습니다.
+      </div>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="file" accept="video/*" style="display:none">
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+
+const S={
+  video:null,vw:0,vh:0,dur:0,expo:1,contr:1,
+  trim:{a:0,b:0},crop:{x:0,y:0,w:0,h:0},ar:0,
+  frames:[],fs:1,fw:0,fh:0,dtMed:0,
+  scale:{ax:null,ay:null,lx:1,ly:1,hidden:false,link:false},
+  ivl:4,smode:'bgsub',thr:30,strobe:null,strobeTimes:[],
+  points:[],step:0,maxStep:0,mode:'idle',drag:null,dragStart:null,
+  rows:[],fits:null,modalKey:null
+};
+const CAN=$('#mainCanvas'), CTX=CAN.getContext('2d');
+const fmt=(v,d=3)=>(v===null||v===undefined||!isFinite(v))?'—':v.toFixed(d);
+const filterStr=()=>`brightness(${S.expo}) contrast(${S.contr})`;
+const setHint=t=>{const h=$('#hint');if(t){h.innerHTML=t;h.style.display='block';}else h.style.display='none';};
+const setBadge=t=>{const b=$('#badge');if(t){b.textContent=t;b.style.display='block';}else b.style.display='none';};
+const busy=(on,txt,pct)=>{const s=$('#spin');s.classList.toggle('on',!!on);if(txt)$('#spinT').textContent=txt;$('#spinB').style.width=(pct||0)+'%';};
+
+const GUIDE=[
+ ['분석할 동영상을 엽니다','삼각대나 책상에 카메라를 고정하고 찍은 영상일수록 결과가 정확합니다. 다른 영상으로 바꿀 수도 있습니다.'],
+ ['물체가 움직이는 구간만 남깁니다','필요 없는 앞뒤를 잘라내고, 물체가 지나가는 영역에 맞춰 화면 크기를 조절하세요. 화면이 어두우면 밝기를 올리세요.'],
+ ['영상을 장면 단위로 쪼갭니다','자동으로 진행됩니다. 각 장면이 실제로 몇 초에 해당하는지 함께 기록하며, 이 시각이 계산의 기준이 됩니다.'],
+ ['화면의 길이를 실제 길이로 바꿉니다','길이를 아는 물건에 화살표를 맞추세요. 가로와 세로 화살표는 같은 길이로 함께 움직입니다.'],
+ ['여러 장면을 한 장에 겹쳐 궤적을 만듭니다','스트로보스코프 사진처럼 물체가 여러 번 찍힌 그림이 만들어집니다.'],
+ ['궤적 위의 물체를 순서대로 눌러 점을 찍습니다','누른 순서대로 시각이 매겨지므로, 반드시 시간 순서를 지켜야 합니다.'],
+ ['표와 그래프로 운동을 분석합니다','그래프가 자동으로 그려집니다. 클릭하면 크게 열려 원하는 시각의 값과 순간 속도를 읽을 수 있습니다.']
+];
+/* 이전 단계를 건드리면 그 뒤 결과는 더 이상 유효하지 않다.
+   n단계까지만 남기고 이후를 정리한 뒤, 다시 순서대로 진행하게 한다. */
+function invalidate(n){
+  if(S.maxStep<=n) return;
+  S.maxStep=n;
+  if(n<5){ S.points=[];S.rows=[];S.fits=null;
+    $('#tableBlock').style.display='none';$('#graphBlock').style.display='none';
+    $('#saveGraph').disabled=true;$('#exportCsv').disabled=true;
+    $('#undoPt').disabled=$('#clearPt').disabled=$('#toAnalyze').disabled=true; }
+  if(n<4){ S.strobe=null;S.strobeTimes=[];
+    $('#toPoint').disabled=true;$('#saveTraj').disabled=true;$('#saveTraj2').disabled=true; }
+  if(n<3){ S.scale.ax=S.scale.ay=null;S.scale.hidden=false;$('#hideArrows').disabled=true; }
+  if(n<2){ S.frames=[];S.dtMed=0;$('#extractInfo').style.display='none'; }
+  $$('#rail button').forEach(b=>{const i=+b.dataset.s;
+    b.classList.toggle('done',i!==S.step&&i<=S.maxStep);
+    b.disabled=i>S.maxStep;});
+  render();
+}
+
+function setStep(n){
+  S.step=n;
+  S.maxStep=Math.max(S.maxStep,n);                  // 되돌아가도 이후 단계는 열어 둔다
+  $$('#rail button').forEach(b=>{const i=+b.dataset.s;
+    b.classList.toggle('on',i===n);
+    b.classList.toggle('done',i!==n&&i<=S.maxStep);
+    b.disabled=i>S.maxStep;});
+  ['open','edit','extract','scale','strobe','point','analyze'].forEach((k,i)=>
+    $('#p-'+k).classList.toggle('on',i===n));
+  $('#gNum').textContent=n+1;
+  $('#gTitle').textContent=GUIDE[n][0];
+  $('#gText').textContent=GUIDE[n][1];
+  S.mode = n===1?'crop' : n===3?'scale' : n===5?'point' : 'idle';
+  CAN.style.cursor = n===5?'crosshair':'default';
+  setHint(n===1?'파란 사각형 안쪽을 끌면 이동, 모서리를 끌면 크기가 바뀝니다.'
+        : n===3?'화살표 가운데를 끌면 이동, 끝을 끌면 길이가 바뀝니다.'
+        : n===4?'프레임 간격을 정하고 <b>궤적 분석</b>을 누르세요.'
+        : null);
+  layout(); render();
+  if(n===6) renderGraphs();       // 결과 보기에 들어오면 그래프를 바로 띄운다
+}
+
+/* 01 */
+$('#pick').onclick=()=>$('#file').click();
+$('#changeVid').onclick=()=>$('#file').click();
+$('#changeVid2').onclick=()=>$('#file').click();
+$('#backToEdit').onclick=()=>setStep(1);
+$('#file').onchange=e=>{const f=e.target.files[0];if(f)loadVideo(f);e.target.value='';};
+function loadVideo(file){
+  const v=document.createElement('video');
+  v.src=URL.createObjectURL(file);v.muted=true;v.playsInline=true;v.preload='auto';
+  v.onloadedmetadata=()=>{
+    if(S.video){try{S.video.pause();URL.revokeObjectURL(S.video.src);}catch(_){}}
+    stopPlay();
+    S.video=v;S.vw=v.videoWidth;S.vh=v.videoHeight;S.dur=v.duration;
+    S.trim={a:0,b:v.duration};S.crop={x:0,y:0,w:S.vw,h:S.vh};S.ar=0;
+    S.frames=[];S.strobe=null;S.strobeTimes=[];S.points=[];S.rows=[];S.fits=null;
+    S.scale={ax:null,ay:null,lx:1,ly:1,hidden:false,link:$('#linkChk').checked};S.dtMed=0;S.maxStep=0;
+    $('#tableBlock').style.display='none';$('#graphBlock').style.display='none';
+    $('#extractInfo').style.display='none';$('#ptCount').style.display='none';
+    ['#toPoint','#saveTraj','#saveTraj2','#saveGraph','#exportCsv','#undoPt','#clearPt','#hideArrows','#toAnalyze']
+      .forEach(s=>$(s).disabled=true);
+    $('#empty').style.display='none';CAN.style.display='block';$('#console').style.display='block';
+    $('#seek').max=v.duration;$('#seek').value=0;$('#seekV').textContent='0.00초';
+    updateTrimLabel();v.currentTime=0;v.onseeked=()=>render();
+    setStep(1);
+  };
+  v.onerror=()=>alert('이 영상 형식을 브라우저가 열지 못했습니다. mp4(H.264) 파일로 다시 시도해 보세요.');
+}
+
+/* 02 */
+const lvl=v=>v<0.9?'어둡게':v>1.15?'밝게':'보통';
+$('#expo').oninput=e=>{S.expo=+e.target.value;$('#expoV').textContent=lvl(S.expo);invalidate(1);render();};
+$('#contr').oninput=e=>{S.contr=+e.target.value;$('#contrV').textContent=lvl(S.contr);invalidate(1);render();};
+$('#seek').oninput=e=>{const t=+e.target.value;$('#seekV').textContent=t.toFixed(2)+'초';
+  if(S.video){stopPlay();S.video.currentTime=t;}};
+$('#setIn').onclick=()=>{S.trim.a=+$('#seek').value;
+  if(S.trim.b<=S.trim.a)S.trim.b=Math.min(S.dur,S.trim.a+1);updateTrimLabel();invalidate(1);};
+$('#setOut').onclick=()=>{S.trim.b=+$('#seek').value;
+  if(S.trim.a>=S.trim.b)S.trim.a=Math.max(0,S.trim.b-1);updateTrimLabel();invalidate(1);};
+
+/* 재생 / 일시정지 */
+let playRAF=null;
+function stopPlay(){
+  if(playRAF){cancelAnimationFrame(playRAF);playRAF=null;}
+  if(S.video&&!S.video.paused)S.video.pause();
+  $('#playBtn').textContent='▶ 재생';
+}
+$('#playBtn').onclick=()=>{
+  const v=S.video;if(!v)return;
+  if(playRAF){stopPlay();return;}
+  if(v.currentTime<S.trim.a-0.01||v.currentTime>=S.trim.b-0.01)v.currentTime=S.trim.a;
+  v.play();$('#playBtn').textContent='❚❚ 일시정지';
+  const tick=()=>{
+    if(!playRAF)return;
+    const t=v.currentTime;
+    $('#seek').value=t;$('#seekV').textContent=t.toFixed(2)+'초';
+    render();
+    if(t>=S.trim.b-0.01){stopPlay();return;}
+    playRAF=requestAnimationFrame(tick);
+  };
+  playRAF=requestAnimationFrame(tick);
+};
+
+function updateTrimLabel(){
+  const d=S.trim.b-S.trim.a,el=$('#trimV');
+  el.textContent=`${S.trim.a.toFixed(2)} → ${S.trim.b.toFixed(2)} (${d.toFixed(2)}초)`;
+  el.style.color=d>15?'var(--red)':'';
+  el.className='val'+(d>15?'':' q');
+  // 막대 위 시작·끝 표시
+  if(S.dur>0){
+    const pa=S.trim.a/S.dur*100, pb=S.trim.b/S.dur*100;
+    $('#pinIn').style.left=pa+'%';$('#pinIn').classList.add('show');
+    $('#pinOut').style.left=pb+'%';$('#pinOut').classList.add('show');
+    $('#tSel').style.left=pa+'%';$('#tSel').style.width=(pb-pa)+'%';
+  }
+}
+$$('.ar').forEach(b=>b.onclick=()=>{
+  $$('.ar').forEach(o=>o.classList.remove('sel'));b.classList.add('sel');
+  S.ar=+b.dataset.ar;if(S.ar>0)applyAR();invalidate(1);render();
+});
+$('#cropReset').onclick=()=>{
+  S.crop={x:0,y:0,w:S.vw,h:S.vh};S.ar=0;
+  $$('.ar').forEach(o=>o.classList.remove('sel'));$$('.ar')[0].classList.add('sel');
+  invalidate(1);render();
+};
+function applyAR(){
+  const c=S.crop,cx=c.x+c.w/2,cy=c.y+c.h/2;
+  let w=c.w,h=w/S.ar;
+  if(h>S.vh){h=S.vh;w=h*S.ar;} if(w>S.vw){w=S.vw;h=w/S.ar;}
+  c.w=w;c.h=h;c.x=Math.max(0,Math.min(S.vw-w,cx-w/2));c.y=Math.max(0,Math.min(S.vh-h,cy-h/2));
+}
+$('#toExtract').onclick=()=>{
+  if(S.trim.b-S.trim.a<0.1){alert('구간이 너무 짧습니다.');return;}
+  setStep(2);
+  setTimeout(runExtract,60);      // 패널이 보인 뒤 바로 추출 시작
+};
+
+/* 03 */
+function runExtract(){
+  return extractFrames().catch(err=>{
+    console.error(err);
+    alert('프레임을 뽑는 중 문제가 생겼습니다. 화질을 「낮음」으로 바꾸거나 구간을 짧게 잡고 다시 시도해 보세요.');
+  }).finally(()=>busy(false));
+}
+$('#extract').onclick=runExtract;
+async function extractFrames(){
+  const v=S.video,storeW=+$('#res').value,rate=+$('#rate').value;
+  S.fs=storeW/S.vw;S.fw=Math.round(storeW);S.fh=Math.round(S.vh*S.fs);
+  S.frames=[];S.strobe=null;S.strobeTimes=[];S.points=[];S.rows=[];S.fits=null;
+  S.maxStep=3;                       // 프레임을 새로 뽑으면 이후 결과는 무효
+  $('#graphBlock').style.display='none';
+  $('#toPoint').disabled=true;$('#saveTraj').disabled=true;$('#saveGraph').disabled=true;
+  if(!('requestVideoFrameCallback' in HTMLVideoElement.prototype)){
+    alert('이 브라우저는 장면 단위 추출을 지원하지 않습니다. Chrome, Edge 또는 Safari 16.4 이상에서 열어 주세요.');return;
+  }
+  busy(true,'프레임 뽑는 중',0);
+  v.pause();v.currentTime=S.trim.a;
+  // 이미 그 시각에 있으면 seeked 이벤트가 발생하지 않아 영원히 기다리게 된다.
+  // 같은 위치인지 먼저 확인하고, 이벤트가 오지 않는 경우를 대비해 시간 제한도 둔다.
+  await new Promise(r=>{
+    if(Math.abs(v.currentTime-S.trim.a)<0.005){v.onseeked=null;return r();}
+    let fired=false;
+    const fin=()=>{if(!fired){fired=true;v.onseeked=null;r();}};
+    v.onseeked=fin;
+    setTimeout(fin,2000);
+  });
+  v.onseeked=()=>render();v.playbackRate=rate;
+  const MAX=240;
+  await new Promise(resolve=>{
+    let done=false;
+    const grab=(now,md)=>{
+      if(done)return;
+      const t=md.mediaTime;
+      if(t>S.trim.b||S.frames.length>=MAX){done=true;v.pause();resolve();return;}
+      const c=document.createElement('canvas');c.width=S.fw;c.height=S.fh;
+      c.getContext('2d').drawImage(v,0,0,S.fw,S.fh);
+      S.frames.push({t,c});
+      busy(true,`프레임 뽑는 중 · ${S.frames.length}장`,Math.min(100,(t-S.trim.a)/(S.trim.b-S.trim.a)*100));
+      v.requestVideoFrameCallback(grab);
+    };
+    v.requestVideoFrameCallback(grab);
+    v.play().catch(()=>{done=true;resolve();});
+    setTimeout(()=>{if(!done){done=true;v.pause();resolve();}},(S.trim.b-S.trim.a)/rate*1000+9000);
+  });
+  v.playbackRate=1;busy(false);
+  if(S.frames.length<4){alert('뽑힌 장면이 너무 적습니다. 구간을 늘리거나 속도를 「천천히」로 바꿔 보세요.');return;}
+  const dts=[];for(let i=1;i<S.frames.length;i++)dts.push(S.frames[i].t-S.frames[i-1].t);
+  dts.sort((a,b)=>a-b);
+  const med=dts[Math.floor(dts.length/2)],jit=dts[dts.length-1]-dts[0];
+  S.dtMed=med;
+  const el=$('#extractInfo');el.style.display='block';
+  el.className='callout'+(jit>med*0.5?'':' ok');
+  el.innerHTML=`장면 ${S.frames.length}장을 뽑았습니다. 한 장면당 약 ${(med*1000).toFixed(1)}ms (초당 ${(1/med).toFixed(1)}장)`
+    +(jit>med*0.5?`<br>장면 간격이 일정하지 않은 영상입니다. 표에는 실제로 측정된 시각이 그대로 들어가므로 계산에는 문제가 없습니다.`:'');
+  const c=S.crop;
+  const L=Math.min(c.w,c.h)*0.32;
+  S.scale.ax={x1:c.x+c.w*0.16,y1:c.y+c.h*0.86,x2:c.x+c.w*0.16+L,y2:c.y+c.h*0.86};
+  S.scale.ay={x1:c.x+c.w*0.80,y1:c.y+c.h*0.86,x2:c.x+c.w*0.80,y2:c.y+c.h*0.86-L};
+  S.scale.lx=+$('#lx').value||1;S.scale.ly=+$('#ly').value||1;
+  updateScaleLabels();setStep(3);
+}
+
+/* 04 */
+/* 04 — 가로·세로는 기본적으로 독립. 연동을 켜면 길이와 숫자가 함께 움직인다 */
+const alen=a=>Math.hypot(a.x2-a.x1,a.y2-a.y1);
+const sx=()=>S.scale.lx/Math.max(1,alen(S.scale.ax));
+const sy=()=>S.scale.ly/Math.max(1,alen(S.scale.ay));
+$('#linkChk').onchange=e=>{
+  S.scale.link=e.target.checked;
+  if(S.scale.link){ S.scale.ly=S.scale.lx;$('#ly').value=S.scale.lx;syncArrows('ax'); }
+  invalidate(3);updateScaleLabels();render();
+};
+$('#lx').oninput=e=>{
+  S.scale.lx=+e.target.value||1;
+  if(S.scale.link){S.scale.ly=S.scale.lx;$('#ly').value=S.scale.lx;}
+  invalidate(3);updateScaleLabels();
+};
+$('#ly').oninput=e=>{
+  S.scale.ly=+e.target.value||1;
+  if(S.scale.link){S.scale.lx=S.scale.ly;$('#lx').value=S.scale.ly;}
+  invalidate(3);updateScaleLabels();
+};
+/* 연동 시 반대쪽 화살표를 같은 픽셀 길이로 맞춘다 */
+function syncArrows(from){
+  if(!S.scale.link)return;
+  const L=Math.max(8,alen(S.scale[from]));
+  const other=from==='ax'?'ay':'ax', o=S.scale[other];
+  if(other==='ax'){ const d=Math.sign(o.x2-o.x1)||1; o.x2=o.x1+d*L; o.y2=o.y1; }
+  else            { const d=Math.sign(o.y2-o.y1)||-1; o.y2=o.y1+d*L; o.x2=o.x1; }
+  clampArrow(other);
+}
+function clampArrow(k){
+  const a=S.scale[k];
+  a.x1=Math.max(0,Math.min(S.vw,a.x1));a.x2=Math.max(0,Math.min(S.vw,a.x2));
+  a.y1=Math.max(0,Math.min(S.vh,a.y1));a.y2=Math.max(0,Math.min(S.vh,a.y2));
+}
+function updateScaleLabels(){
+  if(!S.scale.ax)return;
+  $('#sxV').textContent=`${(sx()*1000).toFixed(2)} mm/픽셀 · ${Math.round(alen(S.scale.ax))}픽셀`;
+  $('#syV').textContent=`${(sy()*1000).toFixed(2)} mm/픽셀 · ${Math.round(alen(S.scale.ay))}픽셀`;
+  const r=sx()/sy(),w=$('#scaleWarn');
+  if(!S.scale.link&&(r>1.2||r<0.833)){
+    w.style.display='block';
+    w.innerHTML=`가로와 세로의 축척이 ${((r>1?r:1/r)*100-100).toFixed(0)}% 차이납니다.
+    카메라가 기울었거나 원근 왜곡일 수 있습니다. 정면에서 찍은 영상이라면 <b>가로·세로 함께 조절</b>을 켜 보세요.`;
+  }else w.style.display='none';
+  $('#hideArrows').disabled=false;buildTable();
+}
+$('#hideArrows').onclick=()=>{
+  S.scale.hidden=!S.scale.hidden;
+  $('#hideArrows').textContent=S.scale.hidden?'화살표 보이기':'화살표 숨기기';render();
+};
+$('#toStrobe').onclick=()=>{
+  S.scale.hidden=true;                       // 축척을 정했으면 화살표는 화면에서 치운다
+  $('#hideArrows').textContent='화살표 보이기';
+  setStep(4);updateIvlLabel();
+};
+/* 이후 단계에서 축척을 다시 잡고 싶을 때 */
+function rescale(){
+  S.scale.hidden=false;
+  $('#hideArrows').textContent='화살표 숨기기';
+  setStep(3);
+  setHint('화살표를 다시 맞춘 뒤 <b>다음</b>을 누르면 표와 그래프가 새 축척으로 다시 계산됩니다.');
+}
+
+/* 05 */
+$('#ivl').oninput=e=>{S.ivl=+e.target.value;updateIvlLabel();invalidate(4);};
+$('#thr').oninput=e=>{S.thr=+e.target.value;$('#thrV').textContent=S.thr;invalidate(4);};
+$('#smode').onchange=e=>{S.smode=e.target.value;invalidate(4);};
+function updateIvlLabel(){
+  $('#ivlV').textContent=S.ivl+'장';
+  if(S.dtMed)$('#ivlT').textContent=`${(S.ivl*S.dtMed).toFixed(3)}초 간격 · 상 ${Math.floor((S.frames.length-1)/S.ivl)+1}개`;
+}
+const strobeIdx=()=>{const a=[];for(let i=0;i<S.frames.length;i+=S.ivl)a.push(i);return a;};
+$('#runStrobe').onclick=async()=>{
+  try{
+    await buildStrobe();
+    $('#toPoint').disabled=false;$('#saveTraj').disabled=false;
+  }catch(err){
+    console.error(err);
+    alert('궤적을 만드는 중 문제가 생겼습니다. 프레임 간격을 늘리거나 화질을 낮춰 다시 시도해 보세요.');
+  }finally{ busy(false); }
+};
+
+async function buildStrobe(){
+  busy(true,'궤적 만드는 중',5);
+  await new Promise(r=>setTimeout(r,30));
+  const idx=strobeIdx();S.strobeTimes=idx.map(i=>S.frames[i].t);
+  const out=document.createElement('canvas');out.width=S.fw;out.height=S.fh;
+  const octx=out.getContext('2d');
+  const show=async(n,total)=>{                 // 쌓이는 과정을 한 장씩 보여준다
+    S.strobe=out;
+    setHint(`상을 쌓는 중 · <b>${n} / ${total}</b>장`);
+    busy(false);render();
+    await new Promise(r=>setTimeout(r,70));
+  };
+  if(S.smode==='lighten'){
+    octx.fillStyle='#000';octx.fillRect(0,0,S.fw,S.fh);
+    octx.filter=filterStr();octx.globalCompositeOperation='lighten';
+    for(let n=0;n<idx.length;n++){
+      octx.drawImage(S.frames[idx[n]].c,0,0);
+      await show(n+1,idx.length);
+    }
+    octx.globalCompositeOperation='source-over';octx.filter='none';
+  }else{
+    const N=Math.min(17,S.frames.length),samples=[];
+    for(let k=0;k<N;k++){
+      const f=S.frames[Math.floor(k*(S.frames.length-1)/(N-1))];
+      samples.push(f.c.getContext('2d').getImageData(0,0,S.fw,S.fh).data);
+    }
+    busy(true,'배경 알아내는 중',30);await new Promise(r=>setTimeout(r,20));
+    const np=S.fw*S.fh,bg=new Uint8ClampedArray(np*4),buf=new Array(N);
+    for(let p=0;p<np;p++){
+      const o=p*4;
+      for(let ch=0;ch<3;ch++){
+        for(let k=0;k<N;k++)buf[k]=samples[k][o+ch];
+        bg[o+ch]=buf.slice().sort((a,b)=>a-b)[N>>1];
+      }
+      bg[o+3]=255;
+    }
+    const bgCan=document.createElement('canvas');bgCan.width=S.fw;bgCan.height=S.fh;
+    bgCan.getContext('2d').putImageData(new ImageData(bg,S.fw,S.fh),0,0);
+    octx.filter=filterStr();octx.drawImage(bgCan,0,0);octx.filter='none';
+    const tmp=document.createElement('canvas');tmp.width=S.fw;tmp.height=S.fh;
+    const tctx=tmp.getContext('2d'),th2=S.thr*S.thr*3;
+    for(let n=0;n<idx.length;n++){
+      const src=S.frames[idx[n]].c.getContext('2d').getImageData(0,0,S.fw,S.fh);
+      const d=src.data,mask=new Uint8Array(np);
+      for(let p=0;p<np;p++){
+        const o=p*4,dr=d[o]-bg[o],dg=d[o+1]-bg[o+1],db=d[o+2]-bg[o+2];
+        if(dr*dr+dg*dg+db*db>th2)mask[p]=1;
+      }
+      const m2=new Uint8Array(np);
+      for(let y=1;y<S.fh-1;y++)for(let x=1;x<S.fw-1;x++){
+        const p=y*S.fw+x;let c=0;
+        for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++)c+=mask[p+dy*S.fw+dx];
+        m2[p]=mask[p]?(c>=4?1:0):(c>=7?1:0);
+      }
+      for(let p=0;p<np;p++)if(!m2[p])d[p*4+3]=0;
+      tctx.clearRect(0,0,S.fw,S.fh);tctx.putImageData(src,0,0);
+      octx.save();
+      octx.globalAlpha=0.6+0.4*(n/Math.max(1,idx.length-1));
+      octx.filter=filterStr();octx.drawImage(tmp,0,0);octx.restore();
+      await show(n+1,idx.length);
+    }
+  }
+  S.strobe=out;busy(false);
+  setHint(`상 ${idx.length}개를 겹쳤습니다 · 시간 간격 ${(S.ivl*S.dtMed).toFixed(3)}초`);
+  render();
+}
+$('#toPoint').onclick=()=>{setStep(5);afterPt();};
+$('#saveTraj').onclick=()=>savePNG(composeExport(),'궤적');
+$('#saveTraj2').onclick=()=>savePNG(composeExport(),'궤적');
+
+/* 06 — 이 단계에서는 별도 버튼 없이 바로 점을 찍는다 */
+$('#toAnalyze').onclick=()=>{
+  if(S.points.length<2){alert('점을 2개 이상 찍어야 속도를 구할 수 있습니다.');return;}
+  buildTable();setStep(6);
+};
+$('#undoPt').onclick=()=>{S.points.pop();invalidate(5);afterPt();};
+$('#clearPt').onclick=()=>{S.points=[];invalidate(5);afterPt();};
+function afterPt(){
+  $('#undoPt').disabled=$('#clearPt').disabled=S.points.length===0;
+  $('#saveTraj2').disabled=!S.strobe;
+  $('#toAnalyze').disabled=S.points.length<2;
+  const max=S.strobeTimes.length,w=$('#ptWarn'),c=$('#ptCount');
+  c.style.display='block';c.className='callout'+(S.points.length?' ok':'');
+  c.innerHTML=`찍은 점 <b>${S.points.length}개</b> / 겹친 상 ${max}개`
+    +(S.points.length>1?` · 점 사이 시간 간격 ${(S.ivl*S.dtMed).toFixed(3)}초`:'');
+  if(S.points.length>max){
+    w.style.display='block';
+    w.innerHTML=`점이 상의 개수보다 많습니다. ${max}개까지만 시각을 알 수 있어 나머지는 표에서 빠집니다.`;
+  }else w.style.display='none';
+  buildTable();render();
+}
+
+/* 캔버스 조작 */
+CAN.addEventListener('pointerdown',e=>{
+  const p=toVideo(e);
+  if(S.mode==='point'){                       // 6단계에서는 언제나 점 찍기
+    S.points.push({vx:p.x,vy:p.y});invalidate(5);afterPt();return;
+  }
+  if(S.mode==='scale'&&!S.scale.hidden){
+    const h=hitArrow(p);
+    if(h){S.drag=h;S.dragStart={p,arr:{...S.scale[h.a]}};CAN.setPointerCapture(e.pointerId);}
+    return;
+  }
+  if(S.mode==='crop'){const h=hitCrop(p);if(h){S.drag=h;S.dragStart={p,crop:{...S.crop}};CAN.setPointerCapture(e.pointerId);}}
+});
+CAN.addEventListener('pointermove',e=>{
+  if(!S.drag){
+    if(S.mode==='point')CAN.style.cursor='crosshair';
+    else if(S.mode==='scale'&&!S.scale.hidden){
+      const h=hitArrow(toVideo(e));
+      CAN.style.cursor=h?(h.k==='move'?'move':'grab'):'default';
+    }
+    else if(S.mode==='crop'){const h=hitCrop(toVideo(e));CAN.style.cursor=h?cropCursor(h.k):'default';}
+    else CAN.style.cursor='default';
+    return;
+  }
+  const p=toVideo(e),d=S.drag;
+  if(d.t==='arrow'){
+    const a=S.scale[d.a];
+    if(d.k==='move'){
+      const s=S.dragStart, dx=p.x-s.p.x, dy=p.y-s.p.y, o=s.arr;
+      a.x1=o.x1+dx;a.y1=o.y1+dy;a.x2=o.x2+dx;a.y2=o.y2+dy;
+      clampArrow(d.a);
+    }else{
+      if(d.k===1){a.x1=p.x;a.y1=p.y;}else{a.x2=p.x;a.y2=p.y;}
+      if(d.a==='ax')a.y2=a.y1;else a.x2=a.x1;   // 수평·수직 유지
+      clampArrow(d.a);
+      syncArrows(d.a);                          // 반대쪽 화살표도 같은 길이로
+    }
+    invalidate(3);updateScaleLabels();
+  }else{
+    const c=S.crop,s=S.dragStart,dx=p.x-s.p.x,dy=p.y-s.p.y;
+    if(d.k==='move'){
+      c.x=Math.max(0,Math.min(S.vw-c.w,s.crop.x+dx));
+      c.y=Math.max(0,Math.min(S.vh-c.h,s.crop.y+dy));
+    }else{
+      let nx=s.crop.x,ny=s.crop.y,nw=s.crop.w,nh=s.crop.h;
+      const horiz=d.k.includes('e')||d.k.includes('w');
+      const vert =d.k.includes('n')||d.k.includes('s');
+      if(d.k.includes('e'))nw=s.crop.w+dx;
+      if(d.k.includes('w')){nx=s.crop.x+dx;nw=s.crop.w-dx;}
+      if(d.k.includes('s'))nh=s.crop.h+dy;
+      if(d.k.includes('n')){ny=s.crop.y+dy;nh=s.crop.h-dy;}
+      if(S.ar>0){                       // 비율 고정: 끈 쪽을 기준으로 반대편을 맞춘다
+        if(horiz)nh=nw/S.ar; else if(vert)nw=nh*S.ar;
+        if(d.k.includes('n'))ny=s.crop.y+s.crop.h-nh;
+        if(d.k.includes('w'))nx=s.crop.x+s.crop.w-nw;
+      }
+      nw=Math.max(48,nw);nh=Math.max(48,nh);
+      nx=Math.max(0,Math.min(S.vw-nw,nx));ny=Math.max(0,Math.min(S.vh-nh,ny));
+      S.crop={x:nx,y:ny,w:Math.min(nw,S.vw-nx),h:Math.min(nh,S.vh-ny)};
+    }
+    layout();
+  }
+  render();
+});
+CAN.addEventListener('pointerup',()=>{S.drag=null;});
+CAN.addEventListener('pointercancel',()=>{S.drag=null;});
+function toVideo(e){
+  const r=CAN.getBoundingClientRect();
+  const cx=(e.clientX-r.left)/r.width*CAN.width, cy=(e.clientY-r.top)/r.height*CAN.height;
+  // 전체 보기(1~3단계)에서는 캔버스가 원본 영상 전체를 보여준다.
+  // 여기서 crop을 기준으로 환산하면 crop이 바뀔 때마다 환산비도 같이 바뀌어
+  // 드래그가 스스로를 증폭시키는 되먹임이 생긴다. 반드시 원본 기준으로 계산할 것.
+  if(S.step<=2) return{x:cx/CAN.width*S.vw, y:cy/CAN.height*S.vh};
+  return{x:S.crop.x+cx/CAN.width*S.crop.w, y:S.crop.y+cy/CAN.height*S.crop.h};
+}
+const toCanvas=(vx,vy)=> S.step<=2
+  ? ({x:vx/S.vw*CAN.width, y:vy/S.vh*CAN.height})
+  : ({x:(vx-S.crop.x)/S.crop.w*CAN.width, y:(vy-S.crop.y)/S.crop.h*CAN.height});
+function hitArrow(p){
+  const R=S.crop.w*0.03;
+  for(const a of['ax','ay']){
+    const A=S.scale[a];if(!A)continue;
+    if(Math.hypot(p.x-A.x1,p.y-A.y1)<R)return{t:'arrow',a,k:1};
+    if(Math.hypot(p.x-A.x2,p.y-A.y2)<R)return{t:'arrow',a,k:2};
+  }
+  // 끝점이 아니면 몸통을 잡아 화살표 전체를 옮긴다
+  for(const a of['ax','ay']){
+    const A=S.scale[a];if(!A)continue;
+    if(distToSeg(p,A)<R*0.8)return{t:'arrow',a,k:'move'};
+  }
+  return null;
+}
+function distToSeg(p,A){
+  const dx=A.x2-A.x1,dy=A.y2-A.y1,L2=dx*dx+dy*dy;
+  if(L2<1)return Math.hypot(p.x-A.x1,p.y-A.y1);
+  let t=((p.x-A.x1)*dx+(p.y-A.y1)*dy)/L2;t=Math.max(0,Math.min(1,t));
+  return Math.hypot(p.x-(A.x1+t*dx),p.y-(A.y1+t*dy));
+}
+function hitCrop(p){
+  const c=S.crop, R=S.vw/CAN.width*26;   // 화면상 약 26px — 손가락으로 잡기 쉽게
+  const mx=c.x+c.w/2, my=c.y+c.h/2;
+  const hs=[
+    ['nw',c.x,c.y],['ne',c.x+c.w,c.y],['sw',c.x,c.y+c.h],['se',c.x+c.w,c.y+c.h],
+    ['n',mx,c.y],['s',mx,c.y+c.h],['w',c.x,my],['e',c.x+c.w,my]   // 변 중앙 = 한 방향만
+  ];
+  for(const[k,X,Y]of hs) if(Math.hypot(p.x-X,p.y-Y)<R)return{t:'crop',k};
+  if(p.x>c.x&&p.x<c.x+c.w&&p.y>c.y&&p.y<c.y+c.h)return{t:'crop',k:'move'};
+  return null;
+}
+const cropCursor=k=>k==='move'?'move'
+  :(k==='n'||k==='s')?'ns-resize'
+  :(k==='e'||k==='w')?'ew-resize'
+  :(k==='nw'||k==='se')?'nwse-resize':'nesw-resize';
+
+/* 그리기 */
+function layout(){
+  if(!S.vw)return;
+  const full=S.step<=2, w=full?S.vw:S.crop.w, h=full?S.vh:S.crop.h;
+  const W=Math.min(1100,Math.round(w));
+  CAN.width=W;CAN.height=Math.round(W*h/w);
+}
+function render(){
+  if(!S.vw)return;
+  const full=S.step<=2;
+  CTX.setTransform(1,0,0,1,0,0);
+  CTX.fillStyle='#eef1f5';CTX.fillRect(0,0,CAN.width,CAN.height);
+  CTX.save();CTX.filter=filterStr();
+  if(full&&S.video){
+    CTX.drawImage(S.video,0,0,CAN.width,CAN.height);
+  }else if(S.strobe&&S.step>=3){
+    const c=S.crop,f=S.fs;CTX.filter='none';
+    CTX.drawImage(S.strobe,c.x*f,c.y*f,c.w*f,c.h*f,0,0,CAN.width,CAN.height);
+  }else if(S.frames.length){
+    const c=S.crop,f=S.fs;
+    CTX.drawImage(S.frames[0].c,c.x*f,c.y*f,c.w*f,c.h*f,0,0,CAN.width,CAN.height);
+  }else if(S.video){
+    const c=S.crop;CTX.drawImage(S.video,c.x,c.y,c.w,c.h,0,0,CAN.width,CAN.height);
+  }
+  CTX.restore();
+  if(full)drawCrop();
+  if(S.step>=3&&S.scale.ax&&!S.scale.hidden)drawArrows();
+  if(S.points.length)drawPoints();
+  setBadge(full?`${S.vw} × ${S.vh}`
+    :(S.strobe?`상 ${S.strobeTimes.length}개 · ${(S.ivl*S.dtMed).toFixed(3)}초 간격`
+    :`${Math.round(S.crop.w)} × ${Math.round(S.crop.h)}`));
+}
+function drawCrop(){
+  const c=S.crop,K=CAN.width/S.vw,X=c.x*K,Y=c.y*K,W=c.w*K,H=c.h*K;
+  CTX.save();
+  CTX.fillStyle='rgba(247,248,250,.72)';
+  CTX.fillRect(0,0,CAN.width,Y);CTX.fillRect(0,Y+H,CAN.width,CAN.height-Y-H);
+  CTX.fillRect(0,Y,X,H);CTX.fillRect(X+W,Y,CAN.width-X-W,H);
+  CTX.strokeStyle='#2b57b5';CTX.lineWidth=2;CTX.strokeRect(X,Y,W,H);
+  CTX.setLineDash([5,5]);CTX.strokeStyle='rgba(43,87,181,.3)';CTX.lineWidth=1;
+  CTX.beginPath();
+  CTX.moveTo(X+W/3,Y);CTX.lineTo(X+W/3,Y+H);CTX.moveTo(X+2*W/3,Y);CTX.lineTo(X+2*W/3,Y+H);
+  CTX.moveTo(X,Y+H/3);CTX.lineTo(X+W,Y+H/3);CTX.moveTo(X,Y+2*H/3);CTX.lineTo(X+W,Y+2*H/3);
+  CTX.stroke();CTX.setLineDash([]);
+  const hw=[[X,Y],[X+W,Y],[X,Y+H],[X+W,Y+H]];
+  CTX.lineWidth=2.5;
+  hw.forEach(([a,b])=>{
+    CTX.fillStyle='#2b57b5';CTX.fillRect(a-10,b-10,20,20);
+    CTX.fillStyle='#fff';CTX.fillRect(a-7,b-7,14,14);
+    CTX.strokeStyle='#2b57b5';CTX.strokeRect(a-10,b-10,20,20);
+  });
+  // 변 중앙 — 가로 또는 세로 한 방향만 조절
+  [[X+W/2,Y,30,14],[X+W/2,Y+H,30,14],[X,Y+H/2,14,30],[X+W,Y+H/2,14,30]].forEach(([a,b,w,h])=>{
+    CTX.fillStyle='#2b57b5';CTX.fillRect(a-w/2,b-h/2,w,h);
+    CTX.fillStyle='#fff';CTX.fillRect(a-w/2+3,b-h/2+3,w-6,h-6);
+    CTX.strokeStyle='#2b57b5';CTX.strokeRect(a-w/2,b-h/2,w,h);
+    // 방향을 알려주는 손잡이 줄
+    CTX.strokeStyle='#2b57b5';CTX.lineWidth=1.6;CTX.beginPath();
+    if(w>h){ CTX.moveTo(a-7,b);CTX.lineTo(a+7,b); }
+    else   { CTX.moveTo(a,b-7);CTX.lineTo(a,b+7); }
+    CTX.stroke();CTX.lineWidth=2.5;
+  });
+  CTX.font='600 12px "IBM Plex Mono",monospace';
+  const t=`${Math.round(c.w)} × ${Math.round(c.h)}   ${(c.w/c.h).toFixed(2)} : 1`;
+  CTX.fillStyle='rgba(255,255,255,.94)';CTX.fillRect(X+6,Y+6,CTX.measureText(t).width+14,21);
+  CTX.fillStyle='#2b57b5';CTX.fillText(t,X+13,Y+21);
+  CTX.restore();
+}
+function arrow(x1,y1,x2,y2,col){
+  CTX.save();
+  CTX.strokeStyle='rgba(255,255,255,.85)';CTX.lineWidth=5.5;CTX.lineCap='round';
+  CTX.beginPath();CTX.moveTo(x1,y1);CTX.lineTo(x2,y2);CTX.stroke();
+  CTX.strokeStyle=col;CTX.fillStyle=col;CTX.lineWidth=2.4;CTX.lineCap='butt';
+  CTX.beginPath();CTX.moveTo(x1,y1);CTX.lineTo(x2,y2);CTX.stroke();
+  const a=Math.atan2(y2-y1,x2-x1),L=12;
+  [[x2,y2,a],[x1,y1,a+Math.PI]].forEach(([X,Y,A])=>{
+    CTX.beginPath();CTX.moveTo(X,Y);
+    CTX.lineTo(X-L*Math.cos(A-.4),Y-L*Math.sin(A-.4));
+    CTX.lineTo(X-L*Math.cos(A+.4),Y-L*Math.sin(A+.4));
+    CTX.closePath();CTX.fill();
+  });
+  [[x1,y1],[x2,y2]].forEach(([X,Y])=>{
+    CTX.beginPath();CTX.arc(X,Y,7,0,7);CTX.fillStyle='#fff';CTX.fill();
+    CTX.strokeStyle=col;CTX.lineWidth=2.4;CTX.stroke();
+  });
+  CTX.restore();
+}
+function tagBox(x,y,text,col){
+  CTX.save();CTX.font='600 12.5px "IBM Plex Mono",monospace';
+  const w=CTX.measureText(text).width+14;
+  CTX.fillStyle='rgba(255,255,255,.95)';CTX.strokeStyle=col;CTX.lineWidth=1.2;
+  if(CTX.roundRect){CTX.beginPath();CTX.roundRect(x,y,w,22,5);CTX.fill();CTX.stroke();}
+  else{CTX.fillRect(x,y,w,22);CTX.strokeRect(x,y,w,22);}
+  CTX.fillStyle=col;CTX.fillText(text,x+7,y+15);CTX.restore();
+}
+function drawArrows(){
+  const A=toCanvas(S.scale.ax.x1,S.scale.ax.y1),B=toCanvas(S.scale.ax.x2,S.scale.ax.y2);
+  const C=toCanvas(S.scale.ay.x1,S.scale.ay.y1),D=toCanvas(S.scale.ay.x2,S.scale.ay.y2);
+  arrow(A.x,A.y,B.x,B.y,'#d13c36');arrow(C.x,C.y,D.x,D.y,'#2b57b5');
+  tagBox((A.x+B.x)/2-22,(A.y+B.y)/2-33,S.scale.lx+' m','#d13c36');
+  tagBox((C.x+D.x)/2+14,(C.y+D.y)/2-11,S.scale.ly+' m','#2b57b5');
+}
+function drawPoints(){
+  CTX.save();
+  S.points.forEach((p,i)=>{
+    if(i===0)return;
+    const q=toCanvas(p.vx,p.vy),r=toCanvas(S.points[i-1].vx,S.points[i-1].vy);
+    CTX.strokeStyle='rgba(255,255,255,.8)';CTX.lineWidth=3.5;
+    CTX.beginPath();CTX.moveTo(r.x,r.y);CTX.lineTo(q.x,q.y);CTX.stroke();
+    CTX.strokeStyle='rgba(209,60,54,.75)';CTX.lineWidth=1.6;CTX.setLineDash([4,4]);
+    CTX.beginPath();CTX.moveTo(r.x,r.y);CTX.lineTo(q.x,q.y);CTX.stroke();CTX.setLineDash([]);
+  });
+  S.points.forEach((p,i)=>{
+    const q=toCanvas(p.vx,p.vy),col=i===0?'#1b8358':'#d13c36';
+    CTX.beginPath();CTX.arc(q.x,q.y,7,0,7);CTX.fillStyle='#fff';CTX.fill();
+    CTX.strokeStyle=col;CTX.lineWidth=2.6;CTX.stroke();
+    CTX.beginPath();CTX.arc(q.x,q.y,2.4,0,7);CTX.fillStyle=col;CTX.fill();
+    CTX.font='600 11px "IBM Plex Mono",monospace';
+    const t=String(i),w=CTX.measureText(t).width+10;
+    CTX.fillStyle='rgba(255,255,255,.95)';
+    if(CTX.roundRect){CTX.beginPath();CTX.roundRect(q.x+9,q.y-19,w,16,4);CTX.fill();}
+    else CTX.fillRect(q.x+9,q.y-19,w,16);
+    CTX.fillStyle=col;CTX.fillText(t,q.x+14,q.y-7);
+  });
+  CTX.restore();
+}
+
+/* 표 */
+function buildTable(){
+  const tb=$('#tbody');S.rows=[];
+  const n=Math.min(S.points.length,S.strobeTimes.length||S.points.length);
+  if(n===0||!S.scale.ax){
+    tb.innerHTML='<tr><td colspan="8" class="emptyrow">점을 찍으면 값이 채워집니다</td></tr>';
+    $('#tableBlock').style.display=S.step>=5?'block':'none';return;
+  }
+  const p0=S.points[0],t0=S.strobeTimes[0]||0,kx=sx(),ky=sy();
+  for(let i=0;i<n;i++){
+    const p=S.points[i];
+    S.rows.push({i,t:(S.strobeTimes[i]??(i*S.ivl*S.dtMed))-t0,
+      x:(p.vx-p0.vx)*kx, y:-(p.vy-p0.vy)*ky});
+  }
+  for(let i=0;i<S.rows.length-1;i++){
+    const a=S.rows[i],b=S.rows[i+1],dt=b.t-a.t;
+    if(dt>1e-6){a.tm=(a.t+b.t)/2;a.vx=(b.x-a.x)/dt;a.vy=(b.y-a.y)/dt;a.v=Math.hypot(a.vx,a.vy);}
+  }
+  tb.innerHTML=S.rows.map(r=>`<tr><td>${r.i}</td><td>${fmt(r.t)}</td>
+    <td class="x">${fmt(r.x)}</td><td class="y">${fmt(r.y)}</td>
+    <td>${r.tm!==undefined?fmt(r.tm):'—'}</td>
+    <td class="x">${r.vx!==undefined?fmt(r.vx,2):'—'}</td>
+    <td class="y">${r.vy!==undefined?fmt(r.vy,2):'—'}</td>
+    <td>${r.v!==undefined?fmt(r.v,2):'—'}</td></tr>`).join('');
+  $('#tableMeta').textContent=`${S.rows.length}개 점 · 원점은 0번 점 · y는 위쪽이 +`;
+  $('#tableBlock').style.display='block';$('#exportCsv').disabled=false;
+}
+
+/* 추세선 */
+function polyfit(xs,ys,deg){
+  const n=deg+1,A=Array.from({length:n},()=>new Array(n+1).fill(0));
+  for(let k=0;k<xs.length;k++){
+    const pw=[];let v=1;for(let i=0;i<2*n;i++){pw.push(v);v*=xs[k];}
+    for(let i=0;i<n;i++){for(let j=0;j<n;j++)A[i][j]+=pw[i+j];A[i][n]+=pw[i]*ys[k];}
+  }
+  for(let i=0;i<n;i++){
+    let mx=i;for(let r=i+1;r<n;r++)if(Math.abs(A[r][i])>Math.abs(A[mx][i]))mx=r;
+    [A[i],A[mx]]=[A[mx],A[i]];
+    if(Math.abs(A[i][i])<1e-12)return null;
+    for(let r=0;r<n;r++){if(r===i)continue;const f=A[r][i]/A[i][i];
+      for(let c=i;c<=n;c++)A[r][c]-=f*A[i][c];}
+  }
+  return A.map((r,i)=>r[n]/A[i][i]);
+}
+const evalPoly=(c,t)=>c.reduce((s,k,i)=>s+k*Math.pow(t,i),0);
+const evalDeriv=(c,t)=>c.reduce((s,k,i)=>i?s+i*k*Math.pow(t,i-1):s,0);
+
+const SPECS=[
+  {k:'x',lab:'가로 위치 x — 시간',yl:'x (m)',col:'#d13c36',deg:2,src:r=>({t:r.t,v:r.x})},
+  {k:'y',lab:'세로 위치 y — 시간',yl:'y (m)',col:'#2b57b5',deg:2,src:r=>({t:r.t,v:r.y})},
+  {k:'vx',lab:'가로 속도 vx — 시간',yl:'vx (m/s)',col:'#d13c36',deg:1,src:r=>r.vx===undefined?null:({t:r.tm,v:r.vx})},
+  {k:'vy',lab:'세로 속도 vy — 시간',yl:'vy (m/s)',col:'#2b57b5',deg:1,src:r=>r.vy===undefined?null:({t:r.tm,v:r.vy})}
+];
+const series=sp=>S.rows.map(sp.src).filter(Boolean);
+
+function renderGraphs(){
+  if(S.rows.length<3)return false;
+  S.fits={};const g=$('#ggrid');g.innerHTML='';
+  SPECS.forEach(sp=>{
+    const d=series(sp);if(d.length<sp.deg+1)return;
+    S.fits[sp.k]=polyfit(d.map(p=>p.t),d.map(p=>p.v),sp.deg);
+    if(!S.fits[sp.k])return;
+    const card=document.createElement('div');card.className='gcard';
+    card.innerHTML=`<div class="cap"><b>${sp.lab}</b><span>${d.length}점</span></div>`;
+    const c=document.createElement('canvas');c.width=600;c.height=370;card.appendChild(c);
+    plot(c.getContext('2d'),c.width,c.height,d,S.fits[sp.k],sp,{mini:true});
+    const z=document.createElement('div');z.className='zoom';z.textContent='클릭해서 자세히 보기 →';
+    card.appendChild(z);
+    card.onclick=()=>openModal(sp.k);
+    g.appendChild(card);
+  });
+  $('#graphBlock').style.display='block';$('#saveGraph').disabled=false;
+  return true;
+}
+$('#showGraph').onclick=()=>{
+  if(!renderGraphs()){alert('그래프를 그리려면 점이 3개 이상 필요합니다.');return;}
+  $('#graphBlock').scrollIntoView({behavior:'smooth',block:'start'});
+};
+
+function niceTicks(lo,hi,n){
+  const raw=(hi-lo)/n,m=Math.pow(10,Math.floor(Math.log10(raw))),r=raw/m;
+  const step=(r<1.5?1:r<3?2:r<7?5:10)*m,out=[];
+  for(let v=Math.ceil(lo/step)*step;v<=hi+step*1e-9;v+=step)out.push(v);
+  return out;
+}
+function plot(g,W,H,data,fit,spec,o={}){
+  o=Object.assign({mini:false,reads:null,tangent:false},o);
+  const P={l:o.mini?54:82,r:o.mini?16:26,t:o.mini?14:24,b:o.mini?36:52};
+  const pw=W-P.l-P.r,ph=H-P.t-P.b;
+  g.fillStyle='#ffffff';g.fillRect(0,0,W,H);
+  const ts=data.map(p=>p.t),vs=data.map(p=>p.v);
+  let t0=Math.min(...ts),t1=Math.max(...ts),v0=Math.min(...vs),v1=Math.max(...vs);
+  const vp=(v1-v0)||1,tp=(t1-t0)||1;
+  v0-=vp*.15;v1+=vp*.15;t0-=tp*.06;t1+=tp*.06;
+  const X=t=>P.l+(t-t0)/(t1-t0)*pw, Y=v=>P.t+(1-(v-v0)/(v1-v0))*ph;
+  const F=o.mini?10.5:13;
+  const xt=niceTicks(t0,t1,o.mini?5:8),yt=niceTicks(v0,v1,o.mini?4:7);
+  g.lineWidth=1;g.font=`${F}px "IBM Plex Mono",monospace`;
+  g.strokeStyle='#eef1f5';
+  xt.forEach(t=>{g.beginPath();g.moveTo(X(t),P.t);g.lineTo(X(t),P.t+ph);g.stroke();
+    g.fillStyle='#7b8492';g.textAlign='center';g.fillText(t.toFixed(2),X(t),P.t+ph+F+7);});
+  yt.forEach(v=>{g.beginPath();g.moveTo(P.l,Y(v));g.lineTo(P.l+pw,Y(v));g.stroke();
+    g.fillStyle='#7b8492';g.textAlign='right';g.fillText(v.toFixed(2),P.l-9,Y(v)+F*.36);});
+  if(v0<0&&v1>0){g.strokeStyle='#c3cbd8';g.lineWidth=1.4;
+    g.beginPath();g.moveTo(P.l,Y(0));g.lineTo(P.l+pw,Y(0));g.stroke();}
+  g.strokeStyle='#dde2ea';g.lineWidth=1;g.strokeRect(P.l,P.t,pw,ph);
+  g.fillStyle='#3e4653';g.textAlign='center';g.font=`500 ${F+1}px "IBM Plex Mono",monospace`;
+  g.fillText('t (s)',P.l+pw/2,H-8);
+  g.save();g.translate(o.mini?15:20,P.t+ph/2);g.rotate(-Math.PI/2);g.fillText(spec.yl,0,0);g.restore();
+  if(fit){
+    g.strokeStyle=spec.col;g.globalAlpha=.42;g.lineWidth=o.mini?2:2.6;
+    g.beginPath();
+    const lo=Math.min(...ts),hi=Math.max(...ts);
+    for(let i=0;i<=200;i++){const t=lo+(hi-lo)*i/200,yy=Y(evalPoly(fit,t));
+      i?g.lineTo(X(t),yy):g.moveTo(X(t),yy);}
+    g.stroke();g.globalAlpha=1;
+  }
+  if(o.reads&&o.reads.length){
+    g.setLineDash([4,4]);g.lineWidth=1.3;g.strokeStyle='rgba(27,131,88,.6)';
+    o.reads.forEach(r=>{
+      g.beginPath();g.moveTo(X(r.t),Y(r.v));g.lineTo(X(r.t),P.t+ph);g.stroke();
+      g.beginPath();g.moveTo(X(r.t),Y(r.v));g.lineTo(P.l,Y(r.v));g.stroke();
+    });
+    g.setLineDash([]);
+    if(!o.mini){
+      // 값과 시각을 숫자로 직접 읽을 수 있게 표시.
+      // 자리가 겹치면 버리지 않고 다음 칸·다음 줄로 밀어 반드시 전부 그린다.
+      const FS=11.5;g.font=`600 ${FS}px "IBM Plex Mono",monospace`;
+      const LW=g.measureText('-000.00').width+9, RH=FS+5;
+      const yCols=[], xRows=[];
+      const maxCol=Math.max(1,Math.floor(pw*0.42/(LW+3)));
+      const maxRow=Math.max(1,Math.floor(ph*0.34/RH));
+      o.reads.forEach(r=>{
+        const px=X(r.t),py=Y(r.v);
+        let col=0;
+        while(col<maxCol-1&&yCols[col]&&yCols[col].some(v=>Math.abs(v-py)<RH))col++;
+        (yCols[col]=yCols[col]||[]).push(py);
+        const lx=P.l+4+col*(LW+3);
+        g.fillStyle='rgba(255,255,255,.93)';g.fillRect(lx,py-RH/2,LW,RH);
+        g.fillStyle=r.measured?spec.col:'#1b8358';g.textAlign='left';
+        g.fillText(r.v.toFixed(2),lx+4,py+FS*.36);
+
+        let row=0;
+        while(row<maxRow-1&&xRows[row]&&xRows[row].some(v=>Math.abs(v-px)<38))row++;
+        (xRows[row]=xRows[row]||[]).push(px);
+        const ly=P.t+ph-6-row*RH;
+        g.fillStyle='rgba(237,247,242,.95)';g.fillRect(px-19,ly-FS-1,38,RH);
+        g.fillStyle=r.measured?spec.col:'#1b8358';g.textAlign='center';
+        g.fillText(r.t.toFixed(2),px,ly-2);
+      });
+      g.textAlign='center';
+    }
+  }
+  if(o.tangent&&fit&&o.reads){
+    o.reads.forEach(r=>{
+      const m=evalDeriv(fit,r.t),span=(t1-t0)*.1;
+      g.strokeStyle='rgba(180,122,16,.95)';g.lineWidth=1.8;
+      g.beginPath();g.moveTo(X(r.t-span),Y(r.v-m*span));g.lineTo(X(r.t+span),Y(r.v+m*span));g.stroke();
+    });
+  }
+  if(o.reads)o.reads.forEach(r=>{
+    g.beginPath();g.arc(X(r.t),Y(r.v),3.8,0,7);g.fillStyle='#1b8358';g.fill();
+    g.strokeStyle='#fff';g.lineWidth=1.3;g.stroke();
+  });
+  data.forEach(p=>{
+    g.beginPath();g.arc(X(p.t),Y(p.v),o.mini?3.8:5.2,0,7);
+    g.fillStyle=spec.col;g.fill();g.strokeStyle='#fff';g.lineWidth=1.6;g.stroke();
+  });
+}
+
+/* 팝업 */
+function openModal(k){
+  S.modalKey=k;const sp=SPECS.find(s=>s.k===k);
+  $('#mTitle').textContent=sp.lab;
+  $('#tanWrap').style.display=sp.deg===2?'flex':'none';
+  $('#modal').classList.add('on');drawModal();
+}
+$('#mClose').onclick=()=>$('#modal').classList.remove('on');
+$('#modal').onclick=e=>{if(e.target===$('#modal'))$('#modal').classList.remove('on');};
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#modal').classList.remove('on');});
+$('#rInt').oninput=drawModal;
+$('#tanChk').onchange=drawModal;
+$('#mSave').onclick=()=>savePNG($('#modalCanvas'),'그래프_'+S.modalKey);
+
+function drawModal(){
+  const sp=SPECS.find(s=>s.k===S.modalKey);if(!sp)return;
+  const d=series(sp),fit=S.fits[sp.k];
+  const mode=$('#rMode').value;
+  $('#rIntWrap').style.display=mode==='interval'?'flex':'none';
+  const lo=Math.min(...d.map(p=>p.t)),hi=Math.max(...d.map(p=>p.t));
+  let reads=[];
+  if(mode==='points'){
+    // 실제로 측정한 점의 값을 그대로 읽는다
+    reads=d.map(p=>({t:p.t,v:p.v,slope:evalDeriv(fit,p.t),measured:true}));
+  }else{
+    const step=Math.max(0.01,+$('#rInt').value||0.1);
+    if((hi-lo)/step>60){ $('#rInt').value=((hi-lo)/60).toFixed(2); }
+    const st=Math.max(0.01,+$('#rInt').value);
+    for(let t=Math.ceil(lo/st)*st;t<=hi+1e-9;t+=st)
+      reads.push({t:+t.toFixed(6),v:evalPoly(fit,t),slope:evalDeriv(fit,t)});
+  }
+  const c=$('#modalCanvas'),g=c.getContext('2d');
+  plot(g,c.width,c.height,d,fit,sp,{mini:false,reads,tangent:$('#tanChk').checked&&sp.deg===2});
+  const eq=$('#mEq');
+  if(sp.deg===2){
+    const[c0,c1,c2]=fit;
+    eq.innerHTML=`추세선 &nbsp; ${sp.k} = ${fmt(c2,4)} t² ${c1<0?'−':'+'} ${fmt(Math.abs(c1),4)} t ${c0<0?'−':'+'} ${fmt(Math.abs(c0),4)}`
+      +`<br>처음 속도 <em>${fmt(c1,3)} m/s</em> &nbsp;·&nbsp; 가속도 <em>${fmt(2*c2,3)} m/s²</em>`;
+  }else{
+    const[c0,c1]=fit;
+    eq.innerHTML=`추세선 &nbsp; ${sp.k} = ${fmt(c1,4)} t ${c0<0?'−':'+'} ${fmt(Math.abs(c0),4)}`
+      +`<br>기울기 = 가속도 <em>${fmt(c1,3)} m/s²</em>`;
+  }
+  const isPos=sp.deg===2;
+  $('#mThead').innerHTML=`<tr><th>시각 (s)</th><th>${sp.yl}</th>${isPos?'<th>접선 기울기 = 순간 속도 (m/s)</th>':''}</tr>`;
+  $('#mTbody').innerHTML=reads.map(r=>`<tr><td>${r.t.toFixed(3)}</td>
+    <td class="${r.measured?'':'est'}">${fmt(r.v)}</td>
+    ${isPos?`<td class="est">${fmt(r.slope,3)}</td>`:''}</tr>`).join('');
+  $('#mNote').innerHTML = mode==='points'
+    ? '<span class="legend" style="background:'+sp.col+'"></span>색 숫자는 <b>직접 측정한 값</b>입니다. 접선 기울기만 추세선에서 구한 값이에요.'
+    : '<span class="legend"></span>초록색 숫자는 측정한 점이 아니라 <b>추세선에서 읽어낸 추정값</b>입니다. 측정한 시간 범위 밖은 읽을 수 없습니다.';
+}
+$('#rMode').onchange=drawModal;
+
+/* 저장 */
+function composeExport(){
+  const out=document.createElement('canvas');
+  out.width=CAN.width;out.height=CAN.height+46;
+  const g=out.getContext('2d');
+  g.fillStyle='#fff';g.fillRect(0,0,out.width,out.height);
+  g.drawImage(CAN,0,0);
+  g.strokeStyle='#dde2ea';g.beginPath();g.moveTo(0,CAN.height+.5);g.lineTo(out.width,CAN.height+.5);g.stroke();
+  g.font='12px "IBM Plex Mono",monospace';g.fillStyle='#3e4653';
+  const dt=S.dtMed?(S.ivl*S.dtMed).toFixed(3):'—';
+  g.fillText(`시간 간격 ${dt}초 · 축척 가로 ${(sx()*1000).toFixed(2)} / 세로 ${(sy()*1000).toFixed(2)} mm/픽셀 · 점 ${S.points.length}개`,12,CAN.height+20);
+  g.fillStyle='#7b8492';
+  g.fillText(new Date().toLocaleString('ko-KR')+' · 운동 분석기',12,CAN.height+37);
+  return out;
+}
+function savePNG(canvas,name){
+  canvas.toBlob(b=>{
+    const a=document.createElement('a');a.href=URL.createObjectURL(b);
+    a.download=`${name}_${Date.now()}.png`;a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  });
+}
+$('#saveGraph').onclick=()=>{
+  const cards=$$('#ggrid canvas');if(!cards.length)return;
+  const W=cards[0].width,H=cards[0].height,cols=2,rows=Math.ceil(cards.length/2);
+  const out=document.createElement('canvas');
+  out.width=W*cols+36;out.height=H*rows+36+30;
+  const g=out.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,out.width,out.height);
+  cards.forEach((c,i)=>g.drawImage(c,12+(i%cols)*(W+12),12+Math.floor(i/cols)*(H+12)));
+  g.fillStyle='#7b8492';g.font='12px "IBM Plex Mono",monospace';
+  g.fillText(new Date().toLocaleString('ko-KR')+' · 운동 분석기',14,out.height-14);
+  savePNG(out,'그래프');
+};
+$('#exportCsv').onclick=()=>{
+  const head='번호,시각_s,x_m,y_m,중간시각_s,vx_ms,vy_ms,속력_ms\n';
+  const body=S.rows.map(r=>[r.i,r.t,r.x,r.y,r.tm??'',r.vx??'',r.vy??'',r.v??''].join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['\ufeff'+head+body],{type:'text/csv;charset=utf-8'}));
+  a.download=`측정값_${Date.now()}.csv`;a.click();
+};
+$('#backPoint').onclick=()=>{setStep(5);afterPt();};
+$$('#rail button').forEach(b=>b.onclick=()=>{if(!b.disabled)setStep(+b.dataset.s);});
+$$('.rescale').forEach(b=>b.onclick=rescale);
+$$('.adv-t').forEach(b=>b.onclick=()=>{
+  const box=$('#'+b.dataset.t),open=box.classList.toggle('on');
+  b.textContent=(open?'－':'＋')+b.textContent.slice(1);
+});
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'&&S.mode==='point'&&S.points.length){
+    e.preventDefault();S.points.pop();afterPt();
+  }
+});
+window.addEventListener('resize',()=>{layout();render();});
+</script>
+</body>
+</html>
