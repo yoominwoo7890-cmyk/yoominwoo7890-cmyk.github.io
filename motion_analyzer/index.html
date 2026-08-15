@@ -195,14 +195,10 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 .callout.ok{background:var(--green-soft);border-color:#cfe8dd;color:#14663f}
 /* 구간 막대 */
 /* 미세 조정 방향 패드 */
-.dpad{display:grid;grid-template-columns:repeat(3,46px);grid-template-rows:repeat(3,42px);gap:4px}
-.dpad button{min-height:42px;padding:0;font-size:15px;line-height:1}
-.dpad .u{grid-column:2;grid-row:1}
-.dpad .l{grid-column:1;grid-row:2}
-.dpad .r{grid-column:3;grid-row:2}
-.dpad .d{grid-column:2;grid-row:3}
-#fineBox{align-items:flex-start;gap:14px}
-#selInfo{min-width:190px}
+.dpad{display:flex;gap:5px}
+.dpad button{min-width:48px;min-height:42px;padding:0;font-size:15px;line-height:1}
+#fineBox{align-items:center;gap:11px}
+#selInfo{margin-left:auto;text-align:right}
 .seekwrap{position:relative;flex:1 1 300px;min-width:220px;height:30px;display:flex;align-items:center}
 .seekwrap input[type=range]{width:100%;position:relative;z-index:2;background:transparent}
 .track{position:absolute;left:0;right:0;top:12px;height:6px;border-radius:3px;background:var(--surface2);z-index:0}
@@ -390,43 +386,41 @@ td.est{color:var(--green)}
     </div>
 
     <div class="panel" id="p-scale">
-      <div class="grp">
-        <span class="pen x"><i></i>가로</span>
-        <label class="f">실제 길이 <input type="number" id="lx" value="100" step="1" min="0.1"> cm</label>
-        <span class="val q" id="sxV">—</span>
-      </div>
-      <div class="grp">
-        <span class="pen y"><i></i>세로</span>
-        <label class="f">실제 길이 <input type="number" id="ly" value="100" step="1" min="0.1"> cm</label>
-        <span class="val q" id="syV">—</span>
-      </div>
-      <div class="grp">
-        <label class="f"><input type="checkbox" id="tiltChk"> <b>화살표 기울이기</b></label>
-        <span class="note" style="margin:0">켜면 화살표를 비스듬히 놓을 수 있고, <b>그 방향이 그대로 x축·y축</b>이 됩니다. 빗면을 따라가는 운동을 분석할 때 쓰세요. 세로 화살표는 가로 화살표와 항상 직각을 이룹니다.</span>
-      </div>
-      <div class="grp">
-        <label class="f"><input type="checkbox" id="linkChk"> <b>가로·세로 함께 조절</b></label>
-        <span class="note" style="margin:0">켜면 두 화살표의 길이와 숫자가 항상 같아집니다. 정면에서 찍은 영상이라면 켜 두는 편이 편합니다.</span>
-      </div>
-      <div class="note">화살표의 <b>가운데를 끌면 위치가</b>, <b>끝의 동그라미를 끌면 길이가</b> 바뀝니다.
-      길이를 아는 물건(사람의 키, 바닥 타일, 자 등)에 맞추고 그 길이를 <b>센티미터(cm)</b>로 적으세요.</div>
       <div class="grp" id="fineBox">
         <span class="tag">미세 조정</span>
         <div class="dpad">
-          <button class="b sm u" data-n="0,-1">▲</button>
-          <button class="b sm l" data-n="-1,0">◀</button>
-          <button class="b sm r" data-n="1,0">▶</button>
-          <button class="b sm d" data-n="0,1">▼</button>
+          <button class="b sm" data-n="-1,0">◀</button>
+          <button class="b sm" data-n="0,-1">▲</button>
+          <button class="b sm" data-n="0,1">▼</button>
+          <button class="b sm" data-n="1,0">▶</button>
         </div>
-        <div style="display:flex;flex-direction:column;gap:6px">
-          <span class="val q" id="selInfo">화살표 끝의 동그라미를 눌러 고르세요</span>
-          <label class="f"><span class="k">한 번에</span>
-            <select id="nudgeStep"><option value="1">1픽셀</option><option value="5">5픽셀</option><option value="20">20픽셀</option></select>
-          </label>
-        </div>
+        <select id="nudgeStep"><option value="1">1픽셀</option><option value="5">5픽셀</option><option value="20">20픽셀</option></select>
+        <span class="val q" id="selInfo">화살표 끝을 눌러 고르세요</span>
       </div>
-      <div class="note">끌어서 대충 맞춘 뒤, 화살표 끝을 한 번 눌러 고르고 <b>화살표 버튼으로 1픽셀씩</b> 미세하게 맞추세요.
-      손가락에 가리지 않아 마지막 몇 픽셀을 정확히 맞출 수 있습니다. 키보드 방향키도 같은 역할을 합니다.</div>
+      <div class="grp">
+        <span class="pen x"><i></i>가로</span>
+        <input type="number" id="lx" value="100" step="1" min="0.1"><span class="k">cm</span>
+        <span class="pen y" style="margin-left:8px"><i></i>세로</span>
+        <input type="number" id="ly" value="100" step="1" min="0.1"><span class="k">cm</span>
+        <span class="val q" id="sxV" style="margin-left:8px">—</span>
+        <span class="val q" id="syV">—</span>
+      </div>
+      <div class="row">
+        <label class="f"><input type="checkbox" id="tiltChk"> 기울이기</label>
+        <label class="f"><input type="checkbox" id="linkChk"> 가로·세로 함께</label>
+        <button class="link adv-t" data-t="adv-scale" style="margin-left:auto">＋ 사용법 설명</button>
+      </div>
+      <div class="adv" id="adv-scale">
+        <div class="note"><b>화살표 맞추기</b> — 가운데를 끌면 위치가, 끝의 동그라미를 끌면 길이가 바뀝니다.
+        길이를 아는 물건(바닥 타일, 자, 사람의 키 등)에 맞추고 그 길이를 cm로 적으세요.
+        기준물은 <b>물체가 지나가는 바로 그 자리</b>에 있어야 하며, <b>길수록 정확</b>합니다.</div>
+        <div class="note"><b>미세 조정</b> — 끌어서 대충 맞춘 뒤 화살표 끝을 한 번 눌러 고르고, 방향 버튼으로 1픽셀씩 맞추세요.
+        길게 누르면 연속으로 움직이고, 키보드 방향키도 같은 역할을 합니다.</div>
+        <div class="note"><b>기울이기</b> — 화살표를 비스듬히 놓을 수 있고 그 방향이 그대로 x축·y축이 됩니다.
+        빗면 운동을 분석할 때 쓰세요. 세로 화살표는 가로와 항상 직각을 이룹니다.</div>
+        <div class="note"><b>가로·세로 함께</b> — 두 화살표의 길이와 숫자가 항상 같아집니다.
+        정면에서 찍은 영상이라면 켜 두는 편이 편합니다.</div>
+      </div>
       <div class="callout" id="scaleWarn" style="display:none"></div>
       <div class="row end">
         <button class="b" id="hideArrows" disabled>화살표 숨기기</button>
@@ -802,11 +796,11 @@ const sy=()=>S.scale.ly/Math.max(1,alen(S.scale.ay));
 function selectHandle(a,k){ S.sel={a,k}; updateSelInfo(); render(); }
 function updateSelInfo(){
   const el=$('#selInfo');
-  if(!S.sel||!S.scale.ax){ el.textContent='화살표 끝의 동그라미를 눌러 고르세요'; return; }
+  if(!S.sel||!S.scale.ax){ el.textContent='화살표 끝을 눌러 고르세요'; return; }
   const A=S.scale[S.sel.a], x=S.sel.k===1?A.x1:A.x2, y=S.sel.k===1?A.y1:A.y2;
   el.innerHTML=`<b style="color:${S.sel.a==='ax'?'var(--red)':'var(--blue)'}">`
-    +`${S.sel.a==='ax'?'가로':'세로'} ${S.sel.k===1?'시작점':'끝점'}</b>`
-    +` &nbsp;(${Math.round(x)}, ${Math.round(y)})`;
+    +`${S.sel.a==='ax'?'가로':'세로'} ${S.sel.k===1?'시작':'끝'}</b>`
+    +` (${Math.round(x)}, ${Math.round(y)})`;
 }
 function nudge(dx,dy){
   if(!S.sel||!S.scale.ax){ alert('먼저 화살표 끝의 동그라미를 눌러 고르세요.'); return; }
@@ -889,9 +883,9 @@ function clampArrow(k){
 function updateScaleLabels(){
   if(!S.scale.ax)return;
   const ang=tiltDeg();
-  const angTxt=S.scale.tilt?` · 기울기 ${(ang>180?ang-360:ang).toFixed(1)}°`:'';
-  $('#sxV').textContent=`${(sx()*10).toFixed(2)} mm/픽셀 · ${Math.round(alen(S.scale.ax))}픽셀${angTxt}`;
-  $('#syV').textContent=`${(sy()*10).toFixed(2)} mm/픽셀 · ${Math.round(alen(S.scale.ay))}픽셀`;
+  const angTxt=S.scale.tilt?` ∠${(ang>180?ang-360:ang).toFixed(1)}°`:'';
+  $('#sxV').textContent=`가로 ${(sx()*10).toFixed(2)}mm/px·${Math.round(alen(S.scale.ax))}px${angTxt}`;
+  $('#syV').textContent=`세로 ${(sy()*10).toFixed(2)}mm/px·${Math.round(alen(S.scale.ay))}px`;
   const r=sx()/sy(),w=$('#scaleWarn');
   if(!S.scale.link&&(r>1.2||r<0.833)){
     w.style.display='block';
