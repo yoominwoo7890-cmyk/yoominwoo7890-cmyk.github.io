@@ -1,1 +1,1263 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>에너지 전환 사슬 추적</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   토큰
+   UI는 무채색 잉크/종이로만 만들고, 색은 오직 에너지 형태에만 씁니다.
+   ============================================================ */
+:root{
+  --paper:#EDF0F3;
+  --surface:#FFFFFF;
+  --ink:#12202B;
+  --ink-70:#3E4E5A;
+  --ink-45:#6B7B87;
+  --rule:#C9D4DC;
+  --rule-soft:#DFE6EB;
 
+  --light:#E8B93B;
+  --thermal:#E2653A;
+  --kinetic:#2F6FE0;
+  --chemical:#2E9E6B;
+  --electric:#7B4FD6;
+  --potential:#17958F;
+  --elastic:#C7458C;
+  --sound:#2F8FA8;
+  --nuclear:#B03A3A;
+  --gravity:#4A5AA8;
+
+  --sans:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"IBM Plex Mono","IBM Plex Sans KR",monospace;
+
+  --r:10px;
+  --shadow:0 1px 2px rgba(18,32,43,.06), 0 8px 20px -12px rgba(18,32,43,.18);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-weight:400;
+  font-size:15px;
+  line-height:1.55;
+  -webkit-text-size-adjust:100%;
+}
+button{font-family:inherit;font-size:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-radius:4px}
+
+.eyebrow{
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  color:var(--ink-45);
+}
+
+/* ---------- 상단 바 ---------- */
+.topbar{
+  position:sticky;top:0;z-index:40;
+  display:flex;align-items:center;gap:16px;
+  padding:14px 24px;
+  background:rgba(237,240,243,.92);
+  backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--rule);
+}
+.brand{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.brand b{font-weight:600;font-size:16px;letter-spacing:-.01em}
+.brand .unit{font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--ink-45)}
+.topbar .spacer{flex:1}
+
+.btn{
+  border:1px solid var(--rule);
+  background:var(--surface);
+  border-radius:var(--r);
+  padding:8px 14px;
+  font-weight:500;
+  transition:border-color .15s, background .15s, transform .05s;
+}
+.btn:hover{border-color:var(--ink-45)}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn.primary:hover{background:#20323F}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.small{padding:5px 10px;font-size:13px}
+
+main{max-width:1180px;margin:0 auto;padding:28px 24px 40px}
+
+/* ---------- 사건 고르기 ---------- */
+.pick-head{margin-bottom:22px;max-width:620px}
+.pick-head h1{
+  font-size:30px;font-weight:600;letter-spacing:-.02em;margin:6px 0 8px;line-height:1.25;
+}
+.pick-head p{margin:0;color:var(--ink-70)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(258px,1fr));gap:12px}
+.ecard{
+  text-align:left;background:var(--surface);border:1px solid var(--rule-soft);
+  border-radius:var(--r);padding:14px 16px 15px;box-shadow:var(--shadow);
+  display:flex;flex-direction:column;gap:9px;min-height:118px;
+  transition:border-color .15s, transform .12s;
+}
+.ecard:hover{border-color:var(--ink);transform:translateY(-2px)}
+.ecard .no{font-family:var(--mono);font-size:11px;color:var(--ink-45);letter-spacing:.08em}
+.ecard h3{margin:0;font-size:16px;font-weight:600;letter-spacing:-.01em}
+.ecard .flow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12.5px;color:var(--ink-70);margin-top:auto}
+.ecard .flow em{font-style:normal;font-family:var(--mono);color:var(--ink-45)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+
+/* ---------- 활동 화면 ---------- */
+.event-head{
+  background:var(--surface);border:1px solid var(--rule-soft);border-radius:var(--r);
+  padding:16px 20px;box-shadow:var(--shadow);margin-bottom:18px;
+}
+.event-head h2{margin:4px 0 8px;font-size:23px;font-weight:600;letter-spacing:-.02em}
+.event-head .scene{
+  margin:0 0 12px;padding-left:12px;border-left:2px solid var(--rule);
+  color:var(--ink-70);font-size:14.5px;max-width:66ch;line-height:1.6;
+}
+.event-head .conv{margin:0;color:var(--ink-70);font-size:14px}
+.event-head .conv b{font-weight:600;color:var(--ink)}
+
+.branch-note{
+  margin-top:12px;display:inline-flex;align-items:center;gap:9px;
+  border:1px dashed var(--rule);border-radius:999px;padding:5px 14px;
+  font-size:13px;color:var(--ink-70);
+}
+.branch-note b{
+  font-family:var(--mono);font-size:10px;letter-spacing:.12em;
+  color:var(--ink-45);font-weight:500;white-space:nowrap;
+}
+
+/* 레일 — 이 앱의 signature */
+.railwrap{position:relative;margin-bottom:14px}
+.rail-labels{
+  display:flex;justify-content:space-between;
+  font-family:var(--mono);font-size:11px;letter-spacing:.1em;color:var(--ink-45);
+  padding:0 2px 8px;
+}
+.railbox{
+  background:var(--surface);border:1px solid var(--rule-soft);border-radius:var(--r);
+  box-shadow:var(--shadow);padding:30px 20px;overflow-x:auto;overflow-y:hidden;
+  cursor:default;
+}
+.rail.picking{cursor:copy}
+.rail{display:flex;align-items:stretch;gap:0;min-width:min-content;position:relative}
+
+.node{display:flex;align-items:center}
+.slot{
+  width:150px;min-height:82px;border-radius:var(--r);
+  border:1.5px dashed var(--rule);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--ink-45);font-size:12.5px;background:#FBFCFD;
+  transition:border-color .12s, background .12s, box-shadow .12s;
+  position:relative;padding:6px;
+}
+.slot.empty::after{content:"카드를 놓으세요";font-family:var(--mono);font-size:10.5px;letter-spacing:.06em}
+.slot.drop{border-color:var(--ink);border-style:solid;background:#EFF3F6;box-shadow:inset 0 0 0 3px rgba(18,32,43,.06)}
+.slot.armed{border-color:var(--ink);border-style:solid;background:#F4F7F9;cursor:pointer}
+.slot.filled{border:none;background:transparent;padding:0}
+
+/* 고정 사건 카드 */
+.fixed{
+  width:158px;min-height:82px;border-radius:var(--r);
+  background:var(--ink);color:#fff;padding:10px 12px;
+  display:flex;flex-direction:column;justify-content:center;gap:6px;
+  box-shadow:0 6px 18px -10px rgba(18,32,43,.7);
+}
+.fixed .tag{font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:rgba(255,255,255,.6)}
+.fixed .lbl{font-size:14px;font-weight:500;line-height:1.3}
+.fixed .bar{height:3px;border-radius:2px;width:26px}
+
+/* 연결선 */
+.link{
+  width:34px;flex:none;display:flex;align-items:center;justify-content:center;
+  color:var(--rule);position:relative;
+}
+.link::before{content:"";position:absolute;left:0;right:0;height:1.5px;background:var(--rule)}
+.link span{position:relative;background:var(--surface);padding:0 3px;font-size:13px;color:var(--ink-45);line-height:1}
+.link.hot::before{background:var(--ink)}
+.link.hot span{color:var(--ink)}
+
+/* 놓을 자리 표시 */
+.caret{
+  position:absolute;top:-10px;bottom:-10px;width:3px;border-radius:2px;
+  background:var(--ink);pointer-events:none;
+  box-shadow:0 0 0 4px rgba(18,32,43,.08);
+}
+.card.ghost{
+  position:fixed;z-index:99;pointer-events:none;margin:0;
+  transform:rotate(-2deg) scale(1.04);
+  box-shadow:0 14px 32px -12px rgba(18,32,43,.6);
+}
+.card.dragging{opacity:.25}
+
+/* 끼워 넣기 자리 */
+.link .plus{display:none;font-size:13px;font-weight:600}
+.rail.picking .link.ins{width:48px}
+.rail.picking .link.ins .arrow{display:none}
+.rail.picking .link.ins .plus{
+  display:inline-block;border:1.5px dashed var(--rule);border-radius:8px;
+  padding:2px 8px;background:var(--surface);color:var(--ink-45);cursor:pointer;
+}
+.rail.picking .link.ins:hover .plus,
+.link.ins.drop .plus{border-style:solid;border-color:var(--ink);color:var(--ink);background:#EFF3F6}
+
+/* 다시 볼 카드 */
+.card.wrong{background:#FBE9E4;border-color:#D9705E;border-style:dashed}
+.card.wrong .bar{background:#D9705E}
+
+/* 끝 표시 */
+.terminus{
+  flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  padding-right:6px;color:var(--ink);
+}
+.terminus .sun{font-size:20px;line-height:1}
+.terminus.right{padding-right:0;padding-left:6px}
+.terminus .txt{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;color:var(--ink-45);writing-mode:vertical-rl;text-orientation:mixed}
+
+/* 에너지 카드 */
+.card{
+  width:150px;min-height:82px;touch-action:none;-webkit-user-drag:none;border-radius:var(--r);
+  border:1.5px solid var(--c,var(--rule));
+  background:#fff;
+  background:color-mix(in srgb, var(--c) 9%, #fff);
+  padding:9px 11px;display:flex;flex-direction:column;gap:5px;justify-content:center;
+  cursor:grab;user-select:none;position:relative;
+  transition:transform .1s, box-shadow .12s;
+}
+.card .bar{height:3px;width:24px;border-radius:2px;background:var(--c)}
+.card .lbl{font-size:13.5px;font-weight:500;line-height:1.3;letter-spacing:-.01em}
+.card:hover{box-shadow:0 4px 14px -8px rgba(18,32,43,.5)}
+.card:active{cursor:grabbing}
+.card.dragging{opacity:.35}
+.card.held{box-shadow:0 0 0 2px var(--ink);transform:translateY(-2px)}
+.card .remove{
+  position:absolute;top:4px;right:4px;width:20px;height:20px;line-height:1;
+  border-radius:50%;border:1px solid var(--rule);background:#fff;color:var(--ink-45);
+  font-size:12px;display:flex;align-items:center;justify-content:center;padding:0;
+}
+.card .remove:hover{border-color:var(--ink);color:var(--ink)}
+.card.source::after{
+  content:"근원";position:absolute;bottom:6px;right:8px;
+  font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:var(--ink-45);
+}
+
+/* 조작 줄 */
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.controls .group{display:flex;gap:6px;align-items:center;padding-right:10px;margin-right:2px;border-right:1px solid var(--rule)}
+.controls .group:last-of-type{border-right:none}
+.controls .glabel{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;color:var(--ink-45)}
+
+/* 피드백 */
+.feedback{
+  border:1px solid var(--rule-soft);border-left:3px solid var(--rule);
+  background:var(--surface);border-radius:var(--r);padding:14px 18px;margin-bottom:18px;
+  box-shadow:var(--shadow);
+}
+.feedback.hide{display:none}
+.feedback .ftitle{font-weight:600;margin-bottom:4px}
+.feedback p{margin:0;color:var(--ink-70);font-size:14px}
+.feedback .line{
+  margin-top:10px;font-family:var(--mono);font-size:12.5px;color:var(--ink-70);
+  background:#F6F8FA;border-radius:6px;padding:8px 10px;overflow-x:auto;white-space:nowrap;
+}
+.feedback.ok{border-left-color:var(--chemical)}
+.feedback.warn{border-left-color:var(--light)}
+.feedback.no{border-left-color:var(--thermal)}
+.feedback.ask{border-left-color:var(--ink)}
+.feedback .ask-q{font-size:17px;font-weight:600;letter-spacing:-.01em;margin-top:6px}
+
+/* 보관함 */
+.tray{
+  background:var(--surface);border:1px solid var(--rule-soft);border-radius:var(--r);
+  padding:14px 18px 18px;box-shadow:var(--shadow);
+}
+.tray-head{display:flex;align-items:baseline;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.tray-head h3{margin:0;font-size:14px;font-weight:600}
+.tray-head .hint{font-size:12.5px;color:var(--ink-45)}
+.tray-cards{display:flex;gap:9px;flex-wrap:wrap}
+.tray.drop{background:#F4F7F9;border-color:var(--ink)}
+
+@media (max-width:640px){
+  main{padding:20px 14px 32px}
+  .topbar{padding:12px 14px}
+  .slot,.card{width:132px}
+  .fixed{width:140px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important;animation:none!important}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <b>에너지 전환 사슬 추적</b>
+    <span class="unit">통합과학 · 에너지의 전환과 보존</span>
+  </div>
+  <div class="spacer"></div>
+  <button class="btn small" id="backBtn" hidden>사건 다시 고르기</button>
+</header>
+
+<main>
+  <!-- 사건 고르기 -->
+  <section id="pickScreen">
+    <div class="pick-head">
+      <div class="eyebrow">STEP 01 — 사건 고르기</div>
+      <h1>하나의 사건을 골라, 그 앞뒤를 끝까지 따라가 봅시다.</h1>
+      <p>모든 사건은 “에너지 A → 에너지 B”라는 한 마디입니다. 그 마디의 왼쪽으로는 “이 에너지는 어디서 왔는가”를, 오른쪽으로는 “이 에너지는 어디로 가는가”를 채웁니다.</p>
+    </div>
+    <div class="grid" id="eventGrid"></div>
+  </section>
+
+  <!-- 활동 -->
+  <section id="playScreen" hidden>
+    <div class="event-head">
+      <div class="eyebrow" id="evEyebrow"></div>
+      <h2 id="evTitle"></h2>
+      <p class="scene" id="evScene"></p>
+      <p class="conv" id="evConv"></p>
+      <div class="branch-note" id="branchNote" hidden></div>
+    </div>
+
+    <div class="railwrap">
+      <div class="rail-labels">
+        <span>← 어디서 왔는가 · 더 거슬러 갈 수 없을 때까지</span>
+        <span>어디로 가는가 · 장면이 끝나는 곳까지 →</span>
+      </div>
+      <div class="railbox" id="railbox">
+        <div class="rail" id="rail"></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn primary" id="checkBtn">확인하기</button>
+      <button class="btn" id="hintBtn">힌트 한 단계</button>
+      <button class="btn" id="resetBtn">사슬 비우기</button>
+      <button class="btn small" id="copyBtn">한 줄로 복사</button>
+      <button class="btn small" id="imgBtn">이미지로 저장</button>
+    </div>
+
+    <div class="feedback hide" id="feedback"></div>
+    <div class="feedback hide" id="terminal"></div>
+
+    <div class="tray" id="tray">
+      <div class="tray-head">
+        <h3>에너지 카드 보관함</h3>
+        <span class="hint">카드를 사슬 쪽으로 끌어다 놓으면 <b>가장 가까운 자리</b>에 들어갑니다. 정확히 빈칸을 맞히지 않아도 됩니다. 누른 뒤 놓을 자리를 누르는 방식도 됩니다. 빼려면 카드의 ×를 누르거나 보관함으로 끌어다 놓으세요.</span>
+      </div>
+      <div class="tray-cards" id="trayCards"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+"use strict";
+
+/* ============================================================
+   1. 에너지 형태 — 색과 설명
+   ============================================================ */
+const TYPES = {
+  light:    { name:"빛에너지",      color:"#E8B93B" },
+  thermal:  { name:"열에너지",      color:"#E2653A" },
+  kinetic:  { name:"운동 에너지",   color:"#2F6FE0" },
+  chemical: { name:"화학 에너지",   color:"#2E9E6B" },
+  electric: { name:"전기 에너지",   color:"#7B4FD6" },
+  potential:{ name:"위치 에너지", color:"#17958F" },
+  elastic:  { name:"탄성 위치 에너지", color:"#C7458C" },
+  sound:    { name:"소리 에너지",   color:"#2F8FA8" },
+  nuclear:  { name:"핵에너지",      color:"#B03A3A" },
+  gravity:  { name:"중력 위치 에너지", color:"#4A5AA8" }
+};
+
+/* 라벨 → 에너지 형태. "인간의 화학 에너지"와 "화학 에너지"를 같은 것으로 봅니다. */
+function typeOf(label){
+  const s = String(label);
+  if (s.includes("핵")) return "nuclear";
+  if (s.includes("빛") || s.includes("복사")) return "light";
+  if (s.includes("화학")) return "chemical";
+  if (s.includes("탄성")) return "elastic";
+  if (s.includes("중력")) return "gravity";
+  if (s.includes("위치")) return "potential";
+  if (s.includes("운동") || s.includes("역학")) return "kinetic";
+  if (s.includes("전기")) return "electric";
+  if (s.includes("소리")) return "sound";
+  if (s.includes("열") || s.includes("내부")) return "thermal";
+  return "light";
+}
+const isSolar = l => String(l).includes("태양");
+
+/* 더 거슬러 올라갈 수 없는 근원 에너지 — 사슬의 맨 앞에만 올 수 있습니다 */
+function isOrigin(label){
+  if (!label) return false;
+  if (isSolar(label)) return true;
+  const t = typeOf(label);
+  return t === "nuclear" || t === "gravity";
+}
+const originGlyph = l => isSolar(l) ? "☀" : (typeOf(l) === "nuclear" ? "⚛" : "☾");
+const colorOf = l => TYPES[typeOf(l)].color;
+
+/* 보관함 카드 */
+const DECK = [
+  { label:"태양의 빛에너지",  source:true,  desc:"지구에서 일어나는 거의 모든 전환의 출발점. 태양 중심의 핵융합에서 나온 복사 에너지입니다." },
+  { label:"빛에너지",         desc:"전자기파의 형태로 퍼져 나가는 에너지. 복사 에너지라고도 합니다." },
+  { label:"화학 에너지",      desc:"물질의 결합 속에 저장된 에너지. 음식, 연료, 전지 속에 들어 있습니다." },
+  { label:"운동 에너지",      desc:"움직이는 물체가 가지는 에너지. 질량이 크고 빠를수록 큽니다." },
+  { label:"위치 에너지",    desc:"높은 곳에 있는 물체가 가지는 중력 위치 에너지." },
+  { label:"탄성 위치 에너지", desc:"늘어나거나 눌린 용수철, 고무줄, 활시위에 저장된 에너지." },
+  { label:"열에너지",         desc:"물질을 이루는 입자들의 무질서한 운동 에너지. 많은 사슬이 여기서 끝나지만, 화학·위치 에너지처럼 저장된 형태로 멈추는 사슬도 있습니다." },
+  { label:"전기 에너지",      desc:"전하의 흐름을 통해 전달되는 에너지. 다른 형태로 바꾸기 쉽습니다." },
+  { label:"소리 에너지",      desc:"물체의 진동이 매질을 통해 퍼져 나가는 에너지." },
+  { label:"핵에너지",         source:true, desc:"원자핵이 쪼개지거나 합쳐질 때 방출되는 에너지. 더 거슬러 올라갈 수 없는 근원입니다." },
+  { label:"중력 위치 에너지(천체)", source:true, desc:"달과 지구처럼 천체 사이의 거리에 따라 저장되는 에너지. 밀물과 썰물의 원인입니다." },
+  { label:"지각의 열에너지",  desc:"땅속 깊은 곳이 품고 있는 열. 태양에서 온 것은 아니지만, 이것도 어디선가 온 에너지입니다." }
+];
+
+/* ============================================================
+   2. 사건 데이터
+   fixed  : 화면 가운데에 고정되는 이 순간의 전환
+   answer : 예시 정답. 중간 단계가 더 세분화되어도 정답으로 봅니다.
+   origin : 추적이 끝나는 지점과, 그때 던지는 질문
+   ============================================================ */
+const events = [
+  { id:1, category:"신체", title:"공을 발로 찬다",
+    fixed:["인간의 화학 에너지","공의 역학적 에너지"],
+    answer:["태양의 빛에너지","식물의 화학 에너지","인간의 화학 에너지","공의 역학적 에너지","열에너지"], isException:false },
+  { id:2, category:"신체", title:"계단을 뛰어 올라간다",
+    fixed:["인간의 화학 에너지","몸의 위치 에너지"],
+    answer:["태양의 빛에너지","식물의 화학 에너지","인간의 화학 에너지","몸의 위치 에너지"], isException:false },
+  { id:3, category:"신체", title:"기타 줄을 튕긴다",
+    fixed:["손의 운동 에너지","소리 에너지"],
+    answer:["태양의 빛에너지","식물의 화학 에너지","인간의 화학 에너지","손의 운동 에너지","소리 에너지","열에너지"], isException:false,
+    optional:["elastic"] },
+  { id:4, category:"신체", title:"손을 비벼 따뜻하게 한다",
+    fixed:["손의 운동 에너지","열에너지"],
+    answer:["태양의 빛에너지","식물의 화학 에너지","인간의 화학 에너지","손의 운동 에너지","열에너지"], isException:false },
+  { id:5, category:"신체", title:"활시위를 당겼다 놓는다",
+    fixed:["인간의 화학 에너지","탄성 위치 에너지","화살의 운동 에너지"],
+    answer:["태양의 빛에너지","식물의 화학 에너지","인간의 화학 에너지","탄성 위치 에너지","화살의 운동 에너지","열에너지"], isException:false },
+
+  { id:6, category:"기계·전기", title:"자동차가 브레이크를 밟아 멈춘다",
+    fixed:["자동차의 운동 에너지","열에너지"],
+    answer:["태양의 빛에너지","고대 생물의 화학 에너지","연료의 화학 에너지","자동차의 운동 에너지","열에너지"], isException:false },
+  { id:7, category:"기계·전기", title:"엘리베이터가 올라간다",
+    fixed:["전기 에너지","위치 에너지"],
+    answer:["태양의 빛에너지","연료의 화학 에너지","수증기의 열에너지","터빈의 운동 에너지","전기 에너지","위치 에너지"], isException:false },
+  { id:8, category:"기계·전기", title:"선풍기가 돌아 바람을 일으킨다",
+    fixed:["전기 에너지","공기의 운동 에너지"],
+    answer:["태양의 빛에너지","연료의 화학 에너지","수증기의 열에너지","터빈의 운동 에너지","전기 에너지","공기의 운동 에너지","열에너지"], isException:false },
+  { id:9, category:"기계·전기", title:"전구에 불이 켜진다",
+    fixed:["전기 에너지","빛·열에너지"],
+    answer:["태양의 빛에너지","연료의 화학 에너지","수증기의 열에너지","터빈의 운동 에너지","전기 에너지","빛·열에너지","열에너지"], isException:false },
+  { id:10, category:"기계·전기", title:"휴대폰을 충전해 쓰면 따뜻해진다",
+    fixed:["전기 에너지","전지의 화학 에너지"],
+    answer:["태양의 빛에너지","연료의 화학 에너지","수증기의 열에너지","터빈의 운동 에너지","전기 에너지","전지의 화학 에너지","열에너지"], isException:false },
+
+  { id:11, category:"발전", title:"화력발전소에서 석탄을 태워 전기를 만든다",
+    fixed:["석탄의 화학 에너지","수증기의 열에너지"],
+    answer:["태양의 빛에너지","고대 식물의 화학 에너지","석탄의 화학 에너지","수증기의 열에너지","터빈의 운동 에너지","전기 에너지"], isException:false },
+  { id:13, category:"발전", title:"떨어지는 물이 수력발전소에서 전기를 만든다",
+    fixed:["물의 운동 에너지","전기 에너지"],
+    answer:["태양의 빛에너지","수증기의 위치 에너지","물의 위치 에너지","물의 운동 에너지","전기 에너지"], isException:false },
+  { id:14, category:"발전", title:"바람이 풍력발전기를 돌려 전기를 만든다",
+    fixed:["바람의 운동 에너지","전기 에너지"],
+    answer:["태양의 빛에너지","공기의 열에너지","바람의 운동 에너지","전기 에너지"], isException:false },
+  { id:15, category:"발전", title:"태양광 패널이 만든 전기로 전등을 켠다",
+    fixed:["태양의 빛에너지","전기 에너지"],
+    answer:["태양의 빛에너지","전기 에너지","전등의 빛에너지"], isException:false },
+
+  { id:16, category:"자연 현상", title:"햇빛에 바닷물이 증발해 비가 되어 내린다",
+    fixed:["태양의 복사 에너지","수증기의 위치 에너지"],
+    answer:["태양의 복사 에너지","수증기의 위치 에너지","빗방울의 운동 에너지"], isException:false },
+  { id:17, category:"자연 현상", title:"폭포에서 물이 떨어진다",
+    fixed:["물의 위치 에너지","물의 운동 에너지"],
+    answer:["태양의 빛에너지","물의 위치 에너지","물의 운동 에너지","열에너지"], isException:false },
+  { id:18, category:"자연 현상", title:"잎이 햇빛으로 만든 양분을 애벌레가 먹는다",
+    fixed:["태양의 복사 에너지","식물의 화학 에너지"],
+    answer:["태양의 복사 에너지","식물의 화학 에너지","애벌레의 화학 에너지"], isException:false },
+  { id:21, category:"자연 현상", title:"소가 풀을 뜯어 먹는다",
+    fixed:["식물의 화학 에너지","소의 화학 에너지"],
+    answer:["태양의 빛에너지","식물의 화학 에너지","소의 화학 에너지"], isException:false },
+  { id:22, category:"자연 현상", title:"장작이 타오른다",
+    fixed:["나무의 화학 에너지","빛·열에너지"],
+    answer:["태양의 빛에너지","나무의 화학 에너지","빛·열에너지"], isException:false },
+
+  { id:23, category:"예외", title:"온천물이 데워진다",
+    fixed:["지각의 열에너지","온천물의 열에너지"],
+    answer:["지구 속의 핵에너지","지각의 열에너지","온천물의 열에너지"], isException:true,
+    question:"그렇다면 지구 속의 핵에너지는 어디서 왔을까요?" },
+  { id:24, category:"예외", title:"밀물이 들어온다",
+    fixed:["달의 중력 위치 에너지","바닷물의 운동 에너지"],
+    answer:["달의 중력 위치 에너지","바닷물의 운동 에너지","열에너지"], isException:true,
+    question:"그렇다면 달과 지구는 이 에너지를 어떻게 나누어 가질까요?" },
+  { id:25, category:"예외", title:"원자로에서 핵분열로 물을 끓여 전기를 만든다",
+    fixed:["핵에너지","수증기의 열에너지"],
+    answer:["핵에너지","수증기의 열에너지","터빈의 운동 에너지","전기 에너지"], isException:true,
+    question:"그렇다면 원자핵 속의 에너지는 어디서 왔을까요?" }
+];
+
+/* ------------------------------------------------------------
+   장면 설명 — 제목만으로는 사슬을 유추할 수 없습니다.
+   에너지가 어디서 왔고 어디서 멈추는지, 추적에 필요한 만큼만 상황을 못 박습니다.
+   ------------------------------------------------------------ */
+const SCENES = {
+  1: "아침에 먹은 밥의 힘으로 공을 힘껏 찬다. 공은 잔디밭을 굴러가다 멈춘다.",
+  2: "밥을 먹고 계단을 뛰어 올라가, 옥상에 올라선 채로 서 있다.",
+  3: "밥을 먹고 기타 줄을 튕긴다. 소리는 방 안에 퍼지다가 잦아든다.",
+  4: "밥을 먹고 추운 날 두 손을 빠르게 비빈다. 손바닥이 따뜻해진다.",
+  5: "밥을 먹고 활시위를 힘껏 당겼다 놓는다. 화살은 날아가 과녁에 박힌다.",
+  6: "땅속에서 뽑아 올린 석유로 만든 휘발유로 달리던 자동차가 브레이크를 밟아 멈춘다. 브레이크 패드가 뜨거워진다.",
+  7: "콘센트에서 온 전기로 엘리베이터가 10층까지 올라가, 그 층에 멈춰 선다.",
+  8: "콘센트에서 온 전기로 선풍기가 돌아간다. 바람이 방 안을 돌다가 잦아든다.",
+  9: "콘센트에서 온 전기로 백열전구에 불이 켜진다. 빛은 벽과 물건에 흡수된다.",
+  10:"콘센트에 꽂아 휴대폰을 충전한다. 충전한 전기로 하루 종일 쓰면 기기가 따뜻해진다.",
+  11:"수억 년 전 식물이 묻혀 만들어진 석탄을 태워 물을 끓인다. 그 수증기가 터빈과 발전기를 돌린다.",
+  13:"산에 내린 비가 모여 댐에 가둬 둔 물이 떨어지며 터빈을 돌려 전기를 만든다. 만들어진 전기는 송전선을 타고 떠난다.",
+  14:"햇빛에 데워진 공기가 만든 바닷바람이 풍력발전기의 날개를 돌려 전기를 만든다. 만들어진 전기는 송전선을 타고 떠난다.",
+  15:"지붕에 놓인 태양광 패널이 햇빛을 받아 전기를 만든다. 그 전기로 방의 전등이 켜진다.",
+  16:"햇빛을 받은 바닷물이 증발해 하늘로 올라간다. 수증기는 구름이 되었다가 비로 떨어진다.",
+  17:"산에 내린 비가 모여 흐르던 강물이 폭포로 떨어져, 아래 웅덩이에 부딪히며 부서진다.",
+  18:"잎이 햇빛을 받아 광합성으로 포도당을 만들어 몸에 저장한다. 그 잎을 애벌레가 갉아 먹는다.",
+  21:"소가 들판의 풀을 뜯어 먹고, 그 힘으로 하루 종일 걷고 되새김질한다. 소의 몸에서는 계속 열이 난다.",
+  22:"숲에서 자란 나무를 말려 만든 장작이 타오르며 빛과 열을 낸다. 불빛은 둘러앉은 사람과 주변에 흡수된다.",
+  23:"땅속의 열이 지하수를 데워 온천물이 솟는다. 물은 식으면서 주변으로 열을 내보낸다.",
+  24:"달의 인력에 끌려 바닷물이 해안으로 밀려든다. 물은 갯벌에 부딪히며 잦아든다.",
+  25:"원자로에서 핵분열이 일어나 물을 끓인다. 그 수증기가 터빈을 돌려 전기를 만든다."
+};
+events.forEach(ev => { ev.scene = SCENES[ev.id] || ""; });
+events.forEach((ev, i) => { ev.no = i + 1; });
+
+/* ------------------------------------------------------------
+   갈래가 갈리는 사건 — 왼쪽 구간의 정답이 하나가 아닙니다.
+   콘센트의 전기는 어느 발전소에서 왔는지에 따라 앞의 사슬이 통째로 달라집니다.
+   ------------------------------------------------------------ */
+const POWER_BRANCHES = [
+  { name:"화력 발전",   start:["태양의 빛에너지","연료의 화학 에너지","수증기의 열에너지","터빈의 운동 에너지"] },
+  { name:"수력 발전",   start:["태양의 빛에너지","수증기의 위치 에너지","물의 위치 에너지","물의 운동 에너지"] },
+  { name:"풍력 발전",   start:["태양의 빛에너지","공기의 열에너지","바람의 운동 에너지"] },
+  { name:"태양광 발전", start:["태양의 빛에너지"] },
+  { name:"원자력 발전", start:["핵에너지","수증기의 열에너지","터빈의 운동 에너지"] }
+];
+const BRANCHES = {
+  7: POWER_BRANCHES, 8: POWER_BRANCHES, 9: POWER_BRANCHES, 10: POWER_BRANCHES
+};
+const BRANCH_NOTE = {
+  7:"이 전기는 어느 발전소에서 왔을까요?", 8:"이 전기는 어느 발전소에서 왔을까요?",
+  9:"이 전기는 어느 발전소에서 왔을까요?", 10:"이 전기는 어느 발전소에서 왔을까요?"
+};
+events.forEach(ev => { ev.branches = BRANCHES[ev.id] || null; ev.branchNote = BRANCH_NOTE[ev.id] || ""; });
+
+/* ------------------------------------------------------------
+   사슬의 끝이 반드시 열에너지인 것은 아닙니다.
+   에너지가 저장된 채 멈추거나(화학·위치·전기), 복사로 퍼져 나가며 끝나는
+   갈래도 정답으로 인정합니다. 아래는 오른쪽 구간의 다른 정답들입니다.
+   ------------------------------------------------------------ */
+const ALT_ENDS = {
+  1:  [["공의 위치 에너지","열에너지"]],                       // 공이 떠올라 잠시 저장
+  5:  [["과녁의 탄성 위치 에너지","열에너지"]],
+  10: [[], ["전기 에너지","열에너지"], ["전기 에너지","빛·열에너지"]],                          // 전지에 저장된 채 끝
+  15: [["열에너지"], ["전동기의 운동 에너지","열에너지"], ["전지의 화학 에너지"]],
+  16: [[], ["빗방울의 운동 에너지","물의 위치 에너지"]],        // 댐에 물로 저장
+  17: [["전기 에너지","열에너지"]],
+  18: [["열에너지"], ["애벌레의 화학 에너지","열에너지"], ["석탄의 화학 에너지"], []], // 수억 년 저장
+  23: [["전기 에너지","열에너지"]],                              // 지열 발전
+  24: [["전기 에너지","열에너지"]]                               // 조력 발전
+};
+events.forEach(ev => { ev.altEnds = ALT_ENDS[ev.id] || []; });
+
+const MAX_SLOTS = 5;
+
+/* ============================================================
+   3. 상태
+   left / right 는 놓인 카드만 순서대로 담습니다. 빈칸은 화면에서 자동으로 관리합니다.
+   ============================================================ */
+let state = null;
+let held = null;   // 눌러서 집어 든 카드
+
+const $ = id => document.getElementById(id);
+const escapeHtml = s => String(s).replace(/[&<>"']/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+/* ============================================================
+   4. 사건 고르기
+   ============================================================ */
+function renderGrid(){
+  const grid = $("eventGrid");
+  grid.innerHTML = "";
+  events.forEach(ev => {
+    const b = document.createElement("button");
+    b.className = "ecard"; b.type = "button";
+    const flow = ev.fixed.map(l =>
+      `<span class="dot" style="background:${colorOf(l)}"></span>${escapeHtml(l)}`).join(' <em>→</em> ');
+    b.innerHTML =
+      `<div class="no">${String(ev.no).padStart(2,"0")}` +
+      (ev.branches ? ` · 갈래 여럿` : "") + `</div>` +
+      `<h3>${escapeHtml(ev.title)}</h3><div class="flow">${flow}</div>`;
+    b.onclick = () => openEvent(ev);
+    grid.appendChild(b);
+  });
+}
+
+/* ============================================================
+   5. 활동 화면
+   ============================================================ */
+function openEvent(ev){
+  state = { ev, left:[], right:[], hint:0, wrong:new Set() };
+  held = null;
+  $("pickScreen").hidden = true;
+  $("playScreen").hidden = false;
+  $("backBtn").hidden = false;
+  $("evEyebrow").textContent = "EVENT " + String(ev.no).padStart(2,"0");
+  $("evTitle").textContent = ev.title;
+  $("evScene").textContent = ev.scene;
+  $("evConv").innerHTML = "이 순간의 전환 &nbsp;" + ev.fixed.map(l => `<b>${escapeHtml(l)}</b>`).join(" → ");
+  $("branchNote").innerHTML = ev.branches
+    ? `<b>갈래 여럿</b> ${escapeHtml(ev.branchNote)} 어느 갈래로 추적해도, 앞뒤가 이어지면 정답입니다.`
+    : "";
+  $("branchNote").hidden = !ev.branches;
+  hideResult();
+  renderAll();
+  window.scrollTo(0, 0);
+}
+
+function backToPick(){
+  $("playScreen").hidden = true;
+  $("pickScreen").hidden = false;
+  $("backBtn").hidden = true;
+  state = null; held = null;
+}
+
+const chainLabels = () => [...state.left, ...state.ev.fixed, ...state.right];
+const sunReached = () => isSolar(chainLabels()[0]);
+const originReached = () => isOrigin(chainLabels()[0]);
+const canAdd = side => state[side].length < MAX_SLOTS &&
+  !(side === "left" && originReached()) &&
+  !(side === "right" && isTerminalRight(state.ev));
+
+/* 주어진 사건 자체가 사슬의 끝인가 — 왼쪽의 근원 규칙과 짝을 이룹니다 */
+function isTerminalRight(ev){
+  const cut = findFixed(ev);
+  return cut + ev.fixed.length >= ev.answer.length && !(ev.altEnds || []).length;
+}
+
+/* ============================================================
+   6. 레일 그리기 — 슬롯은 자동으로 생기고 사라집니다
+   ============================================================ */
+function renderRail(){
+  const rail = $("rail");
+  const ev = state.ev;
+  rail.innerHTML = "";
+  rail.classList.toggle("picking", !!held);
+
+  if (originReached()) rail.appendChild(terminusEl(originGlyph(chainLabels()[0]), "left"));
+
+  if (canAdd("left")){
+    rail.appendChild(endSlot("left"));
+    rail.appendChild(linkEl());
+  }
+  state.left.forEach((label, i) => {
+    rail.appendChild(cardEl(label, {type:"slot", side:"left", idx:i}));
+    rail.appendChild(insLink("left", i + 1));
+  });
+
+  ev.fixed.forEach((label, i) => {
+    rail.appendChild(fixedEl(label));
+    if (i < ev.fixed.length - 1) rail.appendChild(linkEl(true));
+  });
+
+  if (state.right.length > 0) rail.appendChild(insLink("right", 0));
+  state.right.forEach((label, i) => {
+    rail.appendChild(cardEl(label, {type:"slot", side:"right", idx:i}));
+    if (i < state.right.length - 1) rail.appendChild(insLink("right", i + 1));
+  });
+  if (state.right.length === 0 && canAdd("right")){   // 한 장이라도 놓이면 빈칸을 거둡니다
+    rail.appendChild(linkEl());
+    rail.appendChild(endSlot("right"));
+  }
+  if (isTerminalRight(ev)) rail.appendChild(terminusEl("≋", "right"));
+
+  $("hintBtn").disabled = state.hint >= ev.answer.length;
+}
+
+function terminusEl(glyph, side){
+  const t = document.createElement("div");
+  t.className = "terminus " + side;
+  t.innerHTML = `<span class="sun">${glyph}</span><span class="txt">TRACE END</span>`;
+  return t;
+}
+
+function fixedEl(label){
+  const d = document.createElement("div");
+  d.className = "fixed";
+  d.innerHTML = `<span class="bar" style="background:${colorOf(label)}"></span>` +
+                `<span class="tag">주어진 사건</span><span class="lbl">${escapeHtml(label)}</span>`;
+  return d;
+}
+
+function linkEl(hot){
+  const d = document.createElement("div");
+  d.className = "link" + (hot ? " hot" : "");
+  d.innerHTML = `<span class="arrow">→</span>`;
+  return d;
+}
+
+/* 카드 사이에 끼워 넣을 수 있는 화살표 자리 */
+function insLink(side, index){
+  const d = linkEl();
+  d.classList.add("ins");
+  d.innerHTML = `<span class="arrow">→</span><span class="plus" title="여기에 끼워 넣기">+</span>`;
+  d.addEventListener("click", e => {
+    if (!held) return;
+    e.stopPropagation();
+    const p = held; held = null; insertAt(p, side, index);
+  });
+  return d;
+}
+
+/* 양 끝의 빈 슬롯 */
+function endSlot(side){
+  const s = document.createElement("div");
+  s.className = "slot empty" + (held ? " armed" : "");
+  s.addEventListener("click", e => {
+    if (!held) return;
+    e.stopPropagation();
+    const p = held; held = null;
+    insertAt(p, side, side === "left" ? 0 : state.right.length);
+  });
+  return s;
+}
+
+/* ------------------------------------------------------------
+   놓을 자리 찾기 — 손이 어디에 있든 가장 가까운 틈에 끼워 넣습니다
+   ------------------------------------------------------------ */
+function insertPoints(){
+  const rail = $("rail");
+  const pts = [];
+  const fixed = rail.querySelectorAll(".fixed");
+  if (!fixed.length) return pts;
+  const cards = [...rail.querySelectorAll(".card[data-side]")];
+  const lc = cards.filter(c => c.dataset.side === "left");
+  const rc = cards.filter(c => c.dataset.side === "right");
+  const L = state.left.length, R = state.right.length, sun = originReached();
+
+  if (L < MAX_SLOTS && !(sun && L === 0)){
+    lc.forEach((c, i) => {
+      if (i === 0 && sun) return;                       // 근원보다 앞은 없습니다
+      pts.push({side:"left", index:i, x:c.getBoundingClientRect().left});
+    });
+    pts.push({side:"left", index:L, x:fixed[0].getBoundingClientRect().left});
+  }
+  if (R < MAX_SLOTS && !isTerminalRight(state.ev)){
+    rc.forEach((c, j) => pts.push({side:"right", index:j, x:c.getBoundingClientRect().left}));
+    const last = rc.length ? rc[rc.length-1] : fixed[fixed.length-1];
+    pts.push({side:"right", index:R, x:last.getBoundingClientRect().right});
+  }
+  return pts;
+}
+
+function nearestPoint(x, y){
+  const box = $("railbox").getBoundingClientRect();
+  if (y < box.top - 80 || y > box.bottom + 30) return null;   // 보관함 쪽이면 놓을 자리가 아닙니다
+  const pts = insertPoints();
+  if (!pts.length) return null;
+  return pts.reduce((a, b) => Math.abs(b.x - x) < Math.abs(a.x - x) ? b : a);
+}
+
+function showCaret(p){
+  const rail = $("rail");
+  let c = rail.querySelector(".caret");
+  if (!p){ if (c) c.remove(); return; }
+  if (!c){ c = document.createElement("div"); c.className = "caret"; rail.appendChild(c); }
+  c.style.left = (p.x - rail.getBoundingClientRect().left - 1.5) + "px";
+}
+const hideCaret = () => showCaret(null);
+
+function cardEl(label, from){
+  const d = document.createElement("div");
+  const deck = DECK.find(x => x.label === label);
+  const wrong = from.type === "slot" && state.wrong.has(from.side + ":" + from.idx);
+  if (from.type === "slot"){ d.dataset.side = from.side; d.dataset.idx = from.idx; }
+  d.className = "card" +
+    (deck && deck.source ? " source" : "") +
+    (wrong ? " wrong" : "") +
+    (held && held.label === label && from.type === "tray" && held.from.type === "tray" ? " held" : "");
+  d.style.setProperty("--c", colorOf(label));
+  d.draggable = false;
+  d.title = wrong ? "다시 생각해 볼 카드입니다. 끌어서 바꾸거나 ×로 빼세요."
+                  : (deck ? deck.desc : label);
+  d.innerHTML = `<span class="bar"></span><span class="lbl">${escapeHtml(label)}</span>`;
+
+  if (from.type === "slot"){
+    const x = document.createElement("button");
+    x.className = "remove"; x.type = "button"; x.textContent = "×";
+    x.title = "이 카드를 보관함으로 되돌립니다";
+    x.onclick = e => { e.stopPropagation(); removeAt(from.side, from.idx); };
+    d.appendChild(x);
+  }
+
+  d.addEventListener("pointerdown", e => beginDrag(e, label, from, d));
+
+  d.addEventListener("click", e => {
+    if (justDragged) return;
+    if (from.type === "tray"){
+      if (held && held.from.type === "slot") cancelHeld();      // 들고 있던 카드는 제자리로
+      held = (held && held.label === label && held.from.type === "tray") ? null : {label, from};
+      renderAll();
+    } else {
+      if (held) return;              // 이미 든 카드가 있으면 "여기에 놓기"로 넘깁니다
+      e.stopPropagation();           // 집어 드는 동작이 곧바로 놓기로 이어지지 않게 합니다
+      held = {label, from};          // 사슬 위의 카드를 집어 다른 자리로 옮깁니다
+      state[from.side].splice(from.idx, 1);
+      clearMarks();
+      renderAll();
+    }
+  });
+  return d;
+}
+
+/* ---------- 카드 넣기 / 빼기 ---------- */
+function insertAt(payload, side, index){
+  if (payload.from.type === "slot"){
+    const s = payload.from.side, i = payload.from.idx;
+    state[s].splice(i, 1);
+    if (s === side && i < index) index--;
+  }
+  if (state[side].length >= MAX_SLOTS){
+    if (payload.from.type === "slot") state[payload.from.side].splice(payload.from.idx, 0, payload.label);
+    flash("warn", "이 쪽은 5단계까지입니다", "먼저 필요 없는 카드를 빼고 다시 넣어 보세요.");
+    return;
+  }
+  state[side].splice(index, 0, payload.label);
+  clearMarks();
+  hideResult();
+  renderAll();
+}
+
+function removeAt(side, idx){
+  state[side].splice(idx, 1);
+  clearMarks();
+  hideResult();
+  renderAll();
+}
+
+function clearMarks(){ state.wrong = new Set(); }
+
+/* ---------- 보관함 ---------- */
+function renderTray(){
+  const box = $("trayCards");
+  box.innerHTML = "";
+  DECK.forEach(d => box.appendChild(cardEl(d.label, {type:"tray"})));
+}
+
+/* ---------- 추적의 끝 — 확인하기로 정답을 맞혔을 때만 보여 줍니다 ---------- */
+function showSunQuestion(){
+  const box = $("terminal");
+  box.classList.remove("hide");
+  box.className = "feedback ask";
+  box.innerHTML =
+    `<div class="ftitle">여기가 추적의 끝입니다.</div>` +
+    `<p>태양의 빛에너지까지 거슬러 올라갔습니다. 더 왼쪽으로는 추적할 수 없습니다.</p>` +
+    `<div class="ask-q">그렇다면 태양은 이 에너지를 어디서 얻을까요?</div>`;
+}
+
+function showOriginQuestion(){        // 예외 사건을 옳게 추적했을 때
+  const ev = state.ev;
+  if (!ev.question) return;
+  const box = $("terminal");
+  box.classList.remove("hide");
+  box.className = "feedback ask";
+  box.innerHTML =
+    `<div class="ftitle">이 사슬은 태양에서 시작하지 않습니다.</div>` +
+    `<p>출발점은 <b>${escapeHtml(ev.answer[0])}</b>입니다.</p>` +
+    `<div class="ask-q">${escapeHtml(ev.question)}</div>`;
+}
+
+/* ============================================================
+   7. 검증 — 좌·우 구간을 따로 채점하고, 틀린 카드를 표시합니다
+   ============================================================ */
+function isSubsequence(a, b){
+  let i = 0;
+  for (const x of b){ if (i < a.length && a[i] === x) i++; }
+  return i === a.length;
+}
+
+/* 같은 형태가 연달아 나오면 한 단계로 묶습니다. 각 묶음이 어떤 카드였는지도 기억합니다. */
+function runs(types){
+  const out = [];
+  types.forEach((t, i) => {
+    if (out.length && out[out.length-1].type === t) out[out.length-1].idx.push(i);
+    else out.push({type:t, idx:[i]});
+  });
+  return out;
+}
+
+/* 정답 묶음과 학생 묶음의 최장 공통 부분수열 → 짝지어지지 못한 학생 묶음이 오답 */
+function unmatchedRuns(ansTypes, stuRuns){
+  const A = ansTypes, S = stuRuns.map(r => r.type);
+  const dp = Array.from({length:A.length+1}, () => new Array(S.length+1).fill(0));
+  for (let i=1;i<=A.length;i++)
+    for (let j=1;j<=S.length;j++)
+      dp[i][j] = A[i-1] === S[j-1] ? dp[i-1][j-1]+1 : Math.max(dp[i-1][j], dp[i][j-1]);
+  const matched = new Set();
+  let i = A.length, j = S.length;
+  while (i > 0 && j > 0){
+    if (A[i-1] === S[j-1]){ matched.add(j-1); i--; j--; }
+    else if (dp[i-1][j] >= dp[i][j-1]) i--;
+    else j--;
+  }
+  return stuRuns.filter((_, k) => !matched.has(k));
+}
+
+/* 어디서든 흩어져 나올 수 있는 형태 — 정답에 없어도 틀렸다고 하지 않습니다 */
+const LOSS = new Set(["thermal","sound"]);
+
+/* 2 = 정답, 1 = 방향은 맞으나 빠진 단계, 0 = 틀린 카드가 있음 */
+function sideEval(ansLabels, stuLabels, edgeType, optional, leftSide){
+  const A = runs(ansLabels.map(typeOf)).map(r => r.type);
+  const S = runs(stuLabels.map(typeOf));
+  const St = S.map(r => r.type);
+  const firstIsSource = !!(DECK.find(d => d.label === stuLabels[0]) || {}).source;
+  const forgive = (t, k) => {
+    // 사슬의 출발점이 열·소리일 수는 없습니다. 단 지각의 열에너지 같은 근원 카드는 예외입니다.
+    if (leftSide && k === 0 && LOSS.has(t) && !firstIsSource) return false;
+    // 열은 어느 단계에서든 생기고, 다음 단계로 이어지기도 합니다.
+    if (t === "thermal") return true;
+    // 소리는 흩어지며 끝나는 형태입니다. 뒤에 열·소리 말고 다른 단계가 이어지면 틀린 자리입니다.
+    if (t === "sound")
+      return !leftSide && St.slice(k + 1).every(x => x === "thermal" || x === "sound");
+    return (optional || []).includes(t);
+  };
+
+  if (A.length === 0){
+    const bad0 = S.filter((r, k) => r.type !== edgeType && !forgive(r.type, k));
+    return bad0.length ? {grade:0, wrong: bad0.flatMap(r => r.idx)} : {grade:2, wrong:[]};
+  }
+  const bad = unmatchedRuns(A, S).filter(r => !forgive(r.type, S.indexOf(r)));
+  if (bad.length) return {grade:0, wrong: bad.flatMap(r => r.idx)};
+  return isSubsequence(A, St) ? {grade:2, wrong:[]} : {grade:1, wrong:[]};
+}
+
+function findFixed(ev){
+  const a = ev.answer, f = ev.fixed;
+  for (let i = 0; i + f.length <= a.length; i++)
+    if (f.every((x, k) => a[i+k] === x)) return i;
+  return 0;
+}
+
+function check(){
+  const ev = state.ev;
+  const placed = [...state.left, ...state.right];
+  clearMarks();
+
+  if (placed.length === 0){
+    flash("warn", "아직 사슬이 비어 있습니다",
+      "왼쪽에는 “이 에너지는 어디서 왔는가”를, 오른쪽에는 “이 에너지는 어디로 가는가”를 채워 보세요.");
+    renderAll(); return;
+  }
+
+  // 예외 사건에 태양을 억지로 놓은 경우
+  if (ev.isException && placed.some(isSolar)){
+    state.left.forEach((l, i) => { if (isSolar(l)) state.wrong.add("left:" + i); });
+    state.right.forEach((l, i) => { if (isSolar(l)) state.wrong.add("right:" + i); });
+    flash("warn", "이 사건은 태양에서 시작되지 않을 수도 있습니다",
+      "이 에너지가 정말 햇빛에서 왔는지, 아니면 지구나 다른 천체가 원래 가지고 있던 것인지 다시 따져 보세요. " +
+      "옅은 붉은색 카드를 바꿔서 다시 시도해 보세요.");
+    renderAll(); return;
+  }
+
+  const cut = findFixed(ev);
+  const edgeR = typeOf(ev.fixed[ev.fixed.length-1]);
+  const leftCands = ev.branches || [{name:null, start:ev.answer.slice(0, cut)}];
+  const picked = leftCands
+    .map(b => ({b, r: sideEval(b.start, state.left, typeOf(ev.fixed[0]), ev.optional, true)}))
+    .sort((x, y) => y.r.grade - x.r.grade || x.r.wrong.length - y.r.wrong.length)[0];
+  const L = picked.r, branch = picked.b.name;
+  const R = [ev.answer.slice(cut + ev.fixed.length), ...ev.altEnds]
+    .map(a => sideEval(a, state.right, edgeR, ev.optional, false))
+    .sort((x, y) => y.grade - x.grade || x.wrong.length - y.wrong.length)[0];
+  L.wrong.forEach(i => state.wrong.add("left:" + i));
+  R.wrong.forEach(i => state.wrong.add("right:" + i));
+
+  const grade = Math.min(L.grade, R.grade);
+  const retry = " 옅은 붉은색으로 표시된 카드를 빼거나 바꿔서 다시 도전해 보세요.";
+
+  if (grade === 2){
+    flash("ok", "잘 추적했습니다!",
+      "에너지의 흐름을 순서대로 이어 냈습니다. 중간 단계를 더 잘게 나누어 놓았더라도 흐름이 맞으면 정답입니다."
+      + branchNote(branch) + endNote(),
+      chainText());
+    if (ev.isException) showOriginQuestion();
+    else if (sunReached()) showSunQuestion();
+    else showBranchOrigin();
+  } else if (grade === 1){
+    flash("warn", "방향은 맞습니다.", "중간에 빠진 단계가 있는지 확인해보세요.", chainText());
+  } else {
+    flash("no", "다시 생각해보세요.",
+      "이 에너지는 바로 앞 단계에서 어떻게 만들어졌을까요?" + retry, chainText());
+  }
+  renderAll();
+}
+
+/* 여러 갈래 중 어느 길로 추적했는지 알려 줍니다 */
+function branchNote(name){
+  const ev = state.ev;
+  if (!ev.branches || !name) return "";
+  const others = ev.branches.filter(b => b.name !== name).map(b => b.name).join(", ");
+  return ` <b>${escapeHtml(name)}</b> 갈래로 추적했습니다. 이 사건은 ${escapeHtml(others)} 갈래로도 추적할 수 있습니다. 다른 갈래로도 한 번 해 보세요.`;
+}
+
+/* 태양에도, 정해진 근원에도 닿지 않은 갈래 */
+function showBranchOrigin(){
+  const first = chainLabels()[0];
+  const box = $("terminal");
+  box.classList.remove("hide");
+  box.className = "feedback ask";
+  box.innerHTML =
+    `<div class="ftitle">이 갈래는 태양에서 시작하지 않습니다.</div>` +
+    `<p>출발점은 <b>${escapeHtml(first)}</b>입니다.</p>` +
+    `<div class="ask-q">그렇다면 이 에너지는 어디서 왔을까요?</div>`;
+}
+
+/* 사슬이 열에너지로 끝나지 않았을 때 덧붙이는 설명 */
+function endNote(){
+  const last = chainLabels()[chainLabels().length - 1];
+  const t = typeOf(last);
+  if (t === "thermal") return "";
+  if (t === "light" || t === "sound")
+    return ` 이 사슬은 열로 흩어지는 대신 <b>${escapeHtml(last)}</b>의 형태로 퍼져 나가며 끝났습니다. 지구가 우주로 내보내는 에너지도 이런 복사입니다.`;
+  if (t === "kinetic")
+    return ` 이 사슬은 <b>${escapeHtml(last)}</b>로, 아직 움직이는 중인 상태에서 끝났습니다. 이 운동도 곧 다른 형태로 바뀝니다.`;
+  if (t === "electric")
+    return ` 이 사슬은 <b>${escapeHtml(last)}</b>로 다른 곳에 전달된 채 끝났습니다. 전기는 저장된 것도, 흩어진 것도 아닙니다. 쓰이는 곳에서 다시 빛·운동·열로 바뀝니다.`;
+  return ` 이 사슬은 열로 흩어지지 않고 <b>${escapeHtml(last)}</b>로 저장된 채 멈췄습니다. 저장된 에너지는 나중에 다시 다른 형태로 전환됩니다.`;
+}
+
+function hint(){
+  const ev = state.ev;
+  if (state.hint >= ev.answer.length) return;
+  const n = ++state.hint;
+  const cav = ev.branches
+    ? ` 이 사건은 갈래가 여럿이라, 힌트는 그중 <b>${escapeHtml(ev.branches[0].name)}</b> 갈래의 예입니다.`
+    : "";
+  flash("ask", `힌트 ${n} / ${ev.answer.length}`,
+    `사슬을 왼쪽부터 셀 때 ${n}번째 자리에 오는 것은 <b>${escapeHtml(ev.answer[n-1])}</b>입니다.` + cav);
+  $("hintBtn").disabled = state.hint >= ev.answer.length;
+}
+
+function flash(kind, title, body, line){
+  const box = $("feedback");
+  box.classList.remove("hide");
+  box.className = "feedback " + kind;
+  box.innerHTML = `<div class="ftitle">${escapeHtml(title)}</div><p>${body}</p>` +
+    (line ? `<div class="line">${escapeHtml(line)}</div>` : "");
+}
+function hideFeedback(){ $("feedback").classList.add("hide"); }
+function hideResult(){ hideFeedback(); $("terminal").classList.add("hide"); }
+
+/* ============================================================
+   8. 내보내기
+   ============================================================ */
+const chainText = () => chainLabels().join(" → ");
+
+async function copyChain(){
+  const text = `[${state.ev.title}] ${chainText()}`;
+  try { await navigator.clipboard.writeText(text); }
+  catch (e){
+    const ta = document.createElement("textarea");
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); } catch(_){}
+    document.body.removeChild(ta);
+  }
+  flash("ok", "복사했습니다", "친구들의 사슬과 나란히 붙여 놓고 비교해 보세요.", text);
+}
+
+function roundRect(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x+r, y);
+  ctx.arcTo(x+w, y, x+w, y+h, r);
+  ctx.arcTo(x+w, y+h, x, y+h, r);
+  ctx.arcTo(x, y+h, x, y, r);
+  ctx.arcTo(x, y, x+w, y, r);
+  ctx.closePath();
+}
+function wrap(ctx, text, max){
+  const words = text.split(" ");
+  const lines = []; let cur = "";
+  for (const w of words){
+    const t = cur ? cur + " " + w : w;
+    if (ctx.measureText(t).width > max && cur){ lines.push(cur); cur = w; }
+    else cur = t;
+  }
+  if (cur) lines.push(cur);
+  return lines.slice(0, 3);
+}
+
+function saveImage(){
+  const labels = chainLabels();
+  const fixedSet = new Set(state.ev.fixed);
+  const SANS = '"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif';
+  const NW = 168, GAP = 40, PAD = 40, NH = 92;
+  const W = PAD*2 + labels.length*NW + (labels.length-1)*GAP, H = 250, dpr = 2;
+
+  const c = document.createElement("canvas");
+  c.width = W*dpr; c.height = H*dpr;
+  const ctx = c.getContext("2d");
+  ctx.scale(dpr, dpr);
+  ctx.fillStyle = "#EDF0F3"; ctx.fillRect(0, 0, W, H);
+
+  ctx.fillStyle = "#6B7B87"; ctx.font = `500 12px ${SANS}`;
+  ctx.fillText("에너지 전환 사슬 추적 · 통합과학", PAD, 44);
+  ctx.fillStyle = "#12202B"; ctx.font = `600 24px ${SANS}`;
+  ctx.fillText(state.ev.title, PAD, 76);
+
+  const top = 116;
+  labels.forEach((label, i) => {
+    const x = PAD + i*(NW+GAP), isFixed = fixedSet.has(label), col = colorOf(label);
+    roundRect(ctx, x, top, NW, NH, 10);
+    ctx.fillStyle = isFixed ? "#12202B" : "#FFFFFF"; ctx.fill();
+    if (!isFixed){ ctx.strokeStyle = col; ctx.lineWidth = 1.5; ctx.stroke(); }
+    ctx.fillStyle = col; roundRect(ctx, x+14, top+18, 26, 4, 2); ctx.fill();
+    ctx.fillStyle = isFixed ? "#FFFFFF" : "#12202B"; ctx.font = `500 15px ${SANS}`;
+    wrap(ctx, label, NW-28).forEach((ln, k) => ctx.fillText(ln, x+14, top+50+k*20));
+    if (i < labels.length-1){
+      const mx = x + NW, my = top + NH/2;
+      ctx.strokeStyle = "#C9D4DC"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(mx+6, my); ctx.lineTo(mx+GAP-10, my); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(mx+GAP-6, my); ctx.lineTo(mx+GAP-14, my-5); ctx.lineTo(mx+GAP-14, my+5);
+      ctx.fillStyle = "#C9D4DC"; ctx.fill();
+    }
+  });
+
+  ctx.fillStyle = "#6B7B87"; ctx.font = `400 12px ${SANS}`;
+  ctx.fillText(new Date().toLocaleDateString("ko-KR"), PAD, H-24);
+
+  const a = document.createElement("a");
+  a.download = `에너지사슬_${state.ev.title}.png`;
+  a.href = c.toDataURL("image/png");
+  a.click();
+}
+
+/* ============================================================
+   9. 묶기
+   ============================================================ */
+function renderAll(){ renderRail(); renderTray(); }
+
+/* ------------------------------------------------------------
+   포인터 드래그 — 마우스와 손가락을 같은 방식으로 다룹니다
+   ------------------------------------------------------------ */
+let dnd = null, justDragged = false;
+
+function beginDrag(e, label, from, node){
+  if (e.button > 0) return;
+  const r = node.getBoundingClientRect();
+  dnd = { label, from, node, x0:e.clientX, y0:e.clientY, w:r.width,
+          offX:e.clientX - r.left, offY:e.clientY - r.top, active:false };
+  window.addEventListener("pointermove", onDragMove);
+  window.addEventListener("pointerup", onDragEnd);
+  window.addEventListener("pointercancel", onDragEnd);
+}
+
+function onDragMove(e){
+  if (!dnd) return;
+  if (!dnd.active){
+    if (Math.abs(e.clientX - dnd.x0) + Math.abs(e.clientY - dnd.y0) < 6) return;
+    dnd.active = true;
+    if (held) cancelHeld();
+    const g = dnd.node.cloneNode(true);
+    const rm = g.querySelector(".remove"); if (rm) rm.remove();
+    g.classList.add("ghost");
+    g.style.width = dnd.w + "px";
+    document.body.appendChild(g);
+    dnd.ghost = g;
+    dnd.node.classList.add("dragging");
+    $("rail").classList.add("picking");
+  }
+  dnd.ghost.style.left = (e.clientX - dnd.offX) + "px";
+  dnd.ghost.style.top  = (e.clientY - dnd.offY) + "px";
+  autoScroll(e.clientX);
+  showCaret(nearestPoint(e.clientX, e.clientY));
+}
+
+function onDragEnd(e){
+  window.removeEventListener("pointermove", onDragMove);
+  window.removeEventListener("pointerup", onDragEnd);
+  window.removeEventListener("pointercancel", onDragEnd);
+  if (!dnd) return;
+  const d = dnd; dnd = null;
+  if (!d.active) return;                       // 그냥 눌렀다 뗀 것 → 누르기로 처리
+  justDragged = true;
+  setTimeout(() => { justDragged = false; }, 0);
+  if (d.ghost) d.ghost.remove();
+  d.node.classList.remove("dragging");
+  hideCaret();
+  $("rail").classList.remove("picking");
+
+  const t = $("tray").getBoundingClientRect();
+  const onTray = e.clientX >= t.left && e.clientX <= t.right &&
+                 e.clientY >= t.top  && e.clientY <= t.bottom;
+  const p = onTray ? null : nearestPoint(e.clientX, e.clientY);
+
+  if (p) insertAt({label:d.label, from:d.from}, p.side, p.index);
+  else if (d.from.type === "slot") removeAt(d.from.side, d.from.idx);   // 보관함으로 되돌리기
+  else renderAll();
+}
+
+function autoScroll(x){
+  const box = $("railbox"), r = box.getBoundingClientRect();
+  if (x > r.right - 70) box.scrollLeft += 16;
+  else if (x < r.left + 70) box.scrollLeft -= 16;
+}
+
+/* 레일 아무 데나 눌러도 가장 가까운 자리에 들어갑니다 */
+function initRailDrop(){
+  $("railbox").addEventListener("click", e => {
+    if (!held || justDragged) return;
+    const p = nearestPoint(e.clientX, e.clientY);
+    if (!p){ flash("warn", "이 쪽은 5단계까지입니다", "먼저 필요 없는 카드를 빼고 다시 넣어 보세요."); return; }
+    const h = held; held = null;
+    insertAt(h, p.side, p.index);
+  });
+  $("tray").addEventListener("click", e => {
+    if (held && e.target === $("tray")) cancelHeld();
+  });
+}
+
+/* 집어 든 카드를 원래 자리로 되돌립니다 */
+function cancelHeld(){
+  if (!held) return;
+  if (held.from.type === "slot"){
+    const arr = state[held.from.side];
+    arr.splice(Math.min(held.from.idx, arr.length), 0, held.label);
+  }
+  held = null;
+  renderAll();
+}
+
+document.addEventListener("keydown", e => { if (e.key === "Escape") cancelHeld(); });
+
+$("backBtn").onclick = backToPick;
+$("checkBtn").onclick = check;
+$("hintBtn").onclick = hint;
+$("resetBtn").onclick = () => {
+  state.left = []; state.right = []; state.hint = 0;
+  clearMarks(); held = null;
+  hideResult();
+  renderAll();
+};
+$("copyBtn").onclick = copyChain;
+$("imgBtn").onclick  = saveImage;
+
+initRailDrop();
+renderGrid();
+
+</script>
+</body>
+</html>
