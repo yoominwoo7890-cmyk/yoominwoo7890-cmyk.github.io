@@ -1,1 +1,1617 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>운동과 벡터 실험실 — 속도변화 벡터 시각화</title>
+<style>
+  :root{
+    --bg:#E9E8E2;
+    --panel:#F7F6F1;
+    --panel-line:#D8D6CC;
+    --ink:#22303C;
+    --ink-soft:#5B6B7A;
+    --canvas-bg:#FFFFFF;
+    --dot:#1B1B1B;
+    --object:#FFB020;
+    --green:#189E4A;
+    --blue:#2E6FE8;
+    --red:#E4453A;
+    --purple:#9333EA;
+    --teal:#0D9488;
+    --pink:#DB2777;
+    --ke:#F97316;
+    --pe:#0EA5E9;
+    --accent:#22303C;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  button, input, label{touch-action:manipulation;}
+  html,body{height:100%;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-serif;
+    background:var(--bg); color:var(--ink);
+    display:flex; flex-direction:column; height:100vh; height:100dvh; overflow:hidden;
+    font-size:21px;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .mono{font-family:ui-monospace,'SF Mono','Cascadia Code','Consolas',monospace;}
 
+  header{
+    display:flex; align-items:center; gap:14px;
+    padding:10px 16px; background:var(--panel);
+    border-bottom:1px solid var(--panel-line);
+    flex-shrink:0;
+  }
+  header h1{font-size:22.5px; font-weight:700; letter-spacing:-0.3px; white-space:nowrap;}
+  header h1 small{display:block; font-size:15px; font-weight:500; color:var(--ink-soft); letter-spacing:0.5px;}
+  .mode-btns{display:flex; gap:6px; flex-wrap:wrap;}
+  .mode-btn{
+    padding:7px 12px; border:1px solid var(--panel-line); background:#fff;
+    border-radius:999px; cursor:pointer; font-size:19.5px; color:var(--ink);
+    transition:background .12s, color .12s, border-color .12s;
+  }
+  .mode-btn:hover{border-color:var(--ink-soft);}
+  .mode-btn.active{background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600;}
+  .mode-btn:focus-visible{outline:2px solid var(--blue); outline-offset:2px;}
+
+  main{flex:1; display:flex; min-height:0;}
+  aside{
+    width:380px; flex-shrink:0; background:var(--panel);
+    border-right:1px solid var(--panel-line);
+    display:flex; flex-direction:column; overflow-y:auto;
+  }
+  .section{padding:12px 16px; border-bottom:1px solid var(--panel-line);}
+  .section h2{
+    font-size:16.5px; font-weight:700; color:var(--ink-soft);
+    letter-spacing:1px; margin-bottom:9px;
+  }
+
+  .transport{display:flex; gap:8px;}
+  .transport button{
+    flex:1; padding:9px 0; border-radius:8px; border:1px solid var(--panel-line);
+    background:#fff; cursor:pointer; font-size:19.5px; font-weight:600; color:var(--ink);
+  }
+  .transport button:hover{border-color:var(--ink-soft);}
+  #playBtn.playing{background:var(--accent); color:#fff; border-color:var(--accent);}
+  .transport button:focus-visible{outline:2px solid var(--blue); outline-offset:2px;}
+
+  .slider-row{margin-bottom:12px;}
+  .slider-row:last-child{margin-bottom:0;}
+  .slider-row label{
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-size:19.5px; margin-bottom:5px;
+  }
+  .slider-row label .val{font-size:18px; color:var(--ink-soft);}
+  input[type=range]{
+    width:100%; -webkit-appearance:none; appearance:none; height:6px;
+    background:var(--panel-line); border-radius:3px; cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:24px; height:24px; border-radius:50%;
+    background:var(--accent); border:3px solid var(--panel);
+    box-shadow:0 0 0 1px var(--panel-line);
+  }
+  input[type=range]::-moz-range-thumb{
+    width:22px; height:22px; border-radius:50%;
+    background:var(--accent); border:3px solid var(--panel);
+    box-shadow:0 0 0 1px var(--panel-line);
+  }
+  input[type=range]:focus-visible{outline:2px solid var(--blue); outline-offset:4px;}
+
+  .arrow-toggle{
+    display:flex; align-items:center; gap:9px; padding:6px 8px;
+    border-radius:8px; cursor:pointer; user-select:none;
+  }
+  .arrow-toggle:hover{background:rgba(0,0,0,0.04);}
+  .arrow-toggle input{accent-color:var(--accent); width:18px; height:18px; cursor:pointer;}
+  .chip{width:26px; height:0; border-top-width:3px; border-top-style:solid; position:relative; flex-shrink:0;}
+  .chip::after{
+    content:''; position:absolute; right:-2px; top:-5px;
+    border-left:7px solid; border-left-color:inherit;
+    border-top:4px solid transparent; border-bottom:4px solid transparent;
+  }
+  .chip.green{border-top-color:var(--green); color:var(--green);}
+  .chip.blue{border-top-color:var(--blue); color:var(--blue);}
+  .chip.red{border-top-color:var(--red); color:var(--red);}
+  .chip.purple{border-top-color:var(--purple); color:var(--purple);}
+  .chip.teal{border-top-color:var(--teal); color:var(--teal);}
+  .chip.pink{border-top-color:var(--pink); color:var(--pink);}
+  .chip.comp{border-top-color:#7FA6EF; border-top-style:dashed; color:#7FA6EF;}
+  .chip-bar{width:26px; height:12px; flex-shrink:0; border-radius:2px;
+    background:linear-gradient(90deg, var(--ke) 50%, var(--pe) 50%);}
+  .chip-t{width:26px; flex-shrink:0; text-align:center; border-radius:4px;
+    font-family:ui-monospace,monospace; font-size:15px; font-weight:700;
+    color:var(--ink-soft); background:#fff; border:1px solid var(--panel-line);}
+  .arrow-toggle .desc{font-size:16.5px; color:var(--ink-soft); display:block;}
+
+  #dvBtn, #dpBtn{
+    width:100%; padding:10px 0; border-radius:8px; font-size:19.5px; font-weight:700;
+    border:1.5px dashed var(--ink-soft); background:transparent; color:var(--ink); cursor:pointer;
+  }
+  #dpBtn{margin-top:8px;}
+  #dvBtn.active{background:var(--purple); border:1.5px solid var(--purple); color:#fff;}
+  #dpBtn.active{background:var(--pink); border:1.5px solid var(--pink); color:#fff;}
+  #dvBtn:focus-visible, #dpBtn:focus-visible{outline:2px solid var(--blue); outline-offset:2px;}
+  #clearSelBtn{
+    width:100%; margin-top:8px; padding:7px 0; border-radius:8px; font-size:18.75px;
+    border:1px solid var(--panel-line); background:#fff; color:var(--ink); cursor:pointer;
+  }
+  #clearSelBtn:hover{border-color:var(--ink-soft);}
+  #dvHint{font-size:17.25px; color:var(--ink-soft); margin-top:9px; line-height:1.55;}
+  .legend-dv{display:flex; align-items:center; gap:9px; margin-top:10px; font-size:18px;}
+
+  /* 벡터 다이어그램 (합성) */
+  .diagram-wrap{padding:12px 16px 16px;}
+  #diagram{
+    width:100%; height:260px; display:block;
+    background:#fff; border:1px solid var(--panel-line); border-radius:10px;
+  }
+  #diagramInfo{font-size:17.25px; color:var(--ink-soft); margin-top:7px; line-height:1.5; min-height:17px;}
+
+  /* 메인 캔버스 — 800×600 고정 */
+  .stage{
+    flex:1; min-width:0; overflow:auto;
+    display:flex; align-items:center; justify-content:center; padding:14px;
+  }
+  .canvas-box{position:relative; width:800px; height:600px; flex-shrink:0;}
+  #canvas{
+    width:800px; height:600px; display:block;
+    background:var(--canvas-bg); border-radius:12px;
+    border:1px solid var(--panel-line);
+    touch-action:none;
+  }
+  #canvas.dv-mode{cursor:crosshair;}
+  .scale-note{
+    position:absolute; left:14px; bottom:12px;
+    font-size:15.75px; color:#9AA5AF; letter-spacing:0.4px; pointer-events:none;
+  }
+
+  /* ── 인쇄 전용 ──────────────────────────────────
+     용지를 캔버스와 같은 비율(720×540pt = 254×190.5mm)로 잡고 여백을 0으로 둔다.
+     · 여백 0 이면 Chrome 계열은 머리말·꼬리말(URL·날짜·쪽번호)을 자동으로 숨긴다
+     · 용지 비율이 캔버스와 같으므로 위아래 흰 띠가 생기지 않는다
+     결과적으로 종이에는 캔버스 그림만 남는다. */
+  #printArea{display:none;}
+  @media print{
+    /* A4 가로에 이미지를 정확히 200 × 150 mm 로 앉힌다 → 100% 배율 인쇄에서 1 cm = 1 m */
+    @page{ size:A4 landscape; margin:0; }
+    html, body{
+      width:100%; height:100%; margin:0; padding:0;
+      background:#fff; overflow:visible; display:block;
+    }
+    body > *{ display:none !important; }
+    #printArea{ display:block !important; width:100%; height:100%; }
+    #printImg{ display:block; width:200mm; height:150mm; margin:30mm auto 0; }
+  }
+
+  /* ── 태블릿 세로/좁은 화면: 캔버스 상단 + 컨트롤 하단 배치 ── */
+  @media (max-width: 880px){
+    body{overflow:auto;}
+    main{flex-direction:column;}
+    .stage{order:0; padding:10px; overflow:visible; flex:none;}
+    aside{
+      order:1; width:100%; border-right:none;
+      border-top:1px solid var(--panel-line);
+      flex-direction:row; flex-wrap:wrap; align-items:flex-start;
+      overflow:visible;
+    }
+    .section{flex:1 1 310px; border-right:1px solid var(--panel-line);}
+    .diagram-wrap{flex:1 1 360px; max-width:470px;}
+    .scale-note{display:none;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>운동과 벡터 실험실<small>MOTION &amp; VECTOR LAB</small></h1>
+  <div class="mode-btns" id="modeBtns"></div>
+</header>
+
+<main>
+  <aside>
+    <div class="section">
+      <h2>시뮬레이션</h2>
+      <div class="transport">
+        <button id="playBtn">▶ 재생</button>
+        <button id="resetBtn">↺ 초기화</button>
+      </div>
+      <div class="transport" style="margin-top:8px;">
+        <button id="stepBackBtn">⏴ −Δt</button>
+        <button id="stepFwdBtn">+Δt ⏵</button>
+      </div>
+      <div class="transport" style="margin-top:8px;">
+        <button id="printBtn">🖨 캔버스 인쇄 · PDF 저장</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>설정</h2>
+      <div class="slider-row">
+        <label>섬광 간격 Δt <span class="val mono" id="dtVal">0.50 s</span></label>
+        <input type="range" id="dtSlider" min="0.25" max="3.0" step="0.25" value="0.5">
+      </div>
+      <div class="slider-row">
+        <label>질량 m <span class="val mono" id="massVal">1.0 kg</span></label>
+        <input type="range" id="massSlider" min="0.1" max="2.0" step="0.1" value="1.0">
+      </div>
+      <div class="slider-row">
+        <label>물체 크기 <span class="val mono" id="sizeVal">1.5 m</span></label>
+        <input type="range" id="sizeSlider" min="0.5" max="5.0" step="0.5" value="1.5">
+      </div>
+      <div class="slider-row">
+        <label>재생 속도 <span class="val mono" id="speedVal">1.00×</span></label>
+        <input type="range" id="speedSlider" min="0.25" max="2" step="0.25" value="1">
+      </div>
+      <div id="modeParams"></div>
+    </div>
+
+    <div class="section">
+      <h2>화살표 표시</h2>
+      <label class="arrow-toggle">
+        <input type="checkbox" id="tglDir">
+        <span class="chip green"></span>
+        <span>운동 방향 û<span class="desc">초록 · 속도 벡터와 같은 자리 · v = |v|·û</span></span>
+      </label>
+      <label class="arrow-toggle">
+        <input type="checkbox" id="tglVel" checked>
+        <span class="chip blue"></span>
+        <span>속도 벡터 v<span class="desc">파랑 · 물체 <b>위쪽</b>에 배치</span></span>
+      </label>
+      <label class="arrow-toggle">
+        <input type="checkbox" id="tglComp">
+        <span class="chip comp"></span>
+        <span>속도 성분 분해<span class="desc">연한 파랑 점선 · vₓ, v_y</span></span>
+      </label>
+      <label class="arrow-toggle">
+        <input type="checkbox" id="tglForce">
+        <span class="chip red"></span>
+        <span>알짜힘 벡터<span class="desc">빨강 · 길이 ∝ 힘의 크기 (F = ma)</span></span>
+      </label>
+      <label class="arrow-toggle">
+        <input type="checkbox" id="tglMom">
+        <span class="chip teal"></span>
+        <span>운동량 벡터 p<span class="desc">청록 · 물체 <b>아래쪽</b> · p = m × v</span></span>
+      </label>
+      <label class="arrow-toggle">
+        <input type="checkbox" id="tglEnergy">
+        <span class="chip-bar"></span>
+        <span>에너지 막대<span class="desc">주황 K = ½mv² · 하늘 P = mgh · 단위 J</span></span>
+      </label>
+      <label class="arrow-toggle">
+        <input type="checkbox" id="tglTime" checked>
+        <span class="chip-t">t</span>
+        <span>섬광 시각 라벨<span class="desc">회색 · 0 s, 0.5 s, 1.0 s …</span></span>
+      </label>
+    </div>
+
+    <div class="section">
+      <h2>변화량 분석</h2>
+      <button id="dvBtn">Δv 속도변화 모드</button>
+      <button id="dpBtn">Δp 운동량변화 모드</button>
+      <button id="clearSelBtn">선택 지우기</button>
+      <div class="legend-dv">
+        <span class="chip purple"></span>
+        <span>속도변화 Δv = v₂ − v₁</span>
+      </div>
+      <div class="legend-dv">
+        <span class="chip pink"></span>
+        <span>운동량변화 Δp = p₂ − p₁</span>
+      </div>
+      <div id="dvHint">모드를 켜고 궤적 점들을 클릭하세요. 이웃한 두 속도 벡터가 근처 빈 곳에 복사되어 Δv가 작도됩니다.</div>
+    </div>
+
+    <div class="diagram-wrap">
+      <h2 style="font-size:16.5px;font-weight:700;color:var(--ink-soft);letter-spacing:1px;margin-bottom:9px;">벡터 다이어그램 · 벡터 합성</h2>
+      <canvas id="diagram"></canvas>
+      <div id="diagramInfo" class="mono"></div>
+    </div>
+  </aside>
+
+  <div class="stage">
+    <div class="canvas-box">
+      <canvas id="canvas"></canvas>
+    </div>
+  </div>
+</main>
+
+<!-- 화면에는 숨겨져 있고 인쇄할 때만 나타나는 영역 (캔버스 이미지 하나뿐) -->
+<div id="printArea"><img id="printImg" alt=""></div>
+
+<script>
+'use strict';
+/* ══════════════════════════════════════════════════════════
+   운동과 벡터 실험실
+   고등학교 물리 — 속도 벡터 / 속도변화 벡터 귀납적 발견 도구
+   ══════════════════════════════════════════════════════════ */
+
+/* ── 스케일 : 자로 재는 학습지용 ────────────────────
+   인쇄물(20 × 15 cm)에서 자로 읽는 규칙
+     거리   1 cm = 5 m        (격자 한 칸)
+     속도   1 cm = 10 m/s     → 25 m/s = 2.5 cm
+     운동량 1 cm = 10 kg·m/s
+     알짜힘 1 cm = 10 N       → 1 kg 의 무게(10 N) = 정확히 1 cm
+   즉 화살표는 SI 1 단위가 종이 1 mm.
+
+   이 조합에서 화살표 길이 = 0.5 초 동안의 이동 거리가 되어
+   Δt = 0.5 s 의 점 간격과 정확히 같아진다.
+   → 등가속도 운동에서 앞 화살표의 머리와 다음 화살표의 꼬리가 맞닿아 겹치지 않는다. */
+const PX_PER_M = 8;                   // 8 px = 1 m → 캔버스 800×600 px = 100 × 75 m
+const PAPER_CM_PER_M = 0.2;           // 인쇄물 1 cm = 5 m
+const GRID_PX = 40;                   // 격자 한 칸 = 5 m = 종이 1 cm
+const MASS_REF = 1.0;                 // 화살표 길이 기준 질량 1 kg
+const G_MS2 = 10;                     // 중력가속도 10 m/s²
+const G = G_MS2 * PX_PER_M;           // 80 px/s²
+const DEFAULT_DT = 0.5;               // 모든 운동 공통 섬광 간격 (s)
+const DEFAULT_SPEED = 1.0;            // 모든 운동 공통 재생 속도 (×)
+const FS = 1.5;                 // 전체 글씨 배율
+const F = (px, bold) => (bold ? 'bold ' : '') + (px*FS) + 'px ui-monospace,monospace';
+const COLORS = {
+  green:'#189E4A', blue:'#2E6FE8', blueSoft:'#7FA6EF', red:'#E4453A', purple:'#9333EA', teal:'#0D9488', pink:'#DB2777',
+  dot:'#1B1B1B', object:'#FFB020', object2:'#8E9AA6', hud:'#8A96A1', sel:'#FF8C00',
+  env:'#B9C2CC', envFill:'#F2F0EA', grid:'#EDEBE4', guide:'#C9CDD2'
+};
+
+/* ── DOM ─────────────────────────────────────────── */
+const canvas   = document.getElementById('canvas');
+const ctx      = canvas.getContext('2d');
+const diagram  = document.getElementById('diagram');
+const dctx     = diagram.getContext('2d');
+const playBtn  = document.getElementById('playBtn');
+const resetBtn = document.getElementById('resetBtn');
+const stepBackBtn = document.getElementById('stepBackBtn');
+const stepFwdBtn  = document.getElementById('stepFwdBtn');
+const dtSlider = document.getElementById('dtSlider');
+const dtVal    = document.getElementById('dtVal');
+const massSlider = document.getElementById('massSlider');
+const sizeSlider = document.getElementById('sizeSlider');
+const sizeVal  = document.getElementById('sizeVal');
+const speedSlider = document.getElementById('speedSlider');
+const speedVal = document.getElementById('speedVal');
+const massVal  = document.getElementById('massVal');
+const tglDir   = document.getElementById('tglDir');
+const tglVel   = document.getElementById('tglVel');
+const tglComp  = document.getElementById('tglComp');
+const tglForce = document.getElementById('tglForce');
+const tglMom   = document.getElementById('tglMom');
+const tglEnergy = document.getElementById('tglEnergy');
+const tglTime  = document.getElementById('tglTime');
+const dvBtn    = document.getElementById('dvBtn');
+const dpBtn    = document.getElementById('dpBtn');
+const clearSelBtn = document.getElementById('clearSelBtn');
+const printBtn = document.getElementById('printBtn');
+const dvHint   = document.getElementById('dvHint');
+const diagramInfo  = document.getElementById('diagramInfo');
+const modeParamsEl = document.getElementById('modeParams');
+const modeBtnsEl   = document.getElementById('modeBtns');
+
+/* ── 운동 모드 정의 ─────────────────────────────── */
+const MODES = [
+  {
+    id:'uniform', label:'수평 등속',
+    params:[{key:'v0', label:'초기 속력', min:5, max:40, step:1, value:15, unit:' m/s'}],
+    setup(w,h,p){
+      const y = h*0.5, V = p.v0*PX_PER_M;
+      return {
+        refY:null,   // 높이 변화 없음 → PE = 0
+        stateAt:t=>({x:70+V*t, y, vx:V, vy:0, ax:0, ay:0}),
+        done:s=>s.x > w-40,
+        drawEnv(c){ dashedLine(c, 30, y+0.5, w-30, y+0.5); }
+      };
+    }
+  },
+  {
+    id:'accel', label:'수평 등가속도',
+    params:[
+      {key:'v0', label:'초기 속도', min:-25, max:25, step:1, value:0, unit:' m/s'},
+      {key:'a',  label:'가속도',    min:1,   max:15, step:1, value:5, unit:' m/s²'}
+    ],
+    setup(w,h,p){
+      const y = h*0.5, A = p.a*PX_PER_M, V = p.v0*PX_PER_M;
+      // 초기 속도가 왼쪽(-)이면 되돌아오는 구간이 보이도록 시작점을 오른쪽으로
+      const x0 = 70 + (V < 0 ? Math.min(V*V/(2*A), w-240) : 0);
+      return {
+        refY:null,
+        stateAt:t=>({x:x0+V*t+0.5*A*t*t, y, vx:V+A*t, vy:0, ax:A, ay:0}),
+        done:s=>s.x > w-40 || s.x < 30,
+        drawEnv(c){ dashedLine(c, 30, y+0.5, w-30, y+0.5); }
+      };
+    }
+  },
+  {
+    id:'freefall', label:'자유 낙하',
+    setup(w,h){
+      const x = w*0.35, y0 = 60;
+      return {
+        refY:h-40,
+        stateAt:t=>({x, y:y0+0.5*G*t*t, vx:0, vy:G*t, ax:0, ay:G}),
+        done:s=>s.y > h-40,
+        drawEnv(c){ dashedLine(c, x+0.5, 30, x+0.5, h-30); }
+      };
+    }
+  },
+  {
+    id:'hproj', label:'수평 투사',
+    params:[{key:'v0', label:'초기 속력', min:5, max:40, step:1, value:15, unit:' m/s'}],
+    setup(w,h,p){
+      const x0=70, y0=80, V=p.v0*PX_PER_M;
+      return {
+        refY:h-40,
+        stateAt:t=>({x:x0+V*t, y:y0+0.5*G*t*t, vx:V, vy:G*t, ax:0, ay:G}),
+        done:s=>s.y > h-40 || s.x > w-40,
+        // 퍼텐셜 에너지 기준면(지면)을 실제로 표시 — 기준면이 보이지 않으면
+        // 에너지 막대의 P가 무엇에 대한 값인지 알 수 없음
+        drawEnv(c){ dashedLine(c, 30, h-40+0.5, w-30, h-40+0.5); }
+      };
+    }
+  },
+  {
+    id:'dual', label:'동시 재생 (낙하+투사)',
+    params:[{key:'v0', label:'초기 속력', min:5, max:40, step:1, value:15, unit:' m/s'}],
+    setup(w,h,p){
+      const x0=90, y0=80, V=p.v0*PX_PER_M;
+      return {
+        refY:h-40,
+        // 주 물체(주황): 수평 투사
+        stateAt:t=>({x:x0+V*t, y:y0+0.5*G*t*t, vx:V, vy:G*t, ax:0, ay:G}),
+        // 보조 물체(회색): 자유 낙하 — 같은 지점에서 동시 출발
+        stateAt2:t=>({x:x0, y:y0+0.5*G*t*t, vx:0, vy:G*t, ax:0, ay:G}),
+        done:s=>s.y > h-40 || s.x > w-40,
+        drawEnv(c){
+          dashedLine(c, x0+0.5, 30, x0+0.5, h-30);
+          dashedLine(c, 30, h-40+0.5, w-30, h-40+0.5);
+        }
+      };
+    }
+  },
+  {
+    id:'projectile', label:'포물선 (비스듬히 던지기)',
+    params:[
+      {key:'v0',    label:'초기 속력', min:10, max:40, step:1, value:30, unit:' m/s'},
+      {key:'angle', label:'발사각',    min:0, max:80, step:1, value:60, unit:'°'}
+    ],
+    setup(w,h,p){
+      const th = p.angle*Math.PI/180, V = p.v0*PX_PER_M;
+      const x0=70, y0=h-70;
+      const vx=V*Math.cos(th), vy0=-V*Math.sin(th);
+      return {
+        refY:y0,
+        stateAt:t=>({x:x0+vx*t, y:y0+vy0*t+0.5*G*t*t, vx, vy:vy0+G*t, ax:0, ay:G}),
+        done:s=>(s.t>0.05 && s.y>y0+0.5) || s.x>w-40,
+        drawEnv(c){
+          c.strokeStyle=COLORS.env; c.lineWidth=2;
+          c.beginPath(); c.moveTo(30,y0+1); c.lineTo(w-30,y0+1); c.stroke();
+          // 최고점이 화면 위로 벗어나는 조합 경고 (물리는 정확하나 관측이 잘림)
+          const apex = y0 - vy0*vy0/(2*G);
+          if(apex < 8){
+            c.fillStyle='#C08A2E'; c.font = F(11);
+            c.fillText('⚠ 최고점이 화면 위로 벗어납니다 — 속력이나 각도를 낮추세요', 40, 26);
+          }
+        }
+      };
+    }
+  },
+  {
+    id:'incline', label:'빗면',
+    params:[
+      {key:'v0',      label:'초기 속력', min:0,  max:25, step:1, value:0,  unit:' m/s'},
+      {key:'incline', label:'빗면 각도', min:10, max:60, step:1,   value:30, unit:'°'}
+    ],
+    setup(w,h,p){
+      const a = p.incline*Math.PI/180;
+      const V = p.v0*PX_PER_M;
+      // ★ 물체 반지름을 설정 시점에 고정한다.
+      //   stateAt 안에서 objR()을 매번 읽으면 재생 중 크기 슬라이더를 움직였을 때
+      //   이미 기록된 궤적과 현재 위치가 어긋나고, 높이 y가 바뀌면서
+      //   역학적 에너지가 순간적으로 도약한다(보존 위배).
+      const R0 = objR();
+      const yb = h-56, x0 = 70;
+      const H = Math.min(h-170, Math.tan(a)*(w-190));
+      const L = H/Math.tan(a);
+      const top = {x:x0, y:yb-H};
+      const d = {x:Math.cos(a), y:Math.sin(a)};
+      const n = {x:Math.sin(a), y:-Math.cos(a)};
+      const slopeLen = Math.hypot(L,H);
+      const acc = G*Math.sin(a);
+      return {
+        refY: yb,
+        stateAt(t){
+          const s = V*t + 0.5*acc*t*t;
+          const sp = V + acc*t;
+          return {
+            x: top.x + n.x*R0 + d.x*s,
+            y: top.y + n.y*R0 + d.y*s,
+            vx: d.x*sp, vy: d.y*sp,
+            ax: d.x*acc, ay: d.y*acc,
+            s
+          };
+        },
+        done:s=>s.s >= slopeLen - R0*1.2,
+        drawEnv(c){
+          c.fillStyle=COLORS.envFill;
+          c.beginPath();
+          c.moveTo(top.x, top.y); c.lineTo(x0+L, yb); c.lineTo(x0, yb);
+          c.closePath(); c.fill();
+          c.strokeStyle=COLORS.env; c.lineWidth=2; c.stroke();
+          c.strokeStyle='#98A3AE'; c.lineWidth=1.5;
+          c.beginPath(); c.arc(x0+L, yb, 34, Math.PI, Math.PI+a); c.stroke();
+          c.fillStyle='#7A8792'; c.font = F(12);
+          c.fillText(p.incline+'°', x0+L-76, yb-10);
+        }
+      };
+    }
+  },
+  {
+    id:'circular', label:'등속 원운동',
+    params:[
+      {key:'v0', label:'속력',   min:5,  max:30, step:1, value:15, unit:' m/s'},
+      {key:'R',  label:'반지름', min:10, max:28, step:1, value:22, unit:' m'}
+    ],
+    setup(w,h,p){
+      const cx=w*0.5, cy=h*0.5;
+      const R = p.R*PX_PER_M;              // m → px 변환
+      const OM = p.v0*PX_PER_M / R;       // ω = v/R
+      return {
+        refY:null,   // 수평면 위 원운동으로 간주 → PE = 0
+        stateAt(t){
+          const th = -Math.PI/2 + OM*t;
+          return {
+            x: cx+R*Math.cos(th), y: cy+R*Math.sin(th),
+            vx: -R*OM*Math.sin(th), vy: R*OM*Math.cos(th),
+            ax: -R*OM*OM*Math.cos(th), ay: -R*OM*OM*Math.sin(th)
+          };
+        },
+        done:s=>s.t >= 2*Math.PI/OM - 1e-9,
+        drawEnv(c){
+          c.strokeStyle=COLORS.env; c.setLineDash([4,6]); c.lineWidth=1.5;
+          c.beginPath(); c.arc(cx,cy,R,0,Math.PI*2); c.stroke();
+          c.setLineDash([]);
+          c.strokeStyle='#98A3AE';
+          c.beginPath();
+          c.moveTo(cx-7,cy); c.lineTo(cx+7,cy);
+          c.moveTo(cx,cy-7); c.lineTo(cx,cy+7);
+          c.stroke();
+        }
+      };
+    }
+  },
+  {
+    id:'ellipse', label:'타원 운동',
+    params:[{key:'ecc', label:'이심률 e', min:0, max:0.7, step:0.05, value:0.5, unit:''}],
+    setup(w,h,p){
+      const cx=w*0.5, cy=h*0.5;
+      const A=250, e=p.ecc, B=A*Math.sqrt(1-e*e);
+      const T=14, N=2*Math.PI/T, MU=N*N*A*A*A;   // 케플러: μ = n²a³
+      const fx=cx+A*e, fy=cy;                     // 초점(중심 천체)
+      const rp=A*(1-e);                           // 근일점 거리
+      function anom(t){                           // 케플러 방정식 E−e·sinE = M
+        const M=N*t; let E=M;
+        for(let i=0;i<5;i++) E -= (E-e*Math.sin(E)-M)/(1-e*Math.cos(E));
+        return E;
+      }
+      return {
+        refY:null,
+        peOf(pt){                                 // 근일점 기준 중력 퍼텐셜(J, ≥0)
+          const r=Math.hypot(pt.x-fx, pt.y-fy);
+          return mass()*(MU/rp - MU/r)/100;      // kg·px²/s² → J
+        },
+        stateAt(t){
+          const E=anom(t);
+          const cE=Math.cos(E), sE=Math.sin(E);
+          const x=cx+A*cE, y=cy-B*sE;
+          const Ed=N/(1-e*cE);
+          const rx=x-fx, ry=y-fy, r=Math.hypot(rx,ry);
+          const k=MU/(r*r*r);
+          return {x, y, vx:-A*sE*Ed, vy:-B*cE*Ed, ax:-k*rx, ay:-k*ry};
+        },
+        done:s=>s.t >= T-1e-9,
+        drawEnv(c){
+          c.strokeStyle=COLORS.env; c.setLineDash([4,6]); c.lineWidth=1.5;
+          c.beginPath(); c.ellipse(cx,cy,A,B,0,0,Math.PI*2); c.stroke();
+          c.setLineDash([]);
+          c.beginPath(); c.arc(fx,fy,7,0,Math.PI*2);
+          c.fillStyle='#F4A11A'; c.fill();
+          c.strokeStyle='rgba(0,0,0,0.35)'; c.lineWidth=1.5; c.stroke();
+          c.fillStyle='#7A8792'; c.font = F(11);
+          c.fillText('초점 F', fx+12, fy+4);
+        }
+      };
+    }
+  },
+  {
+    id:'random', label:'랜덤 운동',
+    setup(w,h){
+      /* 알짜힘이 구간마다 '일정한' 운동.
+         힘이 바뀌는 횟수 N 은 0~2 중 매번 무작위 → 구간은 N+1 개, 각 구간은 등가속도.
+           · 같은 구간 안에서는 Δv 가 늘 같은 크기·같은 방향(= 힘의 방향)으로 나온다
+           · 힘이 바뀌는 순간 Δv 도 함께 꺾인다
+         N 을 화면에 알려주지 않으므로, 학생이 Δv 가 몇 번 꺾였는지 세어
+         알짜힘이 몇 번 바뀌었는지 맞혀볼 수 있다.
+         초기 속력·초기 힘의 방향·각 구간의 힘은 모두 무작위. */
+      const rnd = (a,b)=>a+Math.random()*(b-a);
+      const N = Math.floor(Math.random()*3);      // 0, 1, 2 중 하나
+      const L = 2, T = L*(N+1);                   // 구간 길이 2 s 고정 (Δt=0.5 기준 4구간)
+      const PAD = 46;
+      /* 힘의 방향이 무작위라 표류는 랜덤워크로 쌓인다 → √(N+1) 에 반비례하게 상한을 준다.
+         구간마다 1/(N+1) 로 줄이면 N 이 클 때 Δv 가 자로 못 잴 만큼 작아진다. */
+      const aMax = 200/Math.sqrt(N+1);
+      const angDiff = (a,b)=>{
+        let d=(a-b)%(2*Math.PI);
+        if(d> Math.PI) d-=2*Math.PI;
+        if(d<-Math.PI) d+=2*Math.PI;
+        return d;
+      };
+      const at = (sg,tt)=>{
+        const k = Math.min(N, Math.floor(tt/L + 1e-9));
+        const c = sg[k], d = tt - c.t0;
+        return {x:c.x + c.vx*d + 0.5*c.ax*d*d,
+                y:c.y + c.vy*d + 0.5*c.ay*d*d,
+                vx:c.vx + c.ax*d, vy:c.vy + c.ay*d,
+                ax:c.ax, ay:c.ay};
+      };
+
+      let segs = null;
+      for(let att=0; att<200 && !segs; att++){
+        const k = att < 140 ? 1 : 0.7;                 // 늦게까지 못 찾으면 얌전하게
+        const dir = rnd(0, 2*Math.PI), sp = rnd(50, 85)*k;
+        let x=0, y=0, vx=sp*Math.cos(dir), vy=sp*Math.sin(dir), prev=null;
+        const cand = [];
+        for(let seg=0; seg<=N; seg++){
+          let am, ad, guard=0;
+          do{
+            am = rnd(0.45, 1.0)*aMax*k; ad = rnd(0, 2*Math.PI); guard++;
+          }while(prev && guard < 40 &&
+                 Math.abs(angDiff(ad, prev.d)) < 0.6 &&
+                 Math.abs(am - prev.m)/prev.m < 0.35);  // 변화가 눈에 띄도록
+          prev = {m:am, d:ad};
+          const ax = am*Math.cos(ad), ay = am*Math.sin(ad);
+          cand.push({t0:seg*L, x, y, vx, vy, ax, ay});
+          x += vx*L + 0.5*ax*L*L;  y += vy*L + 0.5*ay*L*L;
+          vx += ax*L;              vy += ay*L;
+        }
+
+        /* 원점에서 그린 뒤 통째로 옮겨 캔버스 한가운데에 앉힌다.
+           무작위로 뽑고 벗어나면 버리는 방식보다 훨씬 잘 맞는다. */
+        let x0=Infinity, x1=-Infinity, y0=Infinity, y1=-Infinity;
+        const pts = [];
+        for(let tt=0; tt<=T+1e-9; tt+=0.1){
+          const q = at(cand, tt);
+          x0=Math.min(x0,q.x); x1=Math.max(x1,q.x);
+          y0=Math.min(y0,q.y); y1=Math.max(y1,q.y);
+          pts.push({t:tt, x:q.x, y:q.y});
+        }
+        if(x1-x0 > w-2*PAD || y1-y0 > h-2*PAD) continue;
+        const dx = PAD + (w-2*PAD-(x1-x0))/2 - x0;
+        const dy = PAD + (h-2*PAD-(y1-y0))/2 - y0;
+        cand.forEach(c=>{ c.x+=dx; c.y+=dy; });
+        pts.forEach(q=>{ q.x+=dx; q.y+=dy; });
+
+        // 이웃한 섬광 잔상이 겹치지 않을 것
+        let ok = true;
+        for(let tt=DEFAULT_DT; tt<=T+1e-9 && ok; tt+=DEFAULT_DT){
+          const a0=at(cand,tt-DEFAULT_DT), a1=at(cand,tt);
+          if(Math.hypot(a1.x-a0.x, a1.y-a0.y) < 20) ok = false;
+        }
+        // 경로가 스스로 되돌아와 가까워지지 않을 것 (클릭 대상이 모호해짐)
+        for(let a=0; a<pts.length && ok; a++)
+          for(let b=a+1; b<pts.length; b++)
+            if(pts[b].t-pts[a].t > 2.1*DEFAULT_DT &&
+               Math.hypot(pts[b].x-pts[a].x, pts[b].y-pts[a].y) < 26){ ok = false; break; }
+        if(ok) segs = cand;
+      }
+
+      return {
+        refY:null,                     // 수평면 위 운동으로 간주 → PE = 0
+        // 알짜힘이 일을 하므로 역학적 에너지는 보존되지 않는다 (E 기준선이 오르내림)
+        nonConservative:true,
+        stateAt:t=>at(segs, Math.min(t, T)),
+        done:s=>s.t >= T - 1e-9,
+        drawEnv(c){
+          c.fillStyle='#9AA5AF'; c.font=F(11);
+          c.fillText('알짜힘이 0~2번 무작위로 바뀝니다 · 구간마다 힘은 일정(등가속도)', 210, 26);
+          c.fillText('Δv 가 몇 번 꺾이는지 세어 보세요 · 초기화(↺)마다 새로 생성됩니다', 210, 44);
+        }
+      };
+    }
+  }
+];
+
+/* ── 상태 ────────────────────────────────────────── */
+let W=0, H=0, DW=0, DH=0;
+let mode = MODES[0];
+let modeParams = {};
+let cfg = null;
+let t = 0;
+let running = false;
+let finished = false;
+let dots = [];
+let nextDotTime = 0;
+let selMode = null;         // null | 'v'(속도) | 'p'(운동량)
+let selection = [];         // 시간순 정렬된 선택 점들 (다중 선택)
+let lastFrame = null;
+let hoverTargets = [];      // 매 프레임 갱신되는 화살표 호버 대상
+let mouseX = null, mouseY = null;
+
+const dtInterval = () => parseFloat(dtSlider.value);
+const mass = () => parseFloat(massSlider.value);
+const objR = () => Math.round(parseFloat(sizeSlider.value) * PX_PER_M);
+const massRatio = () => mass()/MASS_REF;    // 화살표 길이용 상대 질량 (1 kg 기준)
+const playSpeed = () => parseFloat(speedSlider.value);
+
+/* ── 초기화 / 모드 전환 ───────────────────────────── */
+function setupMode(){ cfg = mode.setup(W, H, modeParams); }
+function resetSim(){
+  t = 0; running = false; finished = false;
+  dots = []; selection = [];
+  setupMode();
+  liveMaxE = computeRunMaxSpec();     // 전체 궤적 기준으로 스케일 고정 → 에너지가 커지면 막대가 자람
+  sideSign = computeSideSign();       // 화살표를 놓을 쪽을 실행 시작 시점에 확정
+  recordDot(0);
+  nextDotTime = dtInterval();
+  updatePlayBtn();
+  updateHint();
+}
+function switchMode(m){
+  mode = m;
+  setSelMode(null);
+  modeParams = {};
+  buildModeParams();
+  document.querySelectorAll('.mode-btn').forEach(b=>
+    b.classList.toggle('active', b.dataset.id===m.id));
+  // 섬광 간격과 재생 속도는 모든 운동에서 같은 값으로 되돌려, 모드끼리 직접 비교할 수 있게 한다
+  dtSlider.value = DEFAULT_DT;
+  dtVal.textContent = DEFAULT_DT.toFixed(2)+' s';
+  speedSlider.value = DEFAULT_SPEED;
+  speedVal.textContent = DEFAULT_SPEED.toFixed(2)+'×';
+  resetSim();
+}
+
+function buildModeParams(){
+  modeParamsEl.innerHTML = '';
+  if(!mode.params) return;
+  mode.params.forEach(p=>{
+    modeParams[p.key] = p.value;
+    const row = document.createElement('div');
+    row.className = 'slider-row';
+    row.innerHTML =
+      `<label>${p.label} <span class="val mono" id="pv_${p.key}">${p.value}${p.unit}</span></label>
+       <input type="range" min="${p.min}" max="${p.max}" step="${p.step}" value="${p.value}" id="ps_${p.key}">`;
+    modeParamsEl.appendChild(row);
+    row.querySelector('input').addEventListener('input', e=>{
+      modeParams[p.key] = parseFloat(e.target.value);
+      document.getElementById('pv_'+p.key).textContent = e.target.value + p.unit;
+      resetSim();
+    });
+  });
+}
+
+function recordDot(time){
+  const s = cfg.stateAt(time);
+  // o2 플래그를 두 물체 모두에 명시한다 (선택 로직이 물체를 구분해야 하므로)
+  dots.push({t:time, x:s.x, y:s.y, vx:s.vx, vy:s.vy, ax:s.ax, ay:s.ay, o2:false});
+  if(cfg.stateAt2){
+    const s2 = cfg.stateAt2(time);
+    dots.push({t:time, x:s2.x, y:s2.y, vx:s2.vx, vy:s2.vy, ax:s2.ax, ay:s2.ay, o2:true});
+  }
+}
+
+/* ── 재생 루프 ───────────────────────────────────── */
+function frame(ts){
+  if(lastFrame===null) lastFrame = ts;
+  const dtReal = Math.min(0.05, (ts-lastFrame)/1000);
+  lastFrame = ts;
+
+  if(running){
+    t += dtReal * playSpeed();
+    while(nextDotTime <= t + 1e-9){
+      const s = cfg.stateAt(nextDotTime); s.t = nextDotTime;
+      if(cfg.done(s)) break;
+      recordDot(nextDotTime);
+      nextDotTime += dtInterval();
+    }
+    const cur = cfg.stateAt(t); cur.t = t;
+    if(cfg.done(cur)){
+      running = false; finished = true; updatePlayBtn();
+    }
+  }
+  render();
+  renderDiagram();
+  requestAnimationFrame(frame);
+}
+
+function updatePlayBtn(){
+  playBtn.textContent = running ? '❚❚ 일시정지' : (finished ? '▶ 처음부터' : '▶ 재생');
+  playBtn.classList.toggle('playing', running);
+}
+
+/* ── 그리기 유틸 ─────────────────────────────────── */
+function arrow(c, x, y, dx, dy, color, opt={}){
+  const len = Math.hypot(dx,dy);
+  if(len < 1) return;
+  if(opt.hover && c===ctx)
+    hoverTargets.push({x1:x, y1:y, x2:x+dx, y2:y+dy, text:opt.hover});
+  const w = opt.width || 2.2;
+  /* 머리 크기는 길이에 관계없이 항상 같다.
+     길이에 비례시키면 정지 상태에서 출발하는 모드(빗면·등가속)의 첫 화살표처럼
+     짧은 것들만 머리가 쪼그라들어 길이가 다른 화살표를 나란히 볼 때 어색하다.
+     머리 끝은 언제나 정확한 종점에 찍히므로 자로 재는 길이에는 영향이 없다. */
+  const head = 10;
+  const ux = dx/len, uy = dy/len;
+  const bx = x + dx - ux*head, by = y + dy - uy*head;
+  c.strokeStyle = color; c.fillStyle = color; c.lineWidth = w;
+  if(opt.dash) c.setLineDash(opt.dash);
+  // 화살표가 머리보다 짧으면 자루가 거꾸로 그려지므로 머리만 찍는다
+  if(len > head + 0.5){
+    c.beginPath(); c.moveTo(x,y); c.lineTo(bx,by); c.stroke();
+  }
+  c.setLineDash([]);
+  c.beginPath();
+  c.moveTo(x+dx, y+dy);
+  c.lineTo(bx - uy*head*0.42, by + ux*head*0.42);
+  c.lineTo(bx + uy*head*0.42, by - ux*head*0.42);
+  c.closePath(); c.fill();
+}
+function dashedLine(c, x1,y1,x2,y2){
+  c.strokeStyle=COLORS.env; c.lineWidth=1.5; c.setLineDash([4,6]);
+  c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.stroke();
+  c.setLineDash([]);
+}
+function label(c, x, y, text, color, size=13){
+  c.fillStyle = color;
+  c.font = F(size, true);
+  c.fillText(text, x, y);
+}
+
+/* 화살표 배율 — SI 1 단위 = 4 px = 종이 0.1 cm
+     v 화살표(px) = v_px × 0.5      (25 m/s → 100 px → 종이 2.5 cm)
+     p 화살표(px) = m × v_px × 0.5
+     F 화살표(px) = m × a_px × 0.5  (10 N → 40 px → 종이 1.0 cm)
+   모든 모드가 같은 절대 눈금을 쓰므로 모드끼리 크기 비교가 된다. */
+const VEL_SCALE   = 0.5;
+const FORCE_SCALE = 0.5;
+const UNIT_LEN = GRID_PX;       // û = 격자 한 칸 = 종이 1 cm (길이 재기 기준자)
+const TIME_GAP = 20;            // 속도 벡터에서 시간 라벨까지 더 띄우는 거리(px)
+
+/* 변화량 분석 대상 물리량 정의 (속도 / 운동량) */
+/* phys: px/s 크기에 곱한 뒤 /10 하면 표시 단위가 되는 환산 계수
+   · v → m/s         : (v_px/10)
+   · p → kg·m/s      : (v_px/10 m/s) × (m kg) */
+const QUANT = {
+  v: { sym:'v', dSym:'Δv', color:COLORS.blue, dColor:COLORS.purple, dec:1,
+       unit:'m/s',     phys:()=>1,        scale:()=>VEL_SCALE },
+  p: { sym:'p', dSym:'Δp', color:COLORS.teal, dColor:COLORS.pink,  dec:2,
+       unit:'kg·m/s',  phys:()=>mass(),   scale:()=>VEL_SCALE*massRatio() }
+};
+const SUBS = ['₀','₁','₂','₃','₄','₅','₆','₇','₈','₉'];
+const sub = n => String(n).split('').map(d=>SUBS[+d]).join('');
+
+/* 진행 방향(ux,uy)에 수직인 두 방향 중 '위쪽'을 고른다.
+   화면 y가 아래로 증가하므로 y가 더 작은 쪽이 위.
+   연직 운동이면 두 후보의 y가 같으므로(좌·우) 오른쪽을 위로 간주. */
+function perpUp(ux, uy){
+  const a = {x: uy, y:-ux};
+  const b = {x:-uy, y: ux};
+  if(Math.abs(a.y - b.y) > 1e-9) return a.y < b.y ? a : b;
+  return a.x >= b.x ? a : b;
+}
+
+/* 속도 화살표를 진행 방향의 어느 쪽에 놓을지는 실행마다 '한 번만' 정하고 끝까지 유지한다.
+
+   매 순간 다시 판단하면 기준이 뒤집히는 경우가 생긴다.
+     · 화면 기준 위쪽으로 정하면  → 원운동에서 반 바퀴마다 안팎이 뒤집힌다
+       (화면 위는 절대 방향인데 원의 바깥쪽은 위치에 따라 도는 상대 방향이라서)
+     · 궤적의 바깥쪽으로 정하면   → 랜덤 운동에서 힘이 바뀔 때마다 좌우가 뒤집힌다
+   그래서 시작 시점에 부호(진행 방향 기준 왼쪽/오른쪽)를 정해 두고,
+   이후에는 속도 방향만 따라 돌린다. 손잡이가 고정되므로 절대 뒤집히지 않는다.
+     · 원운동  → 처음에 바깥쪽이면 한 바퀴 내내 바깥쪽 (곡률 방향이 일정하므로)
+     · 포물선  → 늘 궤적 위쪽
+     · 직선 운동 → 화면 위쪽 규칙으로 부호를 정함                                */
+let sideSign = -1;                       // cross(진행방향, 위쪽) 의 부호
+
+function computeSideSign(){
+  for(let tt=0; tt<=20; tt+=0.05){
+    const st = cfg.stateAt(tt); st.t = tt;
+    const sp = Math.hypot(st.vx, st.vy);
+    if(sp > 0.5){
+      const ux = st.vx/sp, uy = st.vy/sp;
+      const along = st.ax*ux + st.ay*uy;
+      const px = st.ax - along*ux, py = st.ay - along*uy;   // 속도에 수직인 가속도 성분
+      const pm = Math.hypot(px, py);
+      // 곡선이면 바깥쪽(볼록한 쪽), 직선이면 화면 위쪽으로 기준을 잡는다
+      const q = (pm > 0.5 && pm > 0.05*Math.hypot(st.ax, st.ay))
+              ? {x:-px/pm, y:-py/pm}
+              : perpUp(ux, uy);
+      return Math.sign(ux*q.y - uy*q.x) || -1;
+    }
+    if(cfg.done(st)) break;
+  }
+  return -1;
+}
+
+function drawVectorsAt(p){
+  const speed = Math.hypot(p.vx, p.vy);
+  const fmag  = Math.hypot(p.ax, p.ay);
+
+  /* 속도(파랑)는 물체 위쪽, 운동량(청록)은 아래쪽에 나란히 배치한다.
+     두 화살표의 중점이 물체 중심을 지나는 '수직선' 위에 놓이도록
+     각자 길이의 절반만큼 뒤로 당겨 그린다 → 세 점이 항상 일직선.
+     알짜힘(빨강)·단위벡터(초록)는 종전대로 물체 중심에서 출발. */
+  const off = objR() + 9;
+  let up = {x:0, y:-1};
+  if(speed > 0.5){                       // 정해 둔 손잡이대로 속도에 수직인 방향
+    const ux = p.vx/speed, uy = p.vy/speed;
+    up = sideSign > 0 ? {x:-uy, y:ux} : {x:uy, y:-ux};
+  }
+  const dn = {x:-up.x, y:-up.y};
+
+  const vX = p.vx*VEL_SCALE,         vY = p.vy*VEL_SCALE;
+  const mX = p.vx*massRatio()*VEL_SCALE, mY = p.vy*massRatio()*VEL_SCALE;
+  const vTx = p.x - vX/2 + up.x*off, vTy = p.y - vY/2 + up.y*off;   // 속도 꼬리
+  const mTx = p.x - mX/2 + dn.x*off, mTy = p.y - mY/2 + dn.y*off;   // 운동량 꼬리
+
+  // 성분 분해는 속도 벡터에 딸린 작도이므로 속도의 꼬리에서 시작
+  if(tglComp.checked && speed > 0.5){
+    if(Math.abs(vX) > 2 && Math.abs(vY) > 2){   // 두 성분이 모두 있을 때만 분해
+      arrow(ctx, vTx, vTy, vX, 0, COLORS.blueSoft,
+            {width:2, dash:[5,4], hover:`vₓ = ${(Math.abs(p.vx)/PX_PER_M).toFixed(2)} m/s`});
+      arrow(ctx, vTx, vTy, 0, vY, COLORS.blueSoft,
+            {width:2, dash:[5,4], hover:`v_y = ${(Math.abs(p.vy)/PX_PER_M).toFixed(2)} m/s`});
+      ctx.strokeStyle = COLORS.guide; ctx.lineWidth = 1; ctx.setLineDash([2,3]);
+      ctx.beginPath();
+      ctx.moveTo(vTx+vX, vTy);    ctx.lineTo(vTx+vX, vTy+vY);
+      ctx.moveTo(vTx,    vTy+vY); ctx.lineTo(vTx+vX, vTy+vY);
+      ctx.stroke(); ctx.setLineDash([]);
+    }
+  }
+  if(tglMom.checked && speed > 0.5)
+    arrow(ctx, mTx, mTy, mX, mY, COLORS.teal,
+          {width:2.6, hover:`p = ${(speed*mass()/PX_PER_M).toFixed(2)} kg·m/s`});
+  if(tglVel.checked && speed > 0.5)
+    arrow(ctx, vTx, vTy, vX, vY, COLORS.blue,
+          {width:2.6, hover:`v = ${(speed/PX_PER_M).toFixed(2)} m/s`});
+  if(tglForce.checked && fmag > 0.5)
+    arrow(ctx, p.x, p.y, p.ax*massRatio()*FORCE_SCALE, p.ay*massRatio()*FORCE_SCALE, COLORS.red,
+          {hover:`F = ${(fmag*mass()/PX_PER_M).toFixed(2)} N`});
+  // û 는 속도 벡터와 꼬리를 공유한다 → v = |v|·û (실수배)가 겹쳐 보인다
+  if(tglDir.checked && speed > 0.5)
+    arrow(ctx, vTx, vTy, p.vx/speed*UNIT_LEN, p.vy/speed*UNIT_LEN, COLORS.green,
+          {width:2.6, hover:'û (단위 벡터) · 길이 1 m = 종이 1 cm'});
+
+  /* 섬광 시각 라벨: 속도 벡터와 같은 쪽으로, 다만 TIME_GAP 만큼 더 바깥에 둔다.
+     속도 화살표의 중점이 물체 중심과 나란하므로 라벨도 그 선 위에 놓여
+     '어느 점의 시각인지'가 화살표와 겹치지 않고 분명하다.
+     · p.t 가 있는 점(궤적 잔상)만 대상 — 움직이는 물체는 우상단 HUD 가 담당
+     · 동시 재생 모드의 보조 물체(o2)는 같은 시각이므로 라벨 중복을 피해 생략 */
+  if(tglTime.checked && p.t !== undefined && !p.o2){
+    const dt = dtInterval();
+    const dec = (Math.round(dt*100) % 10 === 0) ? 1 : 2;
+    const txt = p.t.toFixed(dec) + ' s';
+    const lx = Math.min(Math.max(p.x + up.x*(off + TIME_GAP), 26), W-26);
+    const ly = Math.min(Math.max(p.y + up.y*(off + TIME_GAP), 14), H-12);
+    ctx.save();
+    ctx.font = F(11);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+    ctx.strokeText(txt, lx, ly);        // 격자·궤적 위에서도 읽히도록 흰 테두리
+    ctx.fillStyle = COLORS.hud;
+    ctx.fillText(txt, lx, ly);
+    ctx.restore();
+  }
+}
+
+/* ── Δv 작도: 궤적 근처 빈 곳에 배치 ────────────────
+   각 연속 쌍 (p1→p2)에 대해:
+   1) 배치 위치 O = 두 점의 중점에서 궤적 바깥쪽(볼록한 쪽,
+      직선 운동이면 진행 방향의 수직)으로 떨어진 빈 곳
+   2) 두 속도가 평행(직선 운동) → v₁·v₂·Δv를 나란한 세
+      선분으로 쌓고 점선 눈금선으로 길이 차이를 비교
+   3) 그 외 → 꼬리를 O에 맞춰 v₁(점선)·v₂(실선)를 그리고
+      v₁ 머리→v₂ 머리로 Δv(보라)를 작도                */
+
+function pairPlacement(p1, p2, sc){
+  const mx=(p1.x+p2.x)/2, my=(p1.y+p2.y)/2;
+  const vm=Math.hypot(p2.vx,p2.vy);
+  const vh = vm>0.5 ? {x:p2.vx/vm, y:p2.vy/vm} : {x:1, y:0};
+  const ax=(p1.ax+p2.ax)/2, ay=(p1.ay+p2.ay)/2;
+  const along = ax*vh.x + ay*vh.y;
+  const px = ax-along*vh.x, py = ay-along*vh.y;   // 속도에 수직인 가속도 성분
+  const pm = Math.hypot(px,py);
+  let dir;
+  if(pm > 1) dir = {x:-px/pm, y:-py/pm};          // 곡선: 볼록한 쪽(바깥)
+  else       dir = {x:vh.y,  y:-vh.x};            // 직선: 진행 방향의 수직
+  const maxLen = Math.max(Math.hypot(p1.vx,p1.vy), Math.hypot(p2.vx,p2.vy))*sc;
+  const dist = 75 + maxLen*0.2;
+  let ox = mx + dir.x*dist, oy = my + dir.y*dist;
+
+  // 작도가 캔버스 밖으로 나가지 않게 경계 보정
+  const xs=[0, p1.vx*sc, p2.vx*sc];
+  const ys=[0, p1.vy*sc, p2.vy*sc];
+  const pad=44;
+  ox = Math.min(Math.max(ox, pad - Math.min(...xs)), W - pad - Math.max(...xs));
+  oy = Math.min(Math.max(oy, pad - Math.min(...ys)), H - pad - Math.max(...ys));
+  return {ox, oy, mx, my, dir, vh};
+}
+
+function drawDvConstruction(p1, p2, idx, many, q){
+  const sc = q.scale();
+  const ph = q.phys();
+  const hv1 = `${q.sym}₁ = ${(Math.hypot(p1.vx,p1.vy)*ph/PX_PER_M).toFixed(q.dec)} ${q.unit}`;
+  const hv2 = `${q.sym}₂ = ${(Math.hypot(p2.vx,p2.vy)*ph/PX_PER_M).toFixed(q.dec)} ${q.unit}`;
+  const hdv = `${q.dSym} = ${(Math.hypot(p2.vx-p1.vx,p2.vy-p1.vy)*ph/PX_PER_M).toFixed(q.dec)} ${q.unit}`;
+  const {ox, oy, mx, my, dir, vh} = pairPlacement(p1, p2, sc);
+  const dvLabel = many ? q.dSym+sub(idx) : q.dSym;
+
+  // 어떤 쌍의 작도인지 연결선
+  ctx.strokeStyle = COLORS.guide; ctx.lineWidth = 1; ctx.setLineDash([3,5]);
+  ctx.beginPath(); ctx.moveTo(mx,my); ctx.lineTo(ox,oy); ctx.stroke();
+  ctx.setLineDash([]);
+
+  const v1x=p1.vx*sc, v1y=p1.vy*sc;
+  const v2x=p2.vx*sc, v2y=p2.vy*sc;
+  const m1=Math.hypot(v1x,v1y), m2=Math.hypot(v2x,v2y);
+  const cross = p1.vx*p2.vy - p1.vy*p2.vx;
+  const collinear = m1<1 || m2<1 || Math.abs(cross) < 0.03*Math.hypot(p1.vx,p1.vy)*Math.hypot(p2.vx,p2.vy);
+
+  if(collinear){
+    /* 직선 운동: 세 선분을 나란히 쌓아 길이 비교 */
+    const ROW = 19;
+    const r1 = {x:ox,              y:oy};
+    const r2 = {x:ox+dir.x*ROW,    y:oy+dir.y*ROW};
+    const r3 = {x:ox+dir.x*ROW*2,  y:oy+dir.y*ROW*2};
+
+    // 눈금 점선: v₁ 끝, v₂ 끝 위치를 세 줄에 걸쳐 표시
+    ctx.strokeStyle = COLORS.guide; ctx.lineWidth = 1; ctx.setLineDash([2,3]);
+    [{vx:v1x,vy:v1y},{vx:v2x,vy:v2y}].forEach(v=>{
+      ctx.beginPath();
+      ctx.moveTo(r1.x+v.vx-dir.x*8,      r1.y+v.vy-dir.y*8);
+      ctx.lineTo(r3.x+v.vx+dir.x*8,      r3.y+v.vy+dir.y*8);
+      ctx.stroke();
+    });
+    ctx.setLineDash([]);
+
+    // v₁ (윗줄)
+    if(m1 < 1){
+      ctx.fillStyle = COLORS.blue;
+      ctx.beginPath(); ctx.arc(r1.x, r1.y, 3, 0, Math.PI*2); ctx.fill();
+      label(ctx, r1.x+8, r1.y-5, q.sym+sub(1)+' = 0', q.color, 12);
+    }else{
+      arrow(ctx, r1.x, r1.y, v1x, v1y, q.color, {width:2.2, hover:hv1});
+      label(ctx, r1.x+v1x+7, r1.y+v1y-5, q.sym+sub(1), q.color, 12);
+    }
+    // v₂ (가운데 줄)
+    arrow(ctx, r2.x, r2.y, v2x, v2y, q.color, {width:2.2, hover:hv2});
+    label(ctx, r2.x+v2x+7, r2.y+v2y-5, q.sym+sub(2), q.color, 12);
+    // Δv (아랫줄): v₁의 끝에서 v₂의 끝까지
+    const dvx=v2x-v1x, dvy=v2y-v1y;
+    if(Math.hypot(dvx,dvy) < 2){
+      label(ctx, r3.x+8, r3.y+14, dvLabel+' = 0', q.dColor, 12);
+    }else{
+      arrow(ctx, r3.x+v1x, r3.y+v1y, dvx, dvy, q.dColor, {width:2.8, hover:hdv});
+      label(ctx, r3.x+v1x+dvx*0.5-6, r3.y+v1y+dvy*0.5+dir.y*17+5, dvLabel, q.dColor, 12);
+    }
+  }else{
+    /* 곡선 운동: 꼬리를 O에 맞춰 두 벡터 복사 */
+    ctx.fillStyle = '#98A3AE';
+    ctx.beginPath(); ctx.arc(ox, oy, 2.5, 0, Math.PI*2); ctx.fill();
+
+    arrow(ctx, ox, oy, v1x, v1y, q.color, {width:2, dash:[6,5], hover:hv1});
+    arrow(ctx, ox, oy, v2x, v2y, q.color, {width:2.4, hover:hv2});
+    label(ctx, ox+v1x+7, oy+v1y-5, q.sym+sub(1), q.color, 12);
+    label(ctx, ox+v2x+7, oy+v2y+13, q.sym+sub(2), q.color, 12);
+
+    const dvx=v2x-v1x, dvy=v2y-v1y;
+    arrow(ctx, ox+v1x, oy+v1y, dvx, dvy, q.dColor, {width:2.8, hover:hdv});
+    label(ctx, ox+v1x+dvx*0.5+8, oy+v1y+dvy*0.5-4, dvLabel, q.dColor, 12);
+  }
+}
+
+/* ── 역학적 에너지 ───────────────────────────────── */
+const EN = { ke:'#F97316', pe:'#0EA5E9' };
+let liveMaxE = 0;
+
+function energyAt(pt){
+  const m = mass();                                    // kg
+  const v = Math.hypot(pt.vx, pt.vy)/PX_PER_M;         // m/s
+  const KE = 0.5*m*v*v;                                // J  (1kg 이 12.5m 낙하 → 12.5J)
+  const PE = cfg.peOf ? cfg.peOf(pt)
+           : (cfg.refY==null ? 0 : m*G_MS2*Math.max(0, cfg.refY-pt.y)/PX_PER_M);
+  return {KE, PE, E:KE+PE};
+}
+
+// K·P 막대쌍 (baseY에서 위로)
+function drawBarPair(c, bx, baseY, e, scale){
+  const w=18, gap=8;
+  const hK = e.KE*scale, hP = e.PE*scale;
+  c.fillStyle = EN.ke; c.fillRect(bx, baseY-hK, w, hK);
+  c.fillStyle = EN.pe; c.fillRect(bx+w+gap, baseY-hP, w, hP);
+  c.strokeStyle = '#B9C2CC'; c.lineWidth = 1;
+  c.beginPath(); c.moveTo(bx-6, baseY+0.5); c.lineTo(bx+w*2+gap+6, baseY+0.5); c.stroke();
+  c.fillStyle = '#7A8792'; c.font = F(10);
+  c.fillText('K', bx+5, baseY+16);
+  c.fillText('P', bx+w+gap+5, baseY+16);
+  // 총 역학적 에너지 기준선
+  const hE = e.E*scale;
+  c.strokeStyle = '#334155'; c.lineWidth = 1.5; c.setLineDash([5,3]);
+  c.beginPath(); c.moveTo(bx-8, baseY-hE); c.lineTo(bx+w*2+gap+8, baseY-hE); c.stroke();
+  c.setLineDash([]);
+  c.fillStyle = '#334155'; c.font = F(10, true);
+  c.fillText('E', bx+w*2+gap+12, baseY-hE+6);
+}
+
+// 전체 궤적을 훑어 단위질량당 최대 역학적 에너지를 구함 (스케일 고정용)
+function computeRunMaxSpec(){
+  let mx = 1e-6;
+  const m = Math.max(massRatio(), 1e-6);
+  for(let tt=0; tt<=40; tt+=0.02){
+    const s = cfg.stateAt(tt); s.t = tt;
+    mx = Math.max(mx, energyAt(s).E/m);
+    if(cfg.done(s)) break;
+  }
+  return mx;
+}
+
+// 실시간 에너지 막대 (좌상단)
+function drawLiveEnergy(cur){
+  const e = energyAt(cur);
+  const spec = e.E/Math.max(massRatio(), 1e-6); // 단위질량당 에너지 (질량 무관)
+  liveMaxE = Math.max(liveMaxE, spec, 1e-6);
+  const scale = 55/liveMaxE;                   // 고정 스케일 → 막대 길이 ∝ 질량
+  drawBarPair(ctx, 22, 190, e, scale);
+  ctx.fillStyle = '#7A8792'; ctx.font = F(11);
+  ctx.fillText(`K ${e.KE.toFixed(1)}J · P ${e.PE.toFixed(1)}J · E ${e.E.toFixed(1)}J`, 16, 226);
+  if(cfg.nonConservative){
+    ctx.fillStyle = '#C08A2E'; ctx.font = F(10);
+    ctx.fillText('※ 알짜힘이 일을 하므로 E는 보존되지 않음', 16, 248);
+  }
+}
+
+/* 인쇄 축척 검증용 눈금자.
+   프린터가 '용지에 맞춤'으로 축소해 버리면 학생이 잰 길이가 전부 틀어지는데
+   본인은 알 수가 없다. 첫 인쇄 때 이 막대를 자로 재어 5.0 cm 인지 확인하게 한다. */
+function drawScaleBar(){
+  const L = 5*GRID_PX, x = 24, y = H-34;      // 5칸 = 25 m = 종이 5 cm
+  ctx.save();
+  ctx.strokeStyle = '#5B6B7A'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x, y);     ctx.lineTo(x+L, y);
+  ctx.moveTo(x, y-7);   ctx.lineTo(x, y+7);
+  ctx.moveTo(x+L, y-7); ctx.lineTo(x+L, y+7);
+  for(let k=1; k<5; k++){ ctx.moveTo(x+k*GRID_PX, y-4); ctx.lineTo(x+k*GRID_PX, y+4); }
+  ctx.stroke();
+  ctx.fillStyle = '#5B6B7A'; ctx.font = F(11); ctx.textAlign = 'left';
+  ctx.fillText('25 m  —  인쇄 후 자로 재어 5.0 cm 인지 확인 (격자 1칸 = 5 m = 1 cm)', x, y+24);
+  ctx.restore();
+}
+
+/* ── 메인 렌더 ───────────────────────────────────── */
+function render(){
+  hoverTargets = [];
+  ctx.clearRect(0,0,W,H);
+
+  ctx.strokeStyle = COLORS.grid; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for(let x=GRID_PX; x<W; x+=GRID_PX){ ctx.moveTo(x+0.5,0); ctx.lineTo(x+0.5,H); }
+  for(let y=GRID_PX; y<H; y+=GRID_PX){ ctx.moveTo(0,y+0.5); ctx.lineTo(W,y+0.5); }
+  ctx.stroke();
+
+  cfg.drawEnv(ctx);
+
+  // 궤적: 물체의 반투명 잔상 (다중섬광 사진 방식)
+  const trailR = objR();
+  ctx.save(); ctx.globalAlpha = 0.45;
+  dots.forEach(p=>{
+    ctx.beginPath(); ctx.arc(p.x, p.y, trailR, 0, Math.PI*2);
+    ctx.fillStyle = p.o2 ? COLORS.object2 : COLORS.object; ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 1.5; ctx.stroke();
+  });
+  ctx.restore();
+  dots.forEach(drawVectorsAt);
+
+  if(selMode){
+    const selR = objR();
+    selection.forEach((p,i)=>{
+      ctx.strokeStyle = COLORS.sel; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(p.x, p.y, selR+5, 0, Math.PI*2); ctx.stroke();
+      ctx.fillStyle = COLORS.sel;
+      ctx.font = F(12, true);
+      ctx.fillText(String(i+1), p.x+selR+8, p.y+selR+10);
+    });
+    const q = QUANT[selMode];
+    const many = selection.length > 2;
+    for(let i=0; i<selection.length-1; i++)
+      drawDvConstruction(selection[i], selection[i+1], i+1, many, q);
+  }
+
+  const cur = cfg.stateAt(t);
+  ctx.beginPath(); ctx.arc(cur.x, cur.y, objR(), 0, Math.PI*2);
+  ctx.fillStyle = COLORS.object; ctx.fill();
+  ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 2; ctx.stroke();
+  drawVectorsAt({...cur});
+
+  if(cfg.stateAt2){
+    const cur2 = cfg.stateAt2(t);
+    ctx.beginPath(); ctx.arc(cur2.x, cur2.y, objR(), 0, Math.PI*2);
+    ctx.fillStyle = COLORS.object2; ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 2; ctx.stroke();
+    drawVectorsAt({...cur2});
+    // 두 물체가 항상 같은 높이임을 보이는 안내선 (수평이어야 하므로 y를 하나로 통일)
+    ctx.strokeStyle = COLORS.guide; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
+    ctx.beginPath();
+    ctx.moveTo(Math.min(cur.x, cur2.x)-30, cur.y);
+    ctx.lineTo(Math.max(cur.x, cur2.x)+30, cur.y);
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  if(tglEnergy.checked) drawLiveEnergy(cur);
+  drawScaleBar();
+
+  ctx.fillStyle = COLORS.hud;
+  ctx.font = F(13);
+  ctx.textAlign = 'right';
+  ctx.fillText('t = ' + t.toFixed(2) + ' s', W-18, 30);
+  if(selMode){
+    ctx.fillStyle = QUANT[selMode].dColor;
+    ctx.fillText(QUANT[selMode].dSym+' 모드', W-18, 56);
+    if(cfg.stateAt2 && selection.length){
+      ctx.fillStyle = selection[0].o2 ? COLORS.object2 : COLORS.object;
+      ctx.fillText(selection[0].o2 ? '회색 물체 선택 중' : '주황 물체 선택 중', W-18, 82);
+    }
+  }
+  ctx.textAlign = 'left';
+
+  drawHoverTooltip();
+}
+
+/* ── 벡터 다이어그램: 속도 합성 (호도그래프) ────────
+   선택한 모든 속도 벡터의 꼬리를 한 원점에 모으고,
+   이웃한 끝점끼리 Δv(보라)로 연결 → v₂ = v₁ + Δv 합성
+   (크기는 창에 맞춰 자동 정규화되므로 v/p 다이어그램의
+    모양은 같다. 실제 크기 비교는 아래 수치와 메인 캔버스에서.) */
+function renderDiagram(){
+  dctx.clearRect(0,0,DW,DH);
+
+  dctx.strokeStyle = COLORS.grid; dctx.lineWidth = 1;
+  dctx.beginPath();
+  for(let x=30; x<DW; x+=30){ dctx.moveTo(x+0.5,0); dctx.lineTo(x+0.5,DH); }
+  for(let y=30; y<DH; y+=30){ dctx.moveTo(0,y+0.5); dctx.lineTo(DW,y+0.5); }
+  dctx.stroke();
+
+  if(!selMode || selection.length===0){
+    dctx.fillStyle = '#9AA5AF';
+    dctx.font = (12*FS)+'px sans-serif';
+    dctx.textAlign = 'center';
+    dctx.fillText(selMode ? '궤적 점을 선택하세요' : 'Δv 또는 Δp 모드를 켜세요', DW/2, DH/2);
+    dctx.textAlign = 'left';
+    diagramInfo.textContent = '';
+    return;
+  }
+
+  const q = QUANT[selMode];
+  const sel = selection;
+  const phys = q.phys();
+  const maxM = Math.max(1, ...sel.map(p=>Math.hypot(p.vx,p.vy)*phys));
+  const sc = Math.min(DW,DH)*0.36/maxM * phys;
+
+  // 끝점들의 범위를 계산해 다이어그램 중앙에 배치
+  const rx = sel.map(p=>p.vx*sc), ry = sel.map(p=>p.vy*sc);
+  const minx=Math.min(0,...rx), maxx=Math.max(0,...rx);
+  const miny=Math.min(0,...ry), maxy=Math.max(0,...ry);
+  const ox = DW/2 - (minx+maxx)/2;
+  const oy = DH/2 - (miny+maxy)/2;
+
+  dctx.fillStyle = '#98A3AE';
+  dctx.beginPath(); dctx.arc(ox, oy, 3, 0, Math.PI*2); dctx.fill();
+
+  // 속도 벡터들 (꼬리를 원점에)
+  sel.forEach((p,i)=>{
+    const first = i===0, last = i===sel.length-1;
+    arrow(dctx, ox, oy, p.vx*sc, p.vy*sc, q.color,
+          {width: first||last ? 2.4 : 1.5});
+    label(dctx, ox+p.vx*sc+6, oy+p.vy*sc-5, q.sym+sub(i+1), q.color, 11);
+  });
+
+  // Δv 사슬: 이웃한 끝점 연결
+  let anyDv = false;
+  for(let i=0;i<sel.length-1;i++){
+    const dvx=(sel[i+1].vx-sel[i].vx)*sc, dvy=(sel[i+1].vy-sel[i].vy)*sc;
+    if(Math.hypot(dvx,dvy) < 2) continue;
+    anyDv = true;
+    arrow(dctx, ox+sel[i].vx*sc, oy+sel[i].vy*sc, dvx, dvy, q.dColor, {width:2.4});
+  }
+
+  if(sel.length===1){
+    diagramInfo.textContent = `|${q.sym}₁| = ${(Math.hypot(sel[0].vx,sel[0].vy)*phys/PX_PER_M).toFixed(q.dec)} ${q.unit}`;
+  }else if(sel.length===2){
+    // 등속 판정은 환산 전 원시 px/s 크기로 한다 (phys가 작아 오판되지 않도록)
+    const dRaw = Math.hypot(sel[1].vx-sel[0].vx, sel[1].vy-sel[0].vy);
+    const dvm  = dRaw*phys;
+    const dT   = sel[1].t - sel[0].t;
+    if(dRaw < 1){
+      diagramInfo.textContent = `${q.dSym} = 0 (등속)`;
+    }else{
+      // Δv/Δt = 평균 가속도, Δp/Δt = 평균 알짜힘 — 화살표와 F = ma 를 잇는 다리
+      const rate = dvm/PX_PER_M/dT;
+      const rateUnit = selMode==='v' ? 'm/s²' : 'N';
+      diagramInfo.textContent =
+        `Δt = ${dT.toFixed(2)} s · |${q.dSym}| = ${(dvm/PX_PER_M).toFixed(q.dec)} ${q.unit}\n`
+        + `|${q.dSym}|/Δt = ${rate.toFixed(2)} ${rateUnit}`;
+      diagramInfo.style.whiteSpace = 'pre-line';
+    }
+  }else{
+    diagramInfo.textContent = anyDv
+      ? `${q.sym} ${sel.length}개 · 사슬 = 누적 ${q.dSym}`
+      : `${q.sym} ${sel.length}개 · ${q.dSym} = 0 (등속)`;
+  }
+}
+
+/* ── 캔버스 좌표 변환 (표시 크기 ≠ 내부 800×600 대응) ── */
+function canvasPos(e){
+  const r = canvas.getBoundingClientRect();
+  return { x:(e.clientX - r.left) * (W / r.width),
+           y:(e.clientY - r.top)  * (H / r.height) };
+}
+
+/* ── 벡터 호버 툴팁 ─────────────────────────────── */
+function segDist(px, py, x1, y1, x2, y2){
+  const dx=x2-x1, dy=y2-y1, L2=dx*dx+dy*dy;
+  let u = L2 ? ((px-x1)*dx+(py-y1)*dy)/L2 : 0;
+  u = Math.max(0, Math.min(1, u));
+  return Math.hypot(px-(x1+dx*u), py-(y1+dy*u));
+}
+function drawHoverTooltip(){
+  if(mouseX===null) return;
+  const hits = [];
+  hoverTargets.forEach(tg=>{
+    if(segDist(mouseX, mouseY, tg.x1, tg.y1, tg.x2, tg.y2) <= 7) hits.push(tg.text);
+  });
+  if(hits.length===0) return;
+  const lines = [...new Set(hits)].slice(0, 3);   // 겹친 화살표는 함께 표시
+  ctx.font = F(12);
+  const bw = Math.max(...lines.map(s=>ctx.measureText(s).width)) + 20;
+  const bh = lines.length*25 + 12;
+  let bx = mouseX + 14, by = mouseY - bh - 12;
+  bx = Math.max(8, Math.min(bx, W - bw - 8));
+  by = Math.max(8, Math.min(by, H - bh - 8));
+  ctx.fillStyle = 'rgba(255,255,255,0.96)';
+  ctx.strokeStyle = '#9AA5AF'; ctx.lineWidth = 1;
+  ctx.beginPath();
+  if(ctx.roundRect) ctx.roundRect(bx, by, bw, bh, 6); else ctx.rect(bx, by, bw, bh);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#22303C';
+  lines.forEach((s,i)=> ctx.fillText(s, bx+10, by+20+i*25));
+}
+canvas.addEventListener('mousemove', e=>{
+  const p = canvasPos(e);
+  mouseX = p.x; mouseY = p.y;
+});
+canvas.addEventListener('mouseleave', ()=>{ mouseX = null; mouseY = null; });
+
+// 터치: 화살표를 탭하면 툴팁을 잠시 표시 (잔상 선택 탭이 우선)
+let tooltipTimer = null;
+canvas.addEventListener('pointerdown', e=>{
+  if(e.pointerType !== 'touch') return;
+  const p = canvasPos(e);
+  const hitR = Math.max(24, objR()+10);
+  if(selMode && dots.some(d=>Math.hypot(d.x-p.x, d.y-p.y) <= hitR)){
+    mouseX = null; mouseY = null;      // 선택 탭 → 툴팁 억제
+    return;
+  }
+  mouseX = p.x; mouseY = p.y;
+  clearTimeout(tooltipTimer);
+  tooltipTimer = setTimeout(()=>{ mouseX = null; mouseY = null; }, 2500);
+});
+
+/* ── Δv 모드: 다중 선택 ────────────────────────────── */
+canvas.addEventListener('click', e=>{
+  if(!selMode || dots.length===0) return;
+  const pos = canvasPos(e);
+  const mx = pos.x, my = pos.y;
+  let best=null, bestD=Infinity;
+  dots.forEach(p=>{
+    const d = Math.hypot(p.x-mx, p.y-my);
+    if(d<bestD){ bestD=d; best=p; }
+  });
+  if(!best || bestD > Math.max(22, objR()+8)) return;
+
+  // ★ 시각(t)이 아니라 점의 동일성으로 토글한다.
+  //   동시 재생 모드에서는 두 물체가 같은 t를 공유하므로
+  //   t로 비교하면 다른 물체의 점을 클릭했을 때 엉뚱한 점이 해제된다.
+  const idx = selection.indexOf(best);
+  if(idx >= 0) selection.splice(idx,1);
+  else{
+    // ★ 서로 다른 물체의 점 사이에는 Δv·Δp가 정의되지 않는다.
+    //   (한 물체의 시간에 따른 변화량이어야 함)
+    //   물체가 바뀌면 선택을 비우고 새로 시작한다.
+    if(selection.length && selection[0].o2 !== best.o2) selection = [];
+    selection.push(best);
+    selection.sort((a,b)=>a.t-b.t);
+  }
+  updateHint();
+});
+
+function setSelMode(m){
+  selMode = m;
+  dvBtn.classList.toggle('active', selMode==='v');
+  dpBtn.classList.toggle('active', selMode==='p');
+  canvas.classList.toggle('dv-mode', !!selMode);
+  updateHint();
+}
+dvBtn.addEventListener('click', ()=> setSelMode(selMode==='v' ? null : 'v'));
+dpBtn.addEventListener('click', ()=> setSelMode(selMode==='p' ? null : 'p'));
+clearSelBtn.addEventListener('click', ()=>{
+  selection = [];
+  updateHint();
+});
+
+function updateHint(){
+  if(!selMode){
+    dvHint.textContent = 'Δv 또는 Δp 모드를 켜고 궤적 점들을 클릭하세요. 모드를 오가도 선택한 점은 유지되어 서로 비교할 수 있습니다.';
+    return;
+  }
+  const q = QUANT[selMode];
+  const n = selection.length;
+  const dualNote = cfg && cfg.stateAt2
+    ? ' 두 물체는 서로 다른 운동이므로 한 번에 한 물체의 점만 선택됩니다.' : '';
+  if(n===0) dvHint.textContent = `궤적 점을 클릭해 선택하세요. 두 개 이상 선택하면 구간마다 ${q.dSym}가 작도되고, 아래 다이어그램에 ${q.sym} 벡터 합성이 나타납니다.` + dualNote;
+  else if(n===1) dvHint.textContent = `점 1개 선택됨. 다음 점을 클릭하면 두 벡터가 빈 곳에 복사되어 ${q.dSym}가 작도됩니다.` + dualNote;
+  else dvHint.textContent = `점 ${n}개 선택됨 · ${q.dSym} ${n-1}개 작도 중. 점을 다시 클릭하면 선택이 해제됩니다.`;
+}
+
+/* ── 컨트롤 이벤트 ────────────────────────────────── */
+playBtn.addEventListener('click', ()=>{
+  if(finished){ resetSim(); running = true; }
+  else running = !running;
+  updatePlayBtn();
+});
+resetBtn.addEventListener('click', resetSim);
+
+massSlider.addEventListener('input', ()=>{
+  massVal.textContent = mass().toFixed(1)+' kg';
+});
+sizeSlider.addEventListener('input', ()=>{
+  sizeVal.textContent = parseFloat(sizeSlider.value).toFixed(1)+' m';
+});
+// 빗면에서는 물체 반지름이 접촉점 기하(=높이=퍼텐셜 에너지)에 들어가므로
+// 크기를 바꾸면 궤적을 다시 계산해야 한다. 드래그를 놓을 때 한 번만 초기화.
+sizeSlider.addEventListener('change', ()=>{
+  if(mode.id === 'incline') resetSim();
+});
+speedSlider.addEventListener('input', ()=>{
+  speedVal.textContent = playSpeed().toFixed(2)+'×';
+});
+dtSlider.addEventListener('input', ()=>{
+  dtVal.textContent = dtInterval().toFixed(2)+' s';
+  const lastT = dots.length ? dots[dots.length-1].t : 0;
+  nextDotTime = lastT + dtInterval();
+});
+
+// Δt 단위 스텝 이동 (일시정지 상태로 전환)
+function stepBy(sign){
+  running = false;
+  const step = dtInterval();
+  if(sign > 0){
+    if(finished){ updatePlayBtn(); return; }
+    t += step;
+    // 지나친 시점의 궤적 잔상 기록
+    while(nextDotTime <= t + 1e-9){
+      const d = cfg.stateAt(nextDotTime); d.t = nextDotTime;
+      if(cfg.done(d)) break;
+      recordDot(nextDotTime);
+      nextDotTime += step;
+    }
+    const s = cfg.stateAt(t); s.t = t;
+    if(cfg.done(s)) finished = true;
+  }else{
+    t = Math.max(0, t - step);
+    finished = false;
+    // 현재 시각 이후의 잔상·선택 제거 (시간 되감기)
+    dots = dots.filter(p=>p.t <= t + 1e-9);
+    selection = selection.filter(p=>p.t <= t + 1e-9);
+    const lastT = dots.length ? dots[dots.length-1].t : 0;
+    nextDotTime = lastT + step;
+    updateHint();
+  }
+  updatePlayBtn();
+}
+stepBackBtn.addEventListener('click', ()=>stepBy(-1));
+stepFwdBtn.addEventListener('click', ()=>stepBy(+1));
+
+/* ── 캔버스 인쇄 (PDF 저장) ──────────────────────
+   캔버스 비트맵은 배경이 투명하므로(배경색은 CSS) 흰 바탕에 합성한 뒤
+   PNG 로 뽑아 인쇄 전용 영역에 넣고, @media print 로 그 영역만 남긴다.
+   용지 크기·여백은 위 @page 에서 캔버스에 맞춰 두었으므로
+   종이(또는 PDF)에는 캔버스 그림 외에 아무것도 나가지 않는다. */
+printBtn.addEventListener('click', ()=>{
+  // 보고 있는 화면 그대로 인쇄되도록 재생을 멈추고, 툴팁을 지운 뒤 한 번 다시 그린다
+  running = false; updatePlayBtn();
+  mouseX = null; mouseY = null;
+  render();
+
+  const off = document.createElement('canvas');
+  off.width = canvas.width; off.height = canvas.height;   // 백킹 스토어 해상도 유지
+  const octx = off.getContext('2d');
+  octx.fillStyle = '#FFFFFF';                             // 투명 배경을 흰색으로 합성
+  octx.fillRect(0, 0, off.width, off.height);
+  octx.drawImage(canvas, 0, 0);
+
+  // 저장 대화상자의 기본 파일명은 문서 제목에서 따온다 (인쇄 내용에는 나타나지 않음)
+  const oldTitle = document.title;
+  const stamp = new Date().toISOString().slice(0,10);
+  document.title = `운동과벡터_${mode.label.replace(/[ ()+]/g,'')}_${stamp}`;
+  const restore = ()=>{ document.title = oldTitle; };
+  window.addEventListener('afterprint', restore, {once:true});
+  setTimeout(restore, 60000);                    // afterprint 미지원 브라우저 대비
+
+  const img = document.getElementById('printImg');
+  img.src = off.toDataURL('image/png');
+  // 이미지가 완전히 준비된 뒤 인쇄해야 빈 칸으로 나가지 않는다
+  (img.decode ? img.decode() : Promise.resolve())
+    .catch(()=>{})
+    .then(()=>window.print());
+});
+
+document.addEventListener('keydown', e=>{
+  if(e.target.tagName==='INPUT') return;
+  if(e.code==='Space'){ e.preventDefault(); playBtn.click(); }
+  if(e.key==='r' || e.key==='R') resetSim();
+  if(e.key==='ArrowLeft'){ e.preventDefault(); stepBy(-1); }
+  if(e.key==='ArrowRight'){ e.preventDefault(); stepBy(+1); }
+});
+
+/* ── 캔버스 초기화 ────────────────────────────────── */
+function initCanvas(){
+  const dpr = window.devicePixelRatio || 1;
+  W = 800; H = 600;
+  canvas.width  = Math.round(W*dpr);
+  canvas.height = Math.round(H*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+
+  const rect = diagram.getBoundingClientRect();
+  DW = rect.width; DH = rect.height;
+  diagram.width  = Math.round(DW*dpr);
+  diagram.height = Math.round(DH*dpr);
+  dctx.setTransform(dpr,0,0,dpr,0,0);
+}
+
+/* ── 모드 버튼 생성 & 시작 ────────────────────────── */
+MODES.forEach(m=>{
+  const b = document.createElement('button');
+  b.className = 'mode-btn'; b.dataset.id = m.id; b.textContent = m.label;
+  b.addEventListener('click', ()=>switchMode(m));
+  modeBtnsEl.appendChild(b);
+});
+
+// 화면 크기에 맞춰 캔버스 표시 크기 조절 (내부 좌표계 800×600은 유지)
+function fitLayout(){
+  const stage = document.querySelector('.stage');
+  const box = document.querySelector('.canvas-box');
+  const availW = stage.clientWidth - 24;
+  const top = stage.getBoundingClientRect().top;
+  const availH = window.innerHeight - top - 24;
+  const k = Math.max(0.35, Math.min(1, availW/W, availH/H));
+  box.style.width  = canvas.style.width  = (W*k)+'px';
+  box.style.height = canvas.style.height = (H*k)+'px';
+  // 레이아웃 전환으로 다이어그램 크기가 바뀌면 백킹 스토어 재적용
+  const dpr = window.devicePixelRatio || 1;
+  const r = diagram.getBoundingClientRect();
+  if(r.width > 0 && (Math.abs(r.width-DW) > 1 || Math.abs(r.height-DH) > 1)){
+    DW = r.width; DH = r.height;
+    diagram.width  = Math.round(DW*dpr);
+    diagram.height = Math.round(DH*dpr);
+    dctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+}
+let fitTimer = null;
+window.addEventListener('resize', ()=>{
+  clearTimeout(fitTimer);
+  fitTimer = setTimeout(fitLayout, 120);
+});
+window.addEventListener('orientationchange', ()=>setTimeout(fitLayout, 300));
+
+initCanvas();
+fitLayout();
+switchMode(MODES[0]);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
