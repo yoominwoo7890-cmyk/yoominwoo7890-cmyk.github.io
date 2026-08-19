@@ -1223,12 +1223,33 @@ function render(){
   }
 
   const cur = cfg.stateAt(t);
-  ctx.beginPath(); ctx.arc(cur.x, cur.y, objR(), 0, Math.PI*2);
-  ctx.fillStyle = COLORS.object; ctx.fill();
-  ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 2; ctx.stroke();
-  drawVectorsAt({...cur});
 
-  if(cfg.stateAt2){
+  /* 재생이 끝나는 시각은 Δt 의 배수가 아니다. 그래서 마지막 물체가 직전 잔상 바로
+     옆에 찍혀 그 구간만 간격이 좁아 보이는 일이 생긴다 (자유낙하가 특히 심하다).
+     학습지에서는 이 점이 또 하나의 섬광처럼 보여 속도를 잘못 재게 되므로,
+     간격이 직전 간격보다 뚜렷하게 좁으면 마지막 물체를 그리지 않는다.
+     재생 중이거나 일시정지 상태에서는 언제나 그린다. */
+  let showObj = true;
+  if(finished){
+    const own = dots.filter(p=>!p.o2);
+    if(own.length){
+      const last = own[own.length-1];
+      const d = Math.hypot(cur.x-last.x, cur.y-last.y);
+      const g = own.length > 1
+        ? Math.hypot(last.x-own[own.length-2].x, last.y-own[own.length-2].y)
+        : Infinity;
+      if(d < 0.7*g || d < objR()*2) showObj = false;
+    }
+  }
+
+  if(showObj){
+    ctx.beginPath(); ctx.arc(cur.x, cur.y, objR(), 0, Math.PI*2);
+    ctx.fillStyle = COLORS.object; ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 2; ctx.stroke();
+    drawVectorsAt({...cur});
+  }
+
+  if(cfg.stateAt2 && showObj){
     const cur2 = cfg.stateAt2(t);
     ctx.beginPath(); ctx.arc(cur2.x, cur2.y, objR(), 0, Math.PI*2);
     ctx.fillStyle = COLORS.object2; ctx.fill();
