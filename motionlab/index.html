@@ -2077,13 +2077,37 @@ MODES.forEach(m=>{
 });
 
 // 화면 크기에 맞춰 캔버스 표시 크기 조절 (내부 좌표계 800×600은 유지)
+const ASIDE_MIN = 200;          // 사이드바를 좁힐 수 있는 한계
+
 function fitLayout(){
   const stage = document.querySelector('.stage');
-  const box = document.querySelector('.canvas-box');
-  const availW = stage.clientWidth - 24;
-  const top = stage.getBoundingClientRect().top;
-  const availH = window.innerHeight - top - 24;
-  const k = Math.max(0.35, Math.min(1, availW/W, availH/H));
+  const box   = document.querySelector('.canvas-box');
+  const aside = document.querySelector('aside');
+  const main  = document.querySelector('main');
+  const PADX  = 16;
+
+  aside.style.width = '';                 // CSS 기본값을 기준으로 다시 잰다
+  const stacked = getComputedStyle(main).flexDirection === 'column';
+  const base  = aside.getBoundingClientRect().width;
+  const total = main.getBoundingClientRect().width;
+  const top   = stage.getBoundingClientRect().top;
+  const availH = Math.max(120, window.innerHeight - top - 20);
+  const kH = Math.min(1, availH/H);
+
+  /* 표를 켜면 캔버스 내부 폭(W)이 늘어난다. 그대로 두면 전체가 축소되어
+     시뮬레이션 영역까지 작아지므로, 표가 차지할 만큼 사이드바를 미리 좁혀
+     시뮬레이션 영역의 화면 크기를 그대로 지킨다. 좁힐 여지가 없으면
+     (창이 작거나 표가 넓으면) 그때만 축소된다. */
+  if(!stacked){
+    const kBase = Math.max(0.35, Math.min(kH, (total - base - PADX)/SIM_W));
+    const want  = total - (W*kBase + PADX);
+    const aw    = Math.max(ASIDE_MIN, Math.min(base, want));
+    if(aw < base - 0.5) aside.style.width = aw + 'px';
+  }
+
+  const availW = stacked ? stage.clientWidth - PADX
+                         : Math.max(120, total - aside.getBoundingClientRect().width - PADX);
+  const k = Math.max(0.35, Math.min(1, availW/W, kH));
   box.style.width  = canvas.style.width  = (W*k)+'px';
   box.style.height = canvas.style.height = (H*k)+'px';
   // 레이아웃 전환으로 다이어그램 크기가 바뀌면 백킹 스토어 재적용
