@@ -137,11 +137,21 @@
     border:1px solid var(--panel-line); background:#fff; color:var(--ink); cursor:pointer;
   }
   #clearSelBtn:hover{border-color:var(--ink-soft);}
+  .tbl-btns{display:flex; gap:6px; flex-wrap:wrap;}
+  .tbl-btn{
+    flex:1 1 calc(50% - 3px); padding:9px 0; border-radius:8px;
+    font-size:19.5px; font-weight:600;
+    border:1px solid var(--panel-line); background:#fff; color:var(--ink); cursor:pointer;
+  }
+  .tbl-btn:hover{border-color:var(--ink-soft);}
+  .tbl-btn.active{background:var(--accent); color:#fff; border-color:var(--accent);}
+  .tbl-btn.wide{flex:1 1 100%; margin-top:2px; font-weight:700;}
+  .tbl-btn:focus-visible{outline:2px solid var(--blue); outline-offset:2px;}
+  #tblHint{font-size:17.25px; color:var(--ink-soft); margin-top:9px; line-height:1.55;}
   #dvHint{font-size:17.25px; color:var(--ink-soft); margin-top:9px; line-height:1.55;}
   .legend-dv{display:flex; align-items:center; gap:9px; margin-top:10px; font-size:18px;}
 
   /* 벡터 다이어그램 (합성) */
-  .diagram-wrap{padding:12px 16px 16px;}
   #diagram{
     width:100%; height:260px; display:block;
     background:#fff; border:1px solid var(--panel-line); border-radius:10px;
@@ -173,15 +183,18 @@
      결과적으로 종이에는 캔버스 그림만 남는다. */
   #printArea{display:none;}
   @media print{
-    /* A4 가로에 이미지를 정확히 200 × 150 mm 로 앉힌다 → 100% 배율 인쇄에서 1 cm = 1 m */
-    @page{ size:A4 landscape; margin:0; }
+    /* 용지 크기와 이미지 치수는 applyPrintSize() 가 캔버스 높이에 맞춰 주입한다 */
+    @page{ margin:0; }
+    /* height:100% 를 주면 자식의 위쪽 여백이 부모 밖으로 빠져나가(마진 병합)
+       내용 높이가 한 쪽을 넘겨 빈 2쪽이 생긴다. 높이를 auto 로 두고
+       위쪽 간격도 margin 이 아니라 padding 으로 준다. */
     html, body{
-      width:100%; height:100%; margin:0; padding:0;
+      width:auto; height:auto; margin:0; padding:0;
       background:#fff; overflow:visible; display:block;
     }
     body > *{ display:none !important; }
-    #printArea{ display:block !important; width:100%; height:100%; }
-    #printImg{ display:block; width:200mm; height:150mm; margin:30mm auto 0; }
+    #printArea{ display:block !important; break-inside:avoid; page-break-inside:avoid; }
+    #printImg{ display:block; margin:0 auto; break-after:avoid; page-break-after:avoid; }
   }
 
   /* ── 태블릿 세로/좁은 화면: 캔버스 상단 + 컨트롤 하단 배치 ── */
@@ -195,10 +208,88 @@
       flex-direction:row; flex-wrap:wrap; align-items:flex-start;
       overflow:visible;
     }
-    .section{flex:1 1 310px; border-right:1px solid var(--panel-line);}
-    .diagram-wrap{flex:1 1 360px; max-width:470px;}
+    .section{flex:1 1 320px; border-right:1px solid var(--panel-line);}
     .scale-note{display:none;}
   }
+
+  /* ══ 컴팩트 사이드바 ═══════════════════════════════
+     접지 않고 전부 펼쳐 두되, 세로 길이를 줄인다.
+       · 토글 7행(≈370px) → 3열 아이콘 격자 2행(≈100px)
+       · 슬라이더 행 높이 62 → 42px
+       · 다이어그램은 Δv·Δp 모드일 때만 자리를 차지 */
+
+  aside{width:344px;}
+  .section{padding:11px 14px 13px;}
+  .section + .section{border-top:none;}
+
+  /* 묶음 제목 : 얇은 띠 */
+  .section h2{
+    font-size:12.5px; font-weight:800; letter-spacing:1.5px;
+    margin-bottom:9px; display:flex; align-items:center; gap:8px;
+  }
+  .section h2::before{
+    content:''; width:3px; height:13px; border-radius:2px; background:var(--accent);
+  }
+
+  /* 슬라이더 : 한 줄 라벨 + 얇은 트랙 */
+  .slider-row{margin-bottom:10px;}
+  .slider-row:last-child{margin-bottom:0;}
+  .slider-row label{font-size:14px; font-weight:600; color:var(--ink); margin-bottom:4px;}
+  .slider-row label .val{
+    font-size:13px; font-weight:700; color:var(--ink);
+    background:#fff; border:1px solid var(--panel-line);
+    border-radius:20px; padding:1px 9px;
+  }
+  input[type=range]{height:5px;}
+  input[type=range]::-webkit-slider-thumb{width:19px; height:19px; border-width:3px;}
+  input[type=range]::-moz-range-thumb{width:17px; height:17px; border-width:3px;}
+
+  /* 벡터 토글 : 3열 아이콘 격자 — 꺼진 것은 흐리게 */
+  .tgl-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin:2px 0 11px;}
+  .tgl{
+    position:relative; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:6px;
+    padding:9px 3px 8px; border-radius:9px; cursor:pointer;
+    border:1px solid transparent; background:transparent;
+    font-size:12px; font-weight:700; line-height:1.15; text-align:center;
+    color:var(--ink); opacity:0.4; transition:opacity .12s;
+  }
+  .tgl input{position:absolute; opacity:0; width:0; height:0;}
+  .tgl:has(input:checked){opacity:1; background:#fff; border-color:var(--panel-line);}
+  .tgl:hover{opacity:0.85;}
+  .tgl:has(input:checked):hover{opacity:1; border-color:var(--ink-soft);}
+  .tgl:has(input:focus-visible){outline:2px solid var(--blue); outline-offset:1px;}
+  .tgl .chip{width:34px;}
+  .tgl .chip-bar{width:34px; height:13px; border-radius:3px;}
+  .tgl .chip-t{width:34px; font-size:12px; padding:1px 0; border-radius:5px;}
+
+  /* 색 견본 공통 */
+  .chip{border-top-width:4px;}
+  .chip::after{right:-3px; top:-7px;
+    border-left-width:11px; border-top-width:6px; border-bottom-width:6px;}
+
+  /* 버튼 */
+  .transport{gap:6px;}
+  .transport button{font-size:14px; font-weight:700; padding:9px 0; border-radius:7px;}
+  .btn-row{display:flex; gap:6px; margin-bottom:6px;}
+  .btn-row > button{flex:1;}
+  #dvBtn, #dpBtn{width:auto; margin:0; font-size:13.5px; padding:9px 0; border-radius:7px;}
+  #clearSelBtn{margin-top:0; font-size:13px; padding:7px 0;}
+  .tbl-btns{gap:5px;}
+  .tbl-btn{flex:1 1 0; font-size:13px; padding:8px 0; border-radius:7px;}
+  .tbl-btn.wide{flex:1 1 calc(50% - 3px); font-size:13px; margin-top:0;}
+  .tbl-btn.full{flex:1 1 100%;}
+
+  /* 보조 설명 */
+  #dvHint, #tblHint, #diagramInfo{font-size:12px; line-height:1.55; color:var(--ink-soft);}
+  #dvHint{margin-top:7px;}
+  #tblHint{margin-top:8px;}
+  .legend-dv{font-size:12.5px; gap:9px; margin-top:7px;}
+  .legend-dv .chip{width:30px;}
+
+  /* 다이어그램 : Δv·Δp 모드일 때만 자리를 차지 */
+  #deltaView{display:none; margin-top:10px;}
+  #diagram{height:150px;}
 </style>
 </head>
 <body>
@@ -211,100 +302,104 @@
 <main>
   <aside>
     <div class="section">
-      <h2>시뮬레이션</h2>
+      <h2>재생</h2>
       <div class="transport">
         <button id="playBtn">▶ 재생</button>
         <button id="resetBtn">↺ 초기화</button>
       </div>
-      <div class="transport" style="margin-top:8px;">
+      <div class="transport" style="margin-top:6px;">
         <button id="stepBackBtn">⏴ −Δt</button>
         <button id="stepFwdBtn">+Δt ⏵</button>
       </div>
-      <div class="transport" style="margin-top:8px;">
-        <button id="printBtn">🖨 캔버스 인쇄 · PDF 저장</button>
-      </div>
-    </div>
-
-    <div class="section">
-      <h2>설정</h2>
-      <div class="slider-row">
-        <label>섬광 간격 Δt <span class="val mono" id="dtVal">0.50 s</span></label>
-        <input type="range" id="dtSlider" min="0.25" max="3.0" step="0.25" value="0.5">
-      </div>
-      <div class="slider-row">
-        <label>질량 m <span class="val mono" id="massVal">1.0 kg</span></label>
-        <input type="range" id="massSlider" min="0.1" max="2.0" step="0.1" value="1.0">
-      </div>
-      <div class="slider-row">
-        <label>물체 크기 <span class="val mono" id="sizeVal">1.5 m</span></label>
-        <input type="range" id="sizeSlider" min="0.5" max="5.0" step="0.5" value="1.5">
-      </div>
-      <div class="slider-row">
+      <div class="slider-row" style="margin-top:11px;">
         <label>재생 속도 <span class="val mono" id="speedVal">1.00×</span></label>
         <input type="range" id="speedSlider" min="0.25" max="2" step="0.25" value="1">
       </div>
-      <div id="modeParams"></div>
     </div>
 
     <div class="section">
-      <h2>화살표 표시</h2>
-      <label class="arrow-toggle">
-        <input type="checkbox" id="tglDir">
-        <span class="chip green"></span>
-        <span>운동 방향 û<span class="desc">초록 · 속도 벡터와 같은 자리 · v = |v|·û</span></span>
-      </label>
-      <label class="arrow-toggle">
-        <input type="checkbox" id="tglVel" checked>
-        <span class="chip blue"></span>
-        <span>속도 벡터 v<span class="desc">파랑 · 물체 <b>위쪽</b>에 배치</span></span>
-      </label>
-      <label class="arrow-toggle">
-        <input type="checkbox" id="tglComp">
-        <span class="chip comp"></span>
-        <span>속도 성분 분해<span class="desc">연한 파랑 점선 · vₓ, v_y</span></span>
-      </label>
-      <label class="arrow-toggle">
-        <input type="checkbox" id="tglForce">
-        <span class="chip red"></span>
-        <span>알짜힘 벡터<span class="desc">빨강 · 길이 ∝ 힘의 크기 (F = ma)</span></span>
-      </label>
-      <label class="arrow-toggle">
-        <input type="checkbox" id="tglMom">
-        <span class="chip teal"></span>
-        <span>운동량 벡터 p<span class="desc">청록 · 물체 <b>아래쪽</b> · p = m × v</span></span>
-      </label>
-      <label class="arrow-toggle">
-        <input type="checkbox" id="tglEnergy">
-        <span class="chip-bar"></span>
-        <span>에너지 막대<span class="desc">주황 K = ½mv² · 하늘 P = mgh · 단위 J</span></span>
-      </label>
-      <label class="arrow-toggle">
-        <input type="checkbox" id="tglTime" checked>
-        <span class="chip-t">t</span>
-        <span>섬광 시각 라벨<span class="desc">회색 · 0 s, 0.5 s, 1.0 s …</span></span>
-      </label>
+      <h2>운동 설정</h2>
+      <div id="modeParams"></div>
+      <div class="slider-row">
+        <label>중력가속도 g <span class="val mono" id="gVal">10.0 m/s²</span></label>
+        <input type="range" id="gSlider" min="1" max="20" step="0.1" value="10">
+      </div>
+      <div class="slider-row">
+        <label>질량 m <span class="val mono" id="massVal">0.5 kg</span></label>
+        <input type="range" id="massSlider" min="0.1" max="2.0" step="0.1" value="0.5">
+      </div>
+      <div class="slider-row">
+        <label>섬광 간격 Δt <span class="val mono" id="dtVal">1.00 s</span></label>
+        <input type="range" id="dtSlider" min="0.25" max="3.0" step="0.25" value="1.0">
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>화면 표시</h2>
+      <div class="tgl-grid">
+        <label class="tgl" title="속도 벡터 — 물체 위쪽, 1 cm = 10 m/s">
+          <input type="checkbox" id="tglVel" checked>
+          <span class="chip blue"></span><span>속도 v</span>
+        </label>
+        <label class="tgl" title="운동량 벡터 — 물체 아래쪽, p = m × v">
+          <input type="checkbox" id="tglMom">
+          <span class="chip teal"></span><span>운동량 p</span>
+        </label>
+        <label class="tgl" title="알짜힘 벡터 — 물체 중심, 1 cm = 10 N">
+          <input type="checkbox" id="tglForce">
+          <span class="chip red"></span><span>알짜힘 F</span>
+        </label>
+        <label class="tgl" title="속도를 가로·세로 성분으로 분해">
+          <input type="checkbox" id="tglComp">
+          <span class="chip comp"></span><span>성분 분해</span>
+        </label>
+        <label class="tgl" title="각 섬광점의 시각 표시">
+          <input type="checkbox" id="tglTime" checked>
+          <span class="chip-t">t</span><span>섬광 시각</span>
+        </label>
+        <label class="tgl" title="운동 에너지 K 와 퍼텐셜 에너지 P 막대">
+          <input type="checkbox" id="tglEnergy">
+          <span class="chip-bar"></span><span>에너지</span>
+        </label>
+      </div>
+      <div class="slider-row">
+        <label>벡터 표시 개수 <span class="val mono" id="vecVal">전체</span></label>
+        <input type="range" id="vecSlider" min="0" max="20" step="1" value="20">
+      </div>
+      <div class="slider-row">
+        <label>물체 크기 <span class="val mono" id="sizeVal">3 m</span></label>
+        <input type="range" id="sizeSlider" min="1" max="10" step="1" value="3">
+      </div>
     </div>
 
     <div class="section">
       <h2>변화량 분석</h2>
-      <button id="dvBtn">Δv 속도변화 모드</button>
-      <button id="dpBtn">Δp 운동량변화 모드</button>
+      <div class="btn-row">
+        <button id="dvBtn">Δv 속도변화</button>
+        <button id="dpBtn">Δp 운동량변화</button>
+      </div>
       <button id="clearSelBtn">선택 지우기</button>
-      <div class="legend-dv">
-        <span class="chip purple"></span>
-        <span>속도변화 Δv = v₂ − v₁</span>
+      <div id="deltaView">
+        <canvas id="diagram"></canvas>
+        <div id="diagramInfo" class="mono"></div>
+        <div class="legend-dv"><span class="chip purple"></span><span>Δv = v₂ − v₁</span></div>
+        <div class="legend-dv"><span class="chip pink"></span><span>Δp = p₂ − p₁</span></div>
       </div>
-      <div class="legend-dv">
-        <span class="chip pink"></span>
-        <span>운동량변화 Δp = p₂ − p₁</span>
-      </div>
-      <div id="dvHint">모드를 켜고 궤적 점들을 클릭하세요. 이웃한 두 속도 벡터가 근처 빈 곳에 복사되어 Δv가 작도됩니다.</div>
+      <div id="dvHint">모드를 켜고 궤적 점들을 클릭하세요.</div>
     </div>
 
-    <div class="diagram-wrap">
-      <h2 style="font-size:16.5px;font-weight:700;color:var(--ink-soft);letter-spacing:1px;margin-bottom:9px;">벡터 다이어그램 · 벡터 합성</h2>
-      <canvas id="diagram"></canvas>
-      <div id="diagramInfo" class="mono"></div>
+    <div class="section">
+      <h2>학습지 만들기</h2>
+      <div class="tbl-btns">
+        <button class="tbl-btn" id="tblV">v</button>
+        <button class="tbl-btn" id="tblP">p</button>
+        <button class="tbl-btn" id="tblVx">vₓ</button>
+        <button class="tbl-btn" id="tblVy">v_y</button>
+        <button class="tbl-btn wide active" id="tblFill">값 채움</button>
+        <button class="tbl-btn wide active" id="tblCond">조건 표시 — 켜짐</button>
+        <button class="tbl-btn full" id="printBtn">🖨 인쇄 · PDF 저장</button>
+      </div>
+      <div id="tblHint">위 네 개는 캔버스 오른쪽 표에 넣을 항목입니다. <b>빈 표</b> + <b>조건 숨김</b> + <b>벡터 개수 ↓</b> → 문제지, 모두 켜기 → 정답지</div>
     </div>
   </aside>
 
@@ -327,29 +422,30 @@
 
 /* ── 스케일 : 자로 재는 학습지용 ────────────────────
    인쇄물(20 × 15 cm)에서 자로 읽는 규칙
-     거리   1 cm = 5 m        (격자 한 칸)
-     속도   1 cm = 10 m/s     → 25 m/s = 2.5 cm
+     거리   1 cm = 10 m       (격자 한 칸)
+     속도   1 cm = 10 m/s
      운동량 1 cm = 10 kg·m/s
      알짜힘 1 cm = 10 N       → 1 kg 의 무게(10 N) = 정확히 1 cm
-   즉 화살표는 SI 1 단위가 종이 1 mm.
+   네 가지 환산이 모두 10 으로 통일되어 자로 읽기 쉽다.
 
-   이 조합에서 화살표 길이 = 0.5 초 동안의 이동 거리가 되어
-   Δt = 0.5 s 의 점 간격과 정확히 같아진다.
-   → 등가속도 운동에서 앞 화살표의 머리와 다음 화살표의 꼬리가 맞닿아 겹치지 않는다. */
-const PX_PER_M = 8;                   // 8 px = 1 m → 캔버스 800×600 px = 100 × 75 m
-const PAPER_CM_PER_M = 0.2;           // 인쇄물 1 cm = 5 m
-const GRID_PX = 40;                   // 격자 한 칸 = 5 m = 종이 1 cm
+   이 조합에서 화살표 길이 = 1 초 동안의 이동 거리가 되므로
+   Δt 를 1 s 로 맞추면 점 간격과 정확히 같아진다.
+   → 등가속도 운동에서 앞 화살표의 머리와 다음 화살표의 꼬리가 맞닿아 겹치지 않고,
+     점과 점 사이를 자로 재어 그대로 옮겨 그리면 그게 속도 벡터가 된다. */
+const PX_PER_M = 4;                   // 4 px = 1 m → 캔버스 800×600 px = 200 × 150 m
+const PAPER_CM_PER_M = 0.1;           // 인쇄물 1 cm = 10 m
+const GRID_PX = 40;                   // 격자 한 칸 = 10 m = 종이 1 cm
 const MASS_REF = 1.0;                 // 화살표 길이 기준 질량 1 kg
-const G_MS2 = 10;                     // 중력가속도 10 m/s²
-const G = G_MS2 * PX_PER_M;           // 80 px/s²
-const DEFAULT_DT = 0.5;               // 모든 운동 공통 섬광 간격 (s)
+let G_MS2 = 10;                       // 중력가속도 (슬라이더로 조절, 기본 10 m/s²)
+let G = G_MS2 * PX_PER_M;             // 40 px/s²  — g 를 바꾸면 함께 갱신된다
+const DEFAULT_DT = 1.0;               // 모든 운동 공통 섬광 간격 (s)
 const DEFAULT_SPEED = 1.0;            // 모든 운동 공통 재생 속도 (×)
 const FS = 1.5;                 // 전체 글씨 배율
 const F = (px, bold) => (bold ? 'bold ' : '') + (px*FS) + 'px ui-monospace,monospace';
 const COLORS = {
   green:'#189E4A', blue:'#2E6FE8', blueSoft:'#7FA6EF', red:'#E4453A', purple:'#9333EA', teal:'#0D9488', pink:'#DB2777',
   dot:'#1B1B1B', object:'#FFB020', object2:'#8E9AA6', hud:'#8A96A1', sel:'#FF8C00',
-  env:'#B9C2CC', envFill:'#F2F0EA', grid:'#EDEBE4', guide:'#C9CDD2'
+  env:'#B9C2CC', envFill:'#F2F0EA', grid:'#DCD7C9', guide:'#BFC4CA'
 };
 
 /* ── DOM ─────────────────────────────────────────── */
@@ -363,19 +459,29 @@ const stepBackBtn = document.getElementById('stepBackBtn');
 const stepFwdBtn  = document.getElementById('stepFwdBtn');
 const dtSlider = document.getElementById('dtSlider');
 const dtVal    = document.getElementById('dtVal');
+const gSlider = document.getElementById('gSlider');
+const gVal    = document.getElementById('gVal');
 const massSlider = document.getElementById('massSlider');
 const sizeSlider = document.getElementById('sizeSlider');
 const sizeVal  = document.getElementById('sizeVal');
 const speedSlider = document.getElementById('speedSlider');
 const speedVal = document.getElementById('speedVal');
 const massVal  = document.getElementById('massVal');
-const tglDir   = document.getElementById('tglDir');
+const vecSlider = document.getElementById('vecSlider');
+const vecVal    = document.getElementById('vecVal');
 const tglVel   = document.getElementById('tglVel');
 const tglComp  = document.getElementById('tglComp');
 const tglForce = document.getElementById('tglForce');
 const tglMom   = document.getElementById('tglMom');
 const tglEnergy = document.getElementById('tglEnergy');
 const tglTime  = document.getElementById('tglTime');
+const tblBtn = {v:document.getElementById('tblV'),   p:document.getElementById('tblP'),
+                vx:document.getElementById('tblVx'), vy:document.getElementById('tblVy')};
+const tblOn = {v:false, p:false, vx:false, vy:false};
+const tblFillBtn = document.getElementById('tblFill');
+let tblFill = true;              // false 면 항목 칸을 비워 학생이 채우게 한다
+const tblCondBtn = document.getElementById('tblCond');
+let showCond = true;             // 좌상단 조건(m·v₀·a) 노출 여부
 const dvBtn    = document.getElementById('dvBtn');
 const dpBtn    = document.getElementById('dpBtn');
 const clearSelBtn = document.getElementById('clearSelBtn');
@@ -389,7 +495,7 @@ const modeBtnsEl   = document.getElementById('modeBtns');
 const MODES = [
   {
     id:'uniform', label:'수평 등속',
-    params:[{key:'v0', label:'초기 속력', min:5, max:40, step:1, value:15, unit:' m/s'}],
+    params:[{key:'v0', label:'초기 속력', min:10, max:60, step:5, value:30, unit:' m/s'}],
     setup(w,h,p){
       const y = h*0.5, V = p.v0*PX_PER_M;
       return {
@@ -403,17 +509,24 @@ const MODES = [
   {
     id:'accel', label:'수평 등가속도',
     params:[
-      {key:'v0', label:'초기 속도', min:-25, max:25, step:1, value:0, unit:' m/s'},
-      {key:'a',  label:'가속도',    min:1,   max:15, step:1, value:5, unit:' m/s²'}
+      {key:'v0', label:'초기 속도', min:-40, max:40, step:5, value:0, unit:' m/s'},
+      {key:'a',  label:'가속도',    min:-15, max:15, step:1, value:5, unit:' m/s²'}
     ],
     setup(w,h,p){
-      const y = h*0.5, A = p.a*PX_PER_M, V = p.v0*PX_PER_M;
-      // 초기 속도가 왼쪽(-)이면 되돌아오는 구간이 보이도록 시작점을 오른쪽으로
-      const x0 = 70 + (V < 0 ? Math.min(V*V/(2*A), w-240) : 0);
+      const y = h*0.5, V = p.v0*PX_PER_M, A = p.a*PX_PER_M;
+      /* 속도와 가속도의 부호는 서로 독립이다. 같은 부호면 가속, 다른 부호면
+         감속 → 정지 → 되돌아옴. (v₀ = +20, a = −5 처럼 조합하면 된다)
+
+         시작점은 '처음 진행 방향' 쪽 끝에서 잡아 캔버스를 최대한 쓴다.
+         이렇게 두면 (v₀, a) 와 (−v₀, −a) 가 캔버스 중앙을 기준으로
+         정확한 거울상이 된다. 양쪽 끝 모두에서 종료를 판정하므로
+         되돌아 나가는 경우도 제대로 멈춘다. */
+      const dir = V !== 0 ? Math.sign(V) : (Math.sign(A) || 1);
+      const M = 70, x0 = dir > 0 ? M : w - M;
       return {
         refY:null,
         stateAt:t=>({x:x0+V*t+0.5*A*t*t, y, vx:V+A*t, vy:0, ax:A, ay:0}),
-        done:s=>s.x > w-40 || s.x < 30,
+        done:s=> s.x > w-40 || s.x < 40,
         drawEnv(c){ dashedLine(c, 30, y+0.5, w-30, y+0.5); }
       };
     }
@@ -421,22 +534,24 @@ const MODES = [
   {
     id:'freefall', label:'자유 낙하',
     setup(w,h){
-      const x = w*0.35, y0 = 60;
+      /* 지면을 바닥에서 10 m 띄운다. 지면에 붙여 두면 마지막 섬광점의 속도
+         화살표(중심 정렬이라 아래로 절반)가 캔버스 밖으로 잘린다. */
+      const x = w*0.35, y0 = 60, yEnd = h-70-10*PX_PER_M;
       return {
-        refY:h-40,
+        refY:yEnd, usesG:true,
         stateAt:t=>({x, y:y0+0.5*G*t*t, vx:0, vy:G*t, ax:0, ay:G}),
-        done:s=>s.y > h-40,
+        done:s=>s.y > yEnd,
         drawEnv(c){ dashedLine(c, x+0.5, 30, x+0.5, h-30); }
       };
     }
   },
   {
     id:'hproj', label:'수평 투사',
-    params:[{key:'v0', label:'초기 속력', min:5, max:40, step:1, value:15, unit:' m/s'}],
+    params:[{key:'v0', label:'초기 속력', min:10, max:60, step:5, value:30, unit:' m/s'}],
     setup(w,h,p){
       const x0=70, y0=80, V=p.v0*PX_PER_M;
       return {
-        refY:h-40,
+        refY:h-40, usesG:true,
         stateAt:t=>({x:x0+V*t, y:y0+0.5*G*t*t, vx:V, vy:G*t, ax:0, ay:G}),
         done:s=>s.y > h-40 || s.x > w-40,
         // 퍼텐셜 에너지 기준면(지면)을 실제로 표시 — 기준면이 보이지 않으면
@@ -447,11 +562,11 @@ const MODES = [
   },
   {
     id:'dual', label:'동시 재생 (낙하+투사)',
-    params:[{key:'v0', label:'초기 속력', min:5, max:40, step:1, value:15, unit:' m/s'}],
+    params:[{key:'v0', label:'초기 속력', min:10, max:60, step:5, value:30, unit:' m/s'}],
     setup(w,h,p){
       const x0=90, y0=80, V=p.v0*PX_PER_M;
       return {
-        refY:h-40,
+        refY:h-40, usesG:true,
         // 주 물체(주황): 수평 투사
         stateAt:t=>({x:x0+V*t, y:y0+0.5*G*t*t, vx:V, vy:G*t, ax:0, ay:G}),
         // 보조 물체(회색): 자유 낙하 — 같은 지점에서 동시 출발
@@ -466,16 +581,23 @@ const MODES = [
   },
   {
     id:'projectile', label:'포물선 (비스듬히 던지기)',
+    /* 초기 속도를 성분으로 직접 잡는다. 수평 성분은 끝까지 일정하고 연직 성분만
+       g 로 변한다는 점을 다루기에, vₓ·v_y 를 눈금으로 주는 편이 표·작도와 맞춰
+       보기 쉽고 값도 딱 떨어진다. 발사각은 두 성분에서 계산해 캔버스에 적는다. */
     params:[
-      {key:'v0',    label:'초기 속력', min:10, max:40, step:1, value:30, unit:' m/s'},
-      {key:'angle', label:'발사각',    min:0, max:80, step:1, value:60, unit:'°'}
+      {key:'vx', label:'수평 속도 vₓ',  min:5,  max:50, step:5, value:20, unit:' m/s'},
+      {key:'vy', label:'연직 속도 v_y', min:10, max:50, step:5, value:40, unit:' m/s'}
     ],
     setup(w,h,p){
-      const th = p.angle*Math.PI/180, V = p.v0*PX_PER_M;
-      const x0=70, y0=h-70;
-      const vx=V*Math.cos(th), vy0=-V*Math.sin(th);
+      /* 발사·착지 높이를 바닥에서 10 m 띄운다. 착지 순간의 속도 화살표는
+         중심 정렬이라 아래로 절반(기본값에서 89 px)이 뻗는데, 바닥에 붙여 두면
+         그만큼이 캔버스 밖으로 잘린다. */
+      const x0=70, y0=h-70-10*PX_PER_M;
+      const vx = p.vx*PX_PER_M, vy0 = -p.vy*PX_PER_M;
       return {
-        refY:y0,
+        refY:y0, usesG:true,
+        // 두 성분에서 되계산한 발사각 — 좌상단 조건 줄의 가속도 옆에 붙는다
+        info:'발사각 = ' + (Math.atan2(p.vy, p.vx)*180/Math.PI).toFixed(1) + '°',
         stateAt:t=>({x:x0+vx*t, y:y0+vy0*t+0.5*G*t*t, vx, vy:vy0+G*t, ax:0, ay:G}),
         done:s=>(s.t>0.05 && s.y>y0+0.5) || s.x>w-40,
         drawEnv(c){
@@ -485,7 +607,7 @@ const MODES = [
           const apex = y0 - vy0*vy0/(2*G);
           if(apex < 8){
             c.fillStyle='#C08A2E'; c.font = F(11);
-            c.fillText('⚠ 최고점이 화면 위로 벗어납니다 — 속력이나 각도를 낮추세요', 40, 26);
+            c.fillText('⚠ 최고점이 화면 위로 벗어납니다 — 연직 속도 v_y 를 낮추세요', 40, 52);
           }
         }
       };
@@ -494,7 +616,7 @@ const MODES = [
   {
     id:'incline', label:'빗면',
     params:[
-      {key:'v0',      label:'초기 속력', min:0,  max:25, step:1, value:0,  unit:' m/s'},
+      {key:'v0',      label:'초기 속력', min:0,  max:40, step:5, value:0,  unit:' m/s'},
       {key:'incline', label:'빗면 각도', min:10, max:60, step:1,   value:30, unit:'°'}
     ],
     setup(w,h,p){
@@ -514,7 +636,7 @@ const MODES = [
       const slopeLen = Math.hypot(L,H);
       const acc = G*Math.sin(a);
       return {
-        refY: yb,
+        refY: yb, usesG:true,
         stateAt(t){
           const s = V*t + 0.5*acc*t*t;
           const sp = V + acc*t;
@@ -544,8 +666,8 @@ const MODES = [
   {
     id:'circular', label:'등속 원운동',
     params:[
-      {key:'v0', label:'속력',   min:5,  max:30, step:1, value:15, unit:' m/s'},
-      {key:'R',  label:'반지름', min:10, max:28, step:1, value:22, unit:' m'}
+      {key:'v0', label:'속력',   min:10, max:40, step:5, value:25, unit:' m/s'},
+      {key:'R',  label:'반지름', min:25, max:55, step:5, value:35, unit:' m'}
     ],
     setup(w,h,p){
       const cx=w*0.5, cy=h*0.5;
@@ -581,7 +703,7 @@ const MODES = [
     setup(w,h,p){
       const cx=w*0.5, cy=h*0.5;
       const A=250, e=p.ecc, B=A*Math.sqrt(1-e*e);
-      const T=14, N=2*Math.PI/T, MU=N*N*A*A*A;   // 케플러: μ = n²a³
+      const T=18, N=2*Math.PI/T, MU=N*N*A*A*A;   // 케플러: μ = n²a³
       const fx=cx+A*e, fy=cy;                     // 초점(중심 천체)
       const rp=A*(1-e);                           // 근일점 거리
       function anom(t){                           // 케플러 방정식 E−e·sinE = M
@@ -593,7 +715,10 @@ const MODES = [
         refY:null,
         peOf(pt){                                 // 근일점 기준 중력 퍼텐셜(J, ≥0)
           const r=Math.hypot(pt.x-fx, pt.y-fy);
-          return mass()*(MU/rp - MU/r)/100;      // kg·px²/s² → J
+          // MU/r 은 px²/s² 이므로 m²/s² 로 바꾸려면 λ² 으로 나눈다.
+          // 예전 스케일(10 px = 1 m)의 100 을 그대로 두면 PE 가 작아져
+          // 보존되어야 할 역학적 에너지가 요동친다.
+          return mass()*(MU/rp - MU/r)/(PX_PER_M*PX_PER_M);
         },
         stateAt(t){
           const E=anom(t);
@@ -619,6 +744,68 @@ const MODES = [
     }
   },
   {
+    id:'pendulum', label:'진자',
+    params:[
+      {key:'L',   label:'실 길이',  min:40, max:90, step:5, value:70, unit:' m'},
+      {key:'amp', label:'진폭 θ₀', min:20, max:70, step:5, value:60, unit:'°'}
+    ],
+    setup(w,h,p){
+      /* 단진자. 진폭이 크면 sinθ ≈ θ 근사가 깨지고 해석해가 없으므로
+         θ'' = −(g/L)·sinθ 를 RK4 로 미리 적분해 표로 만들어 두고 보간해 쓴다.
+         한쪽 끝에서 반대쪽 끝까지, 즉 '반 주기'만 재생한다.
+         한 주기를 다 돌면 왔던 자리를 되짚어 섬광점이 서로 겹쳐 버리기 때문. */
+      const L = p.L*PX_PER_M, th0 = p.amp*Math.PI/180;
+      const cx = w/2, cy = 60, HH = 0.005;
+      const alpha = th => -(G/L)*Math.sin(th);
+
+      const tab = [];
+      let th = -th0, om = 0, tEnd = 0;
+      for(let k=0; k<20000; k++){
+        tab.push({th, om});
+        const a1 = om,           b1 = alpha(th);
+        const a2 = om+b1*HH/2,   b2 = alpha(th+a1*HH/2);
+        const a3 = om+b2*HH/2,   b3 = alpha(th+a2*HH/2);
+        const a4 = om+b3*HH,     b4 = alpha(th+a3*HH);
+        const nth = th + (a1+2*a2+2*a3+a4)*HH/6;
+        const nom = om + (b1+2*b2+2*b3+b4)*HH/6;
+        if(k > 10 && nom <= 0){ tEnd = (k+1)*HH; tab.push({th:nth, om:0}); break; }
+        th = nth; om = nom;
+      }
+
+      const at = t=>{
+        const u = Math.min(Math.max(t,0), tEnd)/HH;
+        const i = Math.min(tab.length-2, Math.floor(u)), f = u-i;
+        const q = tab[i], r = tab[i+1];
+        const A = q.th + (r.th-q.th)*f, W2 = q.om + (r.om-q.om)*f;
+        const sn = Math.sin(A), cs = Math.cos(A);
+        return {
+          x: cx + L*sn,  y: cy + L*cs,
+          vx: L*W2*cs,   vy: -L*W2*sn,
+          // a = 접선성분(−g·sinθ) + 구심성분(−L·ω²) 을 xy 로 분해
+          ax: -G*sn*cs - L*W2*W2*sn,
+          ay:  G*sn*sn - L*W2*W2*cs
+        };
+      };
+
+      return {
+        refY: cy + L, usesG:true,           // 최하점 기준 → 퍼텐셜이 0 이상
+        info: '주기 T = ' + (2*tEnd).toFixed(1) + ' s',
+        stateAt: at,
+        done: s=>s.t >= tEnd - 1e-9,
+        drawEnv(c, tNow){
+          c.strokeStyle=COLORS.env; c.setLineDash([4,6]); c.lineWidth=1.5;
+          c.beginPath(); c.arc(cx, cy, L, Math.PI/2-th0, Math.PI/2+th0); c.stroke();
+          c.setLineDash([]);
+          const b = at(tNow || 0);
+          c.strokeStyle='#98A3AE'; c.lineWidth=1.5;
+          c.beginPath(); c.moveTo(cx, cy); c.lineTo(b.x, b.y); c.stroke();
+          c.fillStyle='#7A8792';
+          c.beginPath(); c.arc(cx, cy, 5, 0, Math.PI*2); c.fill();
+        }
+      };
+    }
+  },
+  {
     id:'random', label:'랜덤 운동',
     setup(w,h){
       /* 알짜힘이 구간마다 '일정한' 운동.
@@ -630,11 +817,11 @@ const MODES = [
          초기 속력·초기 힘의 방향·각 구간의 힘은 모두 무작위. */
       const rnd = (a,b)=>a+Math.random()*(b-a);
       const N = Math.floor(Math.random()*3);      // 0, 1, 2 중 하나
-      const L = 2, T = L*(N+1);                   // 구간 길이 2 s 고정 (Δt=0.5 기준 4구간)
+      const L = 3, T = L*(N+1);                   // 구간 길이 3 s 고정 (Δt=1 기준 3구간)
       const PAD = 46;
       /* 힘의 방향이 무작위라 표류는 랜덤워크로 쌓인다 → √(N+1) 에 반비례하게 상한을 준다.
          구간마다 1/(N+1) 로 줄이면 N 이 클 때 Δv 가 자로 못 잴 만큼 작아진다. */
-      const aMax = 200/Math.sqrt(N+1);
+      const aMax = 90/Math.sqrt(N+1);
       const angDiff = (a,b)=>{
         let d=(a-b)%(2*Math.PI);
         if(d> Math.PI) d-=2*Math.PI;
@@ -653,7 +840,7 @@ const MODES = [
       let segs = null;
       for(let att=0; att<200 && !segs; att++){
         const k = att < 140 ? 1 : 0.7;                 // 늦게까지 못 찾으면 얌전하게
-        const dir = rnd(0, 2*Math.PI), sp = rnd(50, 85)*k;
+        const dir = rnd(0, 2*Math.PI), sp = rnd(45, 75)*k;
         let x=0, y=0, vx=sp*Math.cos(dir), vy=sp*Math.sin(dir), prev=null;
         const cand = [];
         for(let seg=0; seg<=N; seg++){
@@ -708,8 +895,8 @@ const MODES = [
         done:s=>s.t >= T - 1e-9,
         drawEnv(c){
           c.fillStyle='#9AA5AF'; c.font=F(11);
-          c.fillText('알짜힘이 0~2번 무작위로 바뀝니다 · 구간마다 힘은 일정(등가속도)', 210, 26);
-          c.fillText('Δv 가 몇 번 꺾이는지 세어 보세요 · 초기화(↺)마다 새로 생성됩니다', 210, 44);
+          c.fillText('알짜힘이 0~2번 무작위로 바뀝니다 · 구간마다 힘은 일정(등가속도)', 20, 50);
+          c.fillText('Δv 가 몇 번 꺾이는지 세어 보세요 · 초기화(↺)마다 새로 생성됩니다', 20, 68);
         }
       };
     }
@@ -717,7 +904,9 @@ const MODES = [
 ];
 
 /* ── 상태 ────────────────────────────────────────── */
-let W=0, H=0, DW=0, DH=0;
+const SIM_W = 800, SIM_H = 600;   // 운동이 그려지는 영역 (모드 좌표계는 여기에 고정)
+let W=0, H=0, DW=0, DH=0;         // W = SIM_W + 표 영역 폭, H = SIM_H
+let runDots = 0;            // 이번 실행에서 찍힐 섬광 개수 (표 폭을 미리 잡기 위함)
 let mode = MODES[0];
 let modeParams = {};
 let cfg = null;
@@ -736,16 +925,25 @@ const dtInterval = () => parseFloat(dtSlider.value);
 const mass = () => parseFloat(massSlider.value);
 const objR = () => Math.round(parseFloat(sizeSlider.value) * PX_PER_M);
 const massRatio = () => mass()/MASS_REF;    // 화살표 길이용 상대 질량 (1 kg 기준)
+/* 앞쪽 몇 개의 섬광에만 벡터를 그린다. 나머지는 학생이 직접 작도하도록 비워 둔다.
+   슬라이더 최대값은 '전체' 를 뜻한다. 시각 라벨은 개수와 무관하게 늘 남겨야
+   학생이 어느 시각의 벡터를 그리는지 알 수 있다. */
+const vecLimit = () => {
+  const v = parseInt(vecSlider.value, 10);
+  return v >= 20 ? Infinity : v;
+};
 const playSpeed = () => parseFloat(speedSlider.value);
 
 /* ── 초기화 / 모드 전환 ───────────────────────────── */
-function setupMode(){ cfg = mode.setup(W, H, modeParams); }
+function setupMode(){ cfg = mode.setup(SIM_W, SIM_H, modeParams); }
 function resetSim(){
   t = 0; running = false; finished = false;
   dots = []; selection = [];
   setupMode();
   liveMaxE = computeRunMaxSpec();     // 전체 궤적 기준으로 스케일 고정 → 에너지가 커지면 막대가 자람
   sideSign = computeSideSign();       // 화살표를 놓을 쪽을 실행 시작 시점에 확정
+  runDots  = computeRunDots();
+  resizeCanvas();                     // 표 영역 높이가 달라질 수 있으므로 다시 잡는다
   recordDot(0);
   nextDotTime = dtInterval();
   updatePlayBtn();
@@ -802,6 +1000,7 @@ function frame(ts){
   lastFrame = ts;
 
   if(running){
+    const tPrev = t;
     t += dtReal * playSpeed();
     while(nextDotTime <= t + 1e-9){
       const s = cfg.stateAt(nextDotTime); s.t = nextDotTime;
@@ -811,12 +1010,24 @@ function frame(ts){
     }
     const cur = cfg.stateAt(t); cur.t = t;
     if(cfg.done(cur)){
+      t = endTimeBetween(tPrev, t);   // 프레임 간격만큼 지나친 부분을 되돌린다
       running = false; finished = true; updatePlayBtn();
     }
   }
   render();
   renderDiagram();
   requestAnimationFrame(frame);
+}
+
+/* lo(아직 안 끝남) ~ hi(이미 끝남) 구간에서 실제 종료 시각을 찾는다.
+   재생은 프레임 간격만큼, 스텝 이동은 Δt 만큼 종료 시각을 지나칠 수 있는데
+   그대로 두면 물체가 경계 밖에 놓이고 화살표가 잘린다. 두 경로 모두 이걸 쓴다. */
+function endTimeBetween(lo, hi){
+  for(let k=0; k<40; k++){
+    const mid = (lo+hi)/2, q = cfg.stateAt(mid); q.t = mid;
+    if(cfg.done(q)) hi = mid; else lo = mid;
+  }
+  return hi;
 }
 
 function updatePlayBtn(){
@@ -863,13 +1074,12 @@ function label(c, x, y, text, color, size=13){
 }
 
 /* 화살표 배율 — SI 1 단위 = 4 px = 종이 0.1 cm
-     v 화살표(px) = v_px × 0.5      (25 m/s → 100 px → 종이 2.5 cm)
-     p 화살표(px) = m × v_px × 0.5
-     F 화살표(px) = m × a_px × 0.5  (10 N → 40 px → 종이 1.0 cm)
+     v 화살표(px) = v_px          (50 m/s → 200 px → 종이 5.0 cm)
+     p 화살표(px) = m × v_px
+     F 화살표(px) = m × a_px      (10 N → 40 px → 종이 1.0 cm)
    모든 모드가 같은 절대 눈금을 쓰므로 모드끼리 크기 비교가 된다. */
-const VEL_SCALE   = 0.5;
-const FORCE_SCALE = 0.5;
-const UNIT_LEN = GRID_PX;       // û = 격자 한 칸 = 종이 1 cm (길이 재기 기준자)
+const VEL_SCALE   = 1.0;
+const FORCE_SCALE = 1.0;
 const TIME_GAP = 20;            // 속도 벡터에서 시간 라벨까지 더 띄우는 거리(px)
 
 /* 변화량 분석 대상 물리량 정의 (속도 / 운동량) */
@@ -936,6 +1146,11 @@ function drawVectorsAt(p){
      두 화살표의 중점이 물체 중심을 지나는 '수직선' 위에 놓이도록
      각자 길이의 절반만큼 뒤로 당겨 그린다 → 세 점이 항상 일직선.
      알짜힘(빨강)·단위벡터(초록)는 종전대로 물체 중심에서 출발. */
+  // 이 점이 몇 번째 섬광인지 (움직이는 물체는 render 가 k 를 넘겨 준다)
+  const k = p.k !== undefined ? p.k
+          : (p.t !== undefined ? Math.round(p.t/dtInterval()) : 0);
+  const showVec = k < vecLimit();
+
   const off = objR() + 9;
   let up = {x:0, y:-1};
   if(speed > 0.5){                       // 정해 둔 손잡이대로 속도에 수직인 방향
@@ -950,7 +1165,7 @@ function drawVectorsAt(p){
   const mTx = p.x - mX/2 + dn.x*off, mTy = p.y - mY/2 + dn.y*off;   // 운동량 꼬리
 
   // 성분 분해는 속도 벡터에 딸린 작도이므로 속도의 꼬리에서 시작
-  if(tglComp.checked && speed > 0.5){
+  if(showVec && tglComp.checked && speed > 0.5){
     if(Math.abs(vX) > 2 && Math.abs(vY) > 2){   // 두 성분이 모두 있을 때만 분해
       arrow(ctx, vTx, vTy, vX, 0, COLORS.blueSoft,
             {width:2, dash:[5,4], hover:`vₓ = ${(Math.abs(p.vx)/PX_PER_M).toFixed(2)} m/s`});
@@ -963,20 +1178,15 @@ function drawVectorsAt(p){
       ctx.stroke(); ctx.setLineDash([]);
     }
   }
-  if(tglMom.checked && speed > 0.5)
+  if(showVec && tglMom.checked && speed > 0.5)
     arrow(ctx, mTx, mTy, mX, mY, COLORS.teal,
           {width:2.6, hover:`p = ${(speed*mass()/PX_PER_M).toFixed(2)} kg·m/s`});
-  if(tglVel.checked && speed > 0.5)
+  if(showVec && tglVel.checked && speed > 0.5)
     arrow(ctx, vTx, vTy, vX, vY, COLORS.blue,
           {width:2.6, hover:`v = ${(speed/PX_PER_M).toFixed(2)} m/s`});
-  if(tglForce.checked && fmag > 0.5)
+  if(showVec && tglForce.checked && fmag > 0.5)
     arrow(ctx, p.x, p.y, p.ax*massRatio()*FORCE_SCALE, p.ay*massRatio()*FORCE_SCALE, COLORS.red,
           {hover:`F = ${(fmag*mass()/PX_PER_M).toFixed(2)} N`});
-  // û 는 속도 벡터와 꼬리를 공유한다 → v = |v|·û (실수배)가 겹쳐 보인다
-  if(tglDir.checked && speed > 0.5)
-    arrow(ctx, vTx, vTy, p.vx/speed*UNIT_LEN, p.vy/speed*UNIT_LEN, COLORS.green,
-          {width:2.6, hover:'û (단위 벡터) · 길이 1 m = 종이 1 cm'});
-
   /* 섬광 시각 라벨: 속도 벡터와 같은 쪽으로, 다만 TIME_GAP 만큼 더 바깥에 둔다.
      속도 화살표의 중점이 물체 중심과 나란하므로 라벨도 그 선 위에 놓여
      '어느 점의 시각인지'가 화살표와 겹치지 않고 분명하다.
@@ -986,8 +1196,8 @@ function drawVectorsAt(p){
     const dt = dtInterval();
     const dec = (Math.round(dt*100) % 10 === 0) ? 1 : 2;
     const txt = p.t.toFixed(dec) + ' s';
-    const lx = Math.min(Math.max(p.x + up.x*(off + TIME_GAP), 26), W-26);
-    const ly = Math.min(Math.max(p.y + up.y*(off + TIME_GAP), 14), H-12);
+    const lx = Math.min(Math.max(p.x + up.x*(off + TIME_GAP), 26), SIM_W-26);
+    const ly = Math.min(Math.max(p.y + up.y*(off + TIME_GAP), 14), SIM_H-12);
     ctx.save();
     ctx.font = F(11);
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -1027,8 +1237,8 @@ function pairPlacement(p1, p2, sc){
   const xs=[0, p1.vx*sc, p2.vx*sc];
   const ys=[0, p1.vy*sc, p2.vy*sc];
   const pad=44;
-  ox = Math.min(Math.max(ox, pad - Math.min(...xs)), W - pad - Math.max(...xs));
-  oy = Math.min(Math.max(oy, pad - Math.min(...ys)), H - pad - Math.max(...ys));
+  ox = Math.min(Math.max(ox, pad - Math.min(...xs)), SIM_W - pad - Math.max(...xs));
+  oy = Math.min(Math.max(oy, pad - Math.min(...ys)), SIM_H - pad - Math.max(...ys));
   return {ox, oy, mx, my, dir, vh};
 }
 
@@ -1138,6 +1348,17 @@ function drawBarPair(c, bx, baseY, e, scale){
   c.fillText('E', bx+w*2+gap+12, baseY-hE+6);
 }
 
+// 이번 실행에서 찍힐 섬광 개수 — 표의 열 수가 재생 중에 늘었다 줄었다 하지 않도록 미리 고정
+function computeRunDots(){
+  const step = dtInterval();
+  let k = 0;
+  for(; k < 300; k++){
+    const s = cfg.stateAt(k*step); s.t = k*step;
+    if(cfg.done(s)) break;
+  }
+  return k;
+}
+
 // 전체 궤적을 훑어 단위질량당 최대 역학적 에너지를 구함 (스케일 고정용)
 function computeRunMaxSpec(){
   let mx = 1e-6;
@@ -1155,21 +1376,74 @@ function drawLiveEnergy(cur){
   const e = energyAt(cur);
   const spec = e.E/Math.max(massRatio(), 1e-6); // 단위질량당 에너지 (질량 무관)
   liveMaxE = Math.max(liveMaxE, spec, 1e-6);
-  const scale = 55/liveMaxE;                   // 고정 스케일 → 막대 길이 ∝ 질량
-  drawBarPair(ctx, 22, 190, e, scale);
+  /* BAR_FULL = 기준 질량(1 kg)에서 최대 에너지일 때의 막대 높이.
+     막대 길이 ∝ 질량 관계를 지키면서도 무거운 질량에서 캔버스를 뚫지 않도록
+     바닥(BAR_BASE)에서 위로 남은 공간을 넘지 않게 상한을 둔다. */
+  const BAR_BASE = 470, BAR_FULL = 275;
+  const full = Math.min(BAR_FULL, (BAR_BASE-24)/Math.max(massRatio(), 1e-6));
+  const scale = full/liveMaxE;
+  drawBarPair(ctx, 34, BAR_BASE, e, scale);
   ctx.fillStyle = '#7A8792'; ctx.font = F(11);
-  ctx.fillText(`K ${e.KE.toFixed(1)}J · P ${e.PE.toFixed(1)}J · E ${e.E.toFixed(1)}J`, 16, 226);
+  ctx.fillText(`K ${e.KE.toFixed(1)}J · P ${e.PE.toFixed(1)}J · E ${e.E.toFixed(1)}J`, 28, BAR_BASE+36);
   if(cfg.nonConservative){
     ctx.fillStyle = '#C08A2E'; ctx.font = F(10);
-    ctx.fillText('※ 알짜힘이 일을 하므로 E는 보존되지 않음', 16, 248);
+    ctx.fillText('※ 알짜힘이 일을 하므로 E는 보존되지 않음', 28, BAR_BASE+58);
   }
+}
+
+/* 좌상단 조건 표시 — 학습지에서 어떤 설정의 그림인지 알 수 있게 캔버스 안에 남긴다.
+   가속도는 실행 내내 크기·방향이 같을 때만 적는다. 원운동·타원·랜덤처럼 변하는 경우에는
+   하나의 값으로 요약할 수 없으므로 항목 자체를 빼고 질량·초기 속력만 남긴다. */
+function drawParamBox(){
+  if(!showCond) return;          // 끄면 학생이 궤적을 재어 조건을 알아내는 활동이 가능
+  const s0 = cfg.stateAt(0);
+  const a0 = Math.hypot(s0.ax, s0.ay);
+  let same = true;
+  const step = Math.max(dtInterval()/4, 0.05), tEnd = Math.max(runDots-1,1)*dtInterval();
+  for(let t=0; t<=tEnd+1e-9 && same; t+=step){
+    const st = cfg.stateAt(t);
+    if(Math.abs(Math.hypot(st.ax,st.ay) - a0) > 0.01*Math.max(a0,1)) same = false;
+    if(Math.abs(st.ax*s0.ay - st.ay*s0.ax) > 0.02*Math.max(a0*a0,1)) same = false;
+  }
+  const txt = 'm = ' + mass().toFixed(1) + ' kg'
+            + (cfg.usesG ? '   ·   g = ' + G_MS2.toFixed(1) + ' m/s\u00B2' : '')
+            + '   ·   v\u2080 = ' + (Math.hypot(s0.vx,s0.vy)/PX_PER_M).toFixed(1) + ' m/s'
+            + (same ? '   ·   a = ' + (a0/PX_PER_M).toFixed(1) + ' m/s\u00B2' : '')
+            + (cfg.info ? '   ·   ' + cfg.info : '');   // 모드가 덧붙이는 정보 (예: 발사각)
+  ctx.save();
+  ctx.font = F(10); ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#5B6B7A';
+  ctx.fillText(txt, 20, 24);
+  ctx.restore();
+}
+
+/* x·y 축 눈금 — 원점은 시뮬레이션 영역의 왼쪽 아래, 단위는 m.
+   격자 한 칸이 5 m 이므로 두 칸(10 m)마다 숫자를 적는다. */
+function drawAxes(){
+  const STEP = 2*GRID_PX;                 // 10 m
+  ctx.save();
+  ctx.font = F(8); ctx.fillStyle = '#78838D';
+  ctx.strokeStyle = '#A3ACB5'; ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  for(let x=STEP; x<SIM_W-10; x+=STEP){   // 가로축
+    ctx.moveTo(x+0.5, SIM_H-1); ctx.lineTo(x+0.5, SIM_H-7);
+    ctx.fillText(String(Math.round(x/PX_PER_M)), x, SIM_H-10);
+  }
+  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  for(let y=SIM_H-STEP; y>10; y-=STEP){   // 세로축
+    ctx.moveTo(1, y+0.5); ctx.lineTo(7, y+0.5);
+    ctx.fillText(String(Math.round((SIM_H-y)/PX_PER_M)), 10, y);
+  }
+  ctx.stroke();
+  ctx.restore();
 }
 
 /* 인쇄 축척 검증용 눈금자.
    프린터가 '용지에 맞춤'으로 축소해 버리면 학생이 잰 길이가 전부 틀어지는데
    본인은 알 수가 없다. 첫 인쇄 때 이 막대를 자로 재어 5.0 cm 인지 확인하게 한다. */
 function drawScaleBar(){
-  const L = 5*GRID_PX, x = 24, y = H-34;      // 5칸 = 25 m = 종이 5 cm
+  const L = 5*GRID_PX, x = 34, y = SIM_H-34;  // 5칸 = 25 m = 종이 5 cm
   ctx.save();
   ctx.strokeStyle = '#5B6B7A'; ctx.lineWidth = 2;
   ctx.beginPath();
@@ -1179,7 +1453,104 @@ function drawScaleBar(){
   for(let k=1; k<5; k++){ ctx.moveTo(x+k*GRID_PX, y-4); ctx.lineTo(x+k*GRID_PX, y+4); }
   ctx.stroke();
   ctx.fillStyle = '#5B6B7A'; ctx.font = F(11); ctx.textAlign = 'left';
-  ctx.fillText('25 m  —  인쇄 후 자로 재어 5.0 cm 인지 확인 (격자 1칸 = 5 m = 1 cm)', x, y+24);
+  // 가로축 눈금이 놓일 맨 아래를 비워 두려고 막대 오른쪽에 붙여 쓴다
+  ctx.fillText('50 m  —  자로 재어 5.0 cm 인지 확인 (격자 1칸 = 10 m = 1 cm)', x+L+14, y+5);
+  ctx.restore();
+}
+
+/* 데이터 표 — 캔버스 오른쪽에 전용 영역을 덧붙여 그린다.
+   궤적 위에 겹치지 않아야 하므로 시뮬레이션 영역(SIM_W) 밖으로 완전히 내보내고,
+   좁고 긴 자리에 맞게 시간을 세로로 쌓는다 (첫 열이 t, 오른쪽으로 항목).
+   열 수는 실행 전체의 섬광 개수로 미리 고정하므로 재생 중에 표가 흔들리지 않는다.
+   캔버스가 옆으로 넓어져도 인쇄 축척(4 px = 1 mm)은 그대로 유지된다 — applyPrintSize() 참고. */
+const TBL = {PAD:12, RH:22, TCOL:48, QCOL:60, GAP:10, HH:26, FOOT:34};
+
+function tableLayout(){
+  const qs = [];
+  if(tblOn.v)  qs.push({k:'v',  head:'v'});
+  if(tblOn.vx) qs.push({k:'vx', head:'vx'});
+  if(tblOn.vy) qs.push({k:'vy', head:'vy'});
+  if(tblOn.p)  qs.push({k:'p',  head:'p'});
+  if(!qs.length || runDots < 1) return null;
+  const bw = TBL.TCOL + qs.length*TBL.QCOL;
+  // 시간을 세로로 쌓는다. 한 덩이에 다 못 넣으면 행 높이를 줄이고, 그래도 넘치면 옆으로 잇는다.
+  const usable = SIM_H - TBL.PAD*2 - TBL.HH - TBL.FOOT;
+  let RH = TBL.RH, groups = 1, per = runDots;
+  fit:
+  for(const rh of [22, 18, 15, 13]){
+    for(let g = 1; g <= 2; g++){
+      const p = Math.ceil(runDots/g);
+      if(p*rh <= usable){ RH = rh; groups = g; per = p; break fit; }
+    }
+    RH = rh; groups = 2; per = Math.ceil(runDots/2);
+  }
+  return {qs, bw, RH, groups, per, w: groups*bw + (groups-1)*TBL.GAP + TBL.PAD*2};
+}
+function tableAreaW(){ const L = tableLayout(); return L ? L.w : 0; }
+
+function drawDataTable(){
+  const L = tableLayout();
+  if(!L) return;
+  const rows = dots.filter(d=>!d.o2);
+  const cellVal = (r, k)=>{
+    const sp = Math.hypot(r.vx, r.vy);
+    if(k==='v')  return (sp/PX_PER_M).toFixed(1);
+    if(k==='vx') return (r.vx/PX_PER_M).toFixed(1);
+    if(k==='vy') return (-r.vy/PX_PER_M).toFixed(1);      // 위쪽을 + 로
+    return (sp*mass()/PX_PER_M).toFixed(2);
+  };
+
+  ctx.save();
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(SIM_W, 0, W-SIM_W, H);
+  ctx.strokeStyle = '#B9C2CC'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(SIM_W+0.75, 0); ctx.lineTo(SIM_W+0.75, H); ctx.stroke();
+  ctx.textBaseline = 'middle';
+
+  for(let g=0; g<L.groups; g++){
+    const gx = SIM_W + TBL.PAD + g*(L.bw + TBL.GAP), gy = TBL.PAD;
+    const i0 = g*L.per, i1 = Math.min(runDots, i0 + L.per);
+    const bottom = gy + TBL.HH + (i1-i0)*L.RH;
+
+    for(let i=i0; i<i1; i++){                       // 얼룩 배경으로 행 구분
+      if((i-i0)%2===0) continue;
+      ctx.fillStyle = 'rgba(0,0,0,0.035)';
+      ctx.fillRect(gx, gy+TBL.HH+(i-i0)*L.RH, L.bw, L.RH);
+    }
+    ctx.strokeStyle = '#D8D6CC'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for(let c=1; c<=L.qs.length; c++){
+      const cx = gx + TBL.TCOL + c*TBL.QCOL + 0.5;
+      ctx.moveTo(cx, gy); ctx.lineTo(cx, bottom);
+    }
+    ctx.stroke();
+    ctx.strokeStyle = '#B9C2CC'; ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(gx, gy+TBL.HH+0.5); ctx.lineTo(gx+L.bw, gy+TBL.HH+0.5);
+    ctx.moveTo(gx+TBL.TCOL+0.5, gy); ctx.lineTo(gx+TBL.TCOL+0.5, bottom);
+    ctx.stroke();
+
+    ctx.textAlign = 'center';
+    ctx.font = F(10, true); ctx.fillStyle = '#5B6B7A';
+    ctx.fillText('t', gx + TBL.TCOL/2, gy + TBL.HH/2);
+    L.qs.forEach((q,qi)=>
+      ctx.fillText(q.head, gx + TBL.TCOL + (qi+0.5)*TBL.QCOL, gy + TBL.HH/2));
+
+    for(let i=i0; i<i1; i++){
+      const ry = gy + TBL.HH + (i-i0+0.5)*L.RH, r = rows[i];
+      ctx.font = F(10, true); ctx.fillStyle = '#5B6B7A';
+      ctx.fillText((i*dtInterval()).toFixed(1), gx + TBL.TCOL/2, ry);
+      ctx.font = F(10); ctx.fillStyle = '#22303C';
+      L.qs.forEach((q,qi)=>{     // 빈 표 모드에서는 시각만 남기고 항목 칸을 비운다
+        if(r && tblFill) ctx.fillText(cellVal(r, q.k), gx + TBL.TCOL + (qi+0.5)*TBL.QCOL, ry);
+      });
+    }
+  }
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  ctx.font = F(9); ctx.fillStyle = '#7A8792';
+  ctx.fillText('t: s · v, vx, vy: m/s · p: kg·m/s', SIM_W+TBL.PAD, SIM_H-22);
+  ctx.fillText('vx 오른쪽 +, vy 위쪽 +' + (tblOn.p ? ' · m='+mass().toFixed(1)+'kg' : ''),
+               SIM_W+TBL.PAD, SIM_H-6);
   ctx.restore();
 }
 
@@ -1190,19 +1561,21 @@ function render(){
 
   ctx.strokeStyle = COLORS.grid; ctx.lineWidth = 1;
   ctx.beginPath();
-  for(let x=GRID_PX; x<W; x+=GRID_PX){ ctx.moveTo(x+0.5,0); ctx.lineTo(x+0.5,H); }
-  for(let y=GRID_PX; y<H; y+=GRID_PX){ ctx.moveTo(0,y+0.5); ctx.lineTo(W,y+0.5); }
+  for(let x=GRID_PX; x<SIM_W; x+=GRID_PX){ ctx.moveTo(x+0.5,0); ctx.lineTo(x+0.5,SIM_H); }
+  for(let y=GRID_PX; y<SIM_H; y+=GRID_PX){ ctx.moveTo(0,y+0.5); ctx.lineTo(SIM_W,y+0.5); }
   ctx.stroke();
 
-  cfg.drawEnv(ctx);
+  cfg.drawEnv(ctx, t);
 
   // 궤적: 물체의 반투명 잔상 (다중섬광 사진 방식)
   const trailR = objR();
-  ctx.save(); ctx.globalAlpha = 0.45;
+  ctx.save();
   dots.forEach(p=>{
     ctx.beginPath(); ctx.arc(p.x, p.y, trailR, 0, Math.PI*2);
+    ctx.globalAlpha = 0.45;                      // 속은 옅게 (현재 물체와 구분)
     ctx.fillStyle = p.o2 ? COLORS.object2 : COLORS.object; ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.globalAlpha = 1;                         // 테두리는 진하게 — 자로 잴 때 중심을 찍는 기준
+    ctx.strokeStyle = 'rgba(0,0,0,0.62)'; ctx.lineWidth = 1.7; ctx.stroke();
   });
   ctx.restore();
   dots.forEach(drawVectorsAt);
@@ -1234,11 +1607,19 @@ function render(){
     const own = dots.filter(p=>!p.o2);
     if(own.length){
       const last = own[own.length-1];
-      const d = Math.hypot(cur.x-last.x, cur.y-last.y);
-      const g = own.length > 1
-        ? Math.hypot(last.x-own[own.length-2].x, last.y-own[own.length-2].y)
-        : Infinity;
-      if(d < 0.7*g || d < objR()*2) showObj = false;
+      /* 판정은 거리가 아니라 '시간'으로 한다.
+         거리로 보면 가속 구간에서 마지막 간격이 직전보다 길어 보여(등가속도 0.81배,
+         빗면 0.81배) 문턱을 통과해 버리는데, 실제로는 Δt 를 다 채우지 못한
+         어중간한 시각이라 간격이 일정하지 않다.
+         마지막 잔상 이후 Δt 를 거의 다 채웠을 때만 그린다. */
+      const frac = (t - last.t)/dtInterval();
+      if(frac < 0.95 || Math.hypot(cur.x-last.x, cur.y-last.y) < objR()*2) showObj = false;
+      /* 안전망 — 간격이 멀쩡해도 화살표가 캔버스를 벗어나면 그리지 않는다.
+         학습지에서 잘린 화살표는 길이를 재는 순간 틀린 값이 된다. */
+      const sp = Math.hypot(cur.vx, cur.vy);
+      const hx = Math.abs(cur.vx)*VEL_SCALE/2, hy = Math.abs(cur.vy)*VEL_SCALE/2;
+      if(sp > 1 && (cur.x-hx < 0 || cur.x+hx > SIM_W || cur.y-hy < 0 || cur.y+hy > SIM_H))
+        showObj = false;
     }
   }
 
@@ -1246,7 +1627,7 @@ function render(){
     ctx.beginPath(); ctx.arc(cur.x, cur.y, objR(), 0, Math.PI*2);
     ctx.fillStyle = COLORS.object; ctx.fill();
     ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 2; ctx.stroke();
-    drawVectorsAt({...cur});
+    drawVectorsAt({...cur, k: Math.round(t/dtInterval())});
   }
 
   if(cfg.stateAt2 && showObj){
@@ -1254,7 +1635,7 @@ function render(){
     ctx.beginPath(); ctx.arc(cur2.x, cur2.y, objR(), 0, Math.PI*2);
     ctx.fillStyle = COLORS.object2; ctx.fill();
     ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 2; ctx.stroke();
-    drawVectorsAt({...cur2});
+    drawVectorsAt({...cur2, k: Math.round(t/dtInterval())});
     // 두 물체가 항상 같은 높이임을 보이는 안내선 (수평이어야 하므로 y를 하나로 통일)
     ctx.strokeStyle = COLORS.guide; ctx.lineWidth = 1; ctx.setLineDash([4,4]);
     ctx.beginPath();
@@ -1264,18 +1645,21 @@ function render(){
   }
 
   if(tglEnergy.checked) drawLiveEnergy(cur);
+  drawAxes();
   drawScaleBar();
+  drawParamBox();
+  drawDataTable();
 
   ctx.fillStyle = COLORS.hud;
   ctx.font = F(13);
   ctx.textAlign = 'right';
-  ctx.fillText('t = ' + t.toFixed(2) + ' s', W-18, 30);
+  ctx.fillText('t = ' + t.toFixed(2) + ' s', SIM_W-18, 30);
   if(selMode){
     ctx.fillStyle = QUANT[selMode].dColor;
-    ctx.fillText(QUANT[selMode].dSym+' 모드', W-18, 56);
+    ctx.fillText(QUANT[selMode].dSym+' 모드', SIM_W-18, 56);
     if(cfg.stateAt2 && selection.length){
       ctx.fillStyle = selection[0].o2 ? COLORS.object2 : COLORS.object;
-      ctx.fillText(selection[0].o2 ? '회색 물체 선택 중' : '주황 물체 선택 중', W-18, 82);
+      ctx.fillText(selection[0].o2 ? '회색 물체 선택 중' : '주황 물체 선택 중', SIM_W-18, 82);
     }
   }
   ctx.textAlign = 'left';
@@ -1391,8 +1775,8 @@ function drawHoverTooltip(){
   const bw = Math.max(...lines.map(s=>ctx.measureText(s).width)) + 20;
   const bh = lines.length*25 + 12;
   let bx = mouseX + 14, by = mouseY - bh - 12;
-  bx = Math.max(8, Math.min(bx, W - bw - 8));
-  by = Math.max(8, Math.min(by, H - bh - 8));
+  bx = Math.max(8, Math.min(bx, SIM_W - bw - 8));
+  by = Math.max(8, Math.min(by, SIM_H - bh - 8));
   ctx.fillStyle = 'rgba(255,255,255,0.96)';
   ctx.strokeStyle = '#9AA5AF'; ctx.lineWidth = 1;
   ctx.beginPath();
@@ -1450,13 +1834,36 @@ canvas.addEventListener('click', e=>{
   updateHint();
 });
 
+const deltaView = document.getElementById('deltaView');
+
 function setSelMode(m){
   selMode = m;
+  /* 다이어그램은 Δv·Δp 모드에서만 쓰이므로 그때만 자리를 차지하게 한다.
+     숨겨진 동안에는 캔버스 크기가 0 이라, 다시 보일 때 백킹 스토어를 잡아 줘야 한다. */
+  deltaView.style.display = m ? 'block' : 'none';
+  if(m) fitLayout();
   dvBtn.classList.toggle('active', selMode==='v');
   dpBtn.classList.toggle('active', selMode==='p');
   canvas.classList.toggle('dv-mode', !!selMode);
   updateHint();
 }
+Object.keys(tblBtn).forEach(k=>{
+  tblBtn[k].addEventListener('click', ()=>{
+    tblOn[k] = !tblOn[k];
+    tblBtn[k].classList.toggle('active', tblOn[k]);
+    resizeCanvas();                      // 표 영역만큼 캔버스가 늘거나 준다
+  });
+});
+tblCondBtn.addEventListener('click', ()=>{
+  showCond = !showCond;
+  tblCondBtn.classList.toggle('active', showCond);
+  tblCondBtn.textContent = '조건 표시 — ' + (showCond ? '켜짐' : '꺼짐');
+});
+tblFillBtn.addEventListener('click', ()=>{
+  tblFill = !tblFill;
+  tblFillBtn.classList.toggle('active', tblFill);
+  tblFillBtn.textContent = tblFill ? '값 채움 — 눌러서 빈 표로' : '빈 표 — 눌러서 값 채움으로';
+});
 dvBtn.addEventListener('click', ()=> setSelMode(selMode==='v' ? null : 'v'));
 dpBtn.addEventListener('click', ()=> setSelMode(selMode==='p' ? null : 'p'));
 clearSelBtn.addEventListener('click', ()=>{
@@ -1486,11 +1893,21 @@ playBtn.addEventListener('click', ()=>{
 });
 resetBtn.addEventListener('click', resetSim);
 
+vecSlider.addEventListener('input', ()=>{
+  const v = parseInt(vecSlider.value, 10);
+  vecVal.textContent = v >= 20 ? '전체' : (v === 0 ? '없음' : '처음 '+v+'개');
+});
+gSlider.addEventListener('input', ()=>{
+  G_MS2 = parseFloat(gSlider.value);
+  G = G_MS2 * PX_PER_M;
+  gVal.textContent = G_MS2.toFixed(1)+' m/s²';
+  resetSim();          // 각 모드가 설정 시점의 G 를 붙잡아 두므로 다시 만들어야 한다
+});
 massSlider.addEventListener('input', ()=>{
   massVal.textContent = mass().toFixed(1)+' kg';
 });
 sizeSlider.addEventListener('input', ()=>{
-  sizeVal.textContent = parseFloat(sizeSlider.value).toFixed(1)+' m';
+  sizeVal.textContent = parseFloat(sizeSlider.value).toFixed(0)+' m';
 });
 // 빗면에서는 물체 반지름이 접촉점 기하(=높이=퍼텐셜 에너지)에 들어가므로
 // 크기를 바꾸면 궤적을 다시 계산해야 한다. 드래그를 놓을 때 한 번만 초기화.
@@ -1504,6 +1921,8 @@ dtSlider.addEventListener('input', ()=>{
   dtVal.textContent = dtInterval().toFixed(2)+' s';
   const lastT = dots.length ? dots[dots.length-1].t : 0;
   nextDotTime = lastT + dtInterval();
+  runDots = computeRunDots();
+  resizeCanvas();
 });
 
 // Δt 단위 스텝 이동 (일시정지 상태로 전환)
@@ -1521,7 +1940,10 @@ function stepBy(sign){
       nextDotTime += step;
     }
     const s = cfg.stateAt(t); s.t = t;
-    if(cfg.done(s)) finished = true;
+    if(cfg.done(s)){
+      t = endTimeBetween(t - step, t);   // 스텝으로 지나친 부분을 되돌린다
+      finished = true;
+    }
   }else{
     t = Math.max(0, t - step);
     finished = false;
@@ -1580,13 +2002,37 @@ document.addEventListener('keydown', e=>{
 });
 
 /* ── 캔버스 초기화 ────────────────────────────────── */
-function initCanvas(){
+/* 인쇄 용지 크기를 캔버스 높이에 맞춰 다시 잡는다.
+   4 px = 1 mm 라는 관계를 항상 유지하므로 표를 켜서 캔버스가 길어져도
+   종이 위 축척(1 cm = 10 m)은 변하지 않는다.
+   가로 A4 에 안 들어갈 만큼 길어지면 세로 A4 로 자동 전환한다. */
+function applyPrintSize(){
+  const mmW = W/4, mmH = H/4;
+  // 가로·세로 양쪽이 다 들어가는 방향을 고른다 (표가 옆에 붙으면 폭이 늘어난다)
+  const fits = (a,b) => mmW <= a-8 && mmH <= b-8;
+  const land = fits(297,210) || !fits(210,297);
+  const pw = land ? 297 : 210, ph = land ? 210 : 297;
+  let el = document.getElementById('printSize');
+  if(!el){ el = document.createElement('style'); el.id = 'printSize'; document.head.appendChild(el); }
+  el.textContent =
+    '@media print{ @page{ size:'+pw+'mm '+ph+'mm; margin:0; }'
+    + ' #printArea{ padding-top:'+((ph-mmH)/2).toFixed(2)+'mm; }'
+    + ' #printImg{ width:'+mmW+'mm; height:'+mmH+'mm; margin:0 auto; } }';
+}
+
+function resizeCanvas(){
   const dpr = window.devicePixelRatio || 1;
-  W = 800; H = 600;
+  W = SIM_W + tableAreaW(); H = SIM_H;
   canvas.width  = Math.round(W*dpr);
   canvas.height = Math.round(H*dpr);
   ctx.setTransform(dpr,0,0,dpr,0,0);
+  applyPrintSize();
+  fitLayout();
+}
 
+function initCanvas(){
+  resizeCanvas();
+  const dpr = window.devicePixelRatio || 1;
   const rect = diagram.getBoundingClientRect();
   DW = rect.width; DH = rect.height;
   diagram.width  = Math.round(DW*dpr);
