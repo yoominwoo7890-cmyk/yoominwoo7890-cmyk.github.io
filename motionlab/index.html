@@ -420,8 +420,8 @@
       <div class="tbl-btns">
         <button class="tbl-btn" id="tblV">v</button>
         <button class="tbl-btn" id="tblP">p</button>
-        <button class="tbl-btn" id="tblVx">vₓ</button>
-        <button class="tbl-btn" id="tblVy">v_y</button>
+        <button class="tbl-btn" id="tblVx">vx</button>
+        <button class="tbl-btn" id="tblVy">vy</button>
         <button class="tbl-btn wide active" id="tblFill">값 채움</button>
         <button class="tbl-btn wide active" id="tblCond">조건 표시 — 켜짐</button>
         <button class="tbl-btn full" id="printBtn">🖨 인쇄 · PDF 저장</button>
@@ -609,11 +609,11 @@ const MODES = [
   {
     id:'projectile', label:'포물선',
     /* 초기 속도를 성분으로 직접 잡는다. 수평 성분은 끝까지 일정하고 연직 성분만
-       g 로 변한다는 점을 다루기에, vₓ·v_y 를 눈금으로 주는 편이 표·작도와 맞춰
+       g 로 변한다는 점을 다루기에, vx·vy 를 눈금으로 주는 편이 표·작도와 맞춰
        보기 쉽고 값도 딱 떨어진다. 발사각은 두 성분에서 계산해 캔버스에 적는다. */
     params:[
-      {key:'vx', label:'수평 속도 vₓ',  min:5,  max:50, step:5, value:20, unit:' m/s'},
-      {key:'vy', label:'연직 속도 v_y', min:10, max:50, step:5, value:40, unit:' m/s'}
+      {key:'vx', label:'수평 속도 vx',  min:5,  max:50, step:5, value:20, unit:' m/s'},
+      {key:'vy', label:'연직 속도 vy', min:10, max:50, step:5, value:40, unit:' m/s'}
     ],
     setup(w,h,p){
       /* 발사·착지 높이를 바닥에서 10 m 띄운다. 착지 순간의 속도 화살표는
@@ -634,7 +634,7 @@ const MODES = [
           const apex = y0 - vy0*vy0/(2*G);
           if(apex < 8){
             c.fillStyle='#C08A2E'; c.font = F(11);
-            c.fillText('⚠ 최고점이 화면 위로 벗어납니다 — 연직 속도 v_y 를 낮추세요', 40, 52);
+            c.fillText('⚠ 최고점이 화면 위로 벗어납니다 — 연직 속도 vy 를 낮추세요', 40, 52);
           }
         }
       };
@@ -1195,9 +1195,9 @@ function drawVectorsAt(p){
   if(showVec && tglComp.checked && speed > 0.5){
     if(Math.abs(vX) > 2 && Math.abs(vY) > 2){   // 두 성분이 모두 있을 때만 분해
       arrow(ctx, vTx, vTy, vX, 0, COLORS.blueSoft,
-            {width:2, dash:[5,4], hover:`vₓ = ${(Math.abs(p.vx)/PX_PER_M).toFixed(2)} m/s`});
+            {width:2, dash:[5,4], hover:`vx = ${(Math.abs(p.vx)/PX_PER_M).toFixed(2)} m/s`});
       arrow(ctx, vTx, vTy, 0, vY, COLORS.blueSoft,
-            {width:2, dash:[5,4], hover:`v_y = ${(Math.abs(p.vy)/PX_PER_M).toFixed(2)} m/s`});
+            {width:2, dash:[5,4], hover:`vy = ${(Math.abs(p.vy)/PX_PER_M).toFixed(2)} m/s`});
       ctx.strokeStyle = COLORS.guide; ctx.lineWidth = 1; ctx.setLineDash([2,3]);
       ctx.beginPath();
       ctx.moveTo(vTx+vX, vTy);    ctx.lineTo(vTx+vX, vTy+vY);
