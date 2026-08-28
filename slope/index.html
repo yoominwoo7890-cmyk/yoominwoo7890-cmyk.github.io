@@ -1,1 +1,759 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>빗면 위 물체에 작용하는 힘</title>
+<style>
+  :root{
+    --ink:#14181F;
+    --ink-2:#5A6472;
+    --ink-3:#98A1AE;
+    --line:#E4E8EE;
+    --line-2:#F1F4F8;
+    --bg:#FFFFFF;
+    --panel:#FBFCFD;
 
+    --c-mg:#D62828;
+    --c-sin:#1F6FEB;
+    --c-cos:#7A3FD1;
+    --c-n:#0E8A6A;
+    --c-fric:#E07A00;
+    --c-net:#C2185B;
+
+    --sans: system-ui, -apple-system, "Segoe UI", "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", "Consolas", monospace;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  body{
+    font-family:var(--sans);
+    color:var(--ink);
+    background:var(--bg);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .app{display:flex;height:100vh;overflow:hidden;}
+
+  /* ── Sidebar ─────────────────────────────── */
+  .sidebar{
+    width:430px;
+    flex:0 0 430px;
+    border-right:1px solid var(--line);
+    background:var(--panel);
+    overflow-y:auto;
+    padding:26px 26px 48px;
+  }
+  .sidebar::-webkit-scrollbar{width:8px;}
+  .sidebar::-webkit-scrollbar-thumb{background:#DFE4EB;border-radius:4px;}
+
+  .brand{margin-bottom:22px;}
+  .brand .eyebrow{
+    font-family:var(--mono);
+    font-size:15px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--ink-3);margin-bottom:6px;
+  }
+  .brand h1{
+    font-size:28.5px;line-height:1.3;font-weight:650;margin:0;
+    letter-spacing:-.01em;
+  }
+
+  .group{border-top:1px solid var(--line);padding:16px 0 4px;}
+  .group:first-of-type{border-top:none;padding-top:0;}
+  .group > h2{
+    font-family:var(--mono);
+    font-size:15px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--ink-3);margin:0 0 12px;font-weight:600;
+  }
+
+  /* sliders */
+  .field{margin-bottom:16px;}
+  .field-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px;}
+  .field-top label{font-size:19.5px;color:var(--ink-2);}
+  .readout{font-family:var(--mono);font-size:19.5px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;}
+
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:100%;height:26px;background:transparent;cursor:pointer;margin:0;
+  }
+  input[type=range]::-webkit-slider-runnable-track{height:4px;background:var(--line);border-radius:2px;}
+  input[type=range]::-moz-range-track{height:4px;background:var(--line);border-radius:2px;}
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:20px;height:20px;border-radius:50%;
+    background:#fff;border:2.5px solid var(--ink);margin-top:-8px;
+    transition:transform .12s ease;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:20px;height:20px;border-radius:50%;background:#fff;border:2.5px solid var(--ink);
+  }
+  input[type=range]:active::-webkit-slider-thumb{transform:scale(1.18);}
+  input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 4px rgba(31,111,235,.22);}
+  input[type=range]:disabled{opacity:.35;cursor:not-allowed;}
+
+  /* toggle rows */
+  .toggle{
+    display:flex;align-items:center;gap:10px;
+    padding:9px 9px;margin:0 -9px;border-radius:8px;cursor:pointer;
+    transition:background .12s ease;
+  }
+  .toggle:hover{background:#F2F5F9;}
+  .toggle input{
+    appearance:none;-webkit-appearance:none;margin:0;
+    width:22px;height:22px;flex:0 0 22px;border:2px solid #C3CAD4;border-radius:6px;background:#fff;
+    cursor:pointer;position:relative;transition:all .12s ease;
+  }
+  .toggle input:checked{background:var(--ink);border-color:var(--ink);}
+  .toggle input:checked::after{
+    content:"";position:absolute;left:6.5px;top:2px;width:5px;height:11px;
+    border:solid #fff;border-width:0 2.5px 2.5px 0;transform:rotate(43deg);
+  }
+  .toggle input:focus-visible{box-shadow:0 0 0 3px rgba(31,111,235,.25);}
+  .toggle .swatch{width:15px;height:15px;border-radius:4px;flex:0 0 15px;}
+  .toggle .txt{font-size:19.5px;flex:1;}
+  .toggle .sym{font-family:var(--mono);font-size:16.5px;color:var(--ink-3);}
+
+  /* buttons */
+  .btnrow{display:flex;gap:8px;margin-top:4px;}
+  button{
+    font-family:var(--sans);font-size:19.5px;font-weight:550;
+    padding:12px 16px;border-radius:9px;border:1px solid var(--line);
+    background:#fff;color:var(--ink);cursor:pointer;flex:1;
+    transition:all .12s ease;
+  }
+  button:hover{border-color:#C3CAD4;background:#F7F9FC;}
+  button:active{transform:translateY(1px);}
+  button:focus-visible{outline:2px solid var(--c-sin);outline-offset:2px;}
+  button.primary{background:var(--ink);color:#fff;border-color:var(--ink);}
+  button.primary:hover{background:#2A313C;}
+  button.wide{flex:1 1 100%;}
+
+  /* similarity proof card */
+  .proof{
+    margin-top:12px;border:1px solid var(--line);border-radius:9px;
+    background:#fff;padding:12px 13px;
+  }
+  .proof.dim{opacity:.4;}
+  .proof .prow{
+    display:flex;align-items:center;gap:6px;
+    font-family:var(--mono);font-size:18px;font-variant-numeric:tabular-nums;
+    padding:5px 0;
+  }
+  .proof .prow + .prow{border-top:1px dashed var(--line-2);}
+  .proof .lbl{color:var(--ink-3);width:26px;}
+  .proof .frac{color:var(--ink);}
+  .proof .eq{color:var(--ink-3);}
+  .proof .val{margin-left:auto;font-weight:650;}
+  .proof .note{font-family:var(--sans);font-size:17px;color:var(--ink-2);line-height:1.5;margin-top:9px;padding-top:9px;border-top:1px solid var(--line-2);}
+
+  /* data table */
+  .data{width:100%;border-collapse:collapse;}
+  .data tr{border-bottom:1px solid var(--line-2);}
+  .data tr:last-child{border-bottom:none;}
+  .data td{padding:9px 0;font-size:19px;vertical-align:middle;}
+  .data td.k{color:var(--ink-2);}
+  .data td.k .bar{display:inline-block;width:4px;height:16px;border-radius:2px;margin-right:9px;vertical-align:-2px;}
+  .data td.v{text-align:right;font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums;}
+  .data tr.muted td{color:var(--ink-3);}
+
+  .state{
+    margin-top:14px;padding:12px 14px;border-radius:9px;
+    font-size:19px;font-weight:550;text-align:center;
+    background:#F0F4F9;color:var(--ink-2);
+  }
+  .state.moving{background:#FDF0E7;color:#B45309;}
+
+  /* ── Stage ───────────────────────────────── */
+  .stage{flex:1;position:relative;min-width:0;background:#fff;}
+  canvas{display:block;}
+  .hint{
+    position:absolute;left:24px;bottom:18px;
+    font-family:var(--mono);font-size:16px;letter-spacing:.06em;
+    color:var(--ink-3);text-transform:uppercase;pointer-events:none;
+  }
+
+  @media (max-width:960px){
+    .app{flex-direction:column-reverse;}
+    .sidebar{width:100%;flex:1 1 auto;border-right:none;border-top:1px solid var(--line);}
+    .stage{flex:0 0 46vh;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none !important;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="eyebrow">역학 시뮬레이션</div>
+      <h1>빗면 위 물체에<br>작용하는 힘</h1>
+    </div>
+
+    <div class="group">
+      <h2>빗면과 물체</h2>
+
+      <div class="field">
+        <div class="field-top">
+          <label for="ang">빗면의 각도 θ</label>
+          <span class="readout" id="angOut">30°</span>
+        </div>
+        <input type="range" id="ang" min="0" max="60" step="1" value="30">
+      </div>
+
+      <div class="field">
+        <div class="field-top">
+          <label for="mass">물체의 질량 m</label>
+          <span class="readout" id="massOut">3.0 kg</span>
+        </div>
+        <input type="range" id="mass" min="1" max="10" step="0.5" value="3">
+      </div>
+
+      <div class="btnrow" style="margin-bottom:6px;">
+        <button id="btnDir" class="wide">빗면 방향 뒤집기 ⇄</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>표시할 힘</h2>
+      <label class="toggle"><input type="checkbox" id="tGrav" checked><span class="swatch" style="background:var(--c-mg)"></span><span class="txt">중력</span><span class="sym">mg</span></label>
+      <label class="toggle"><input type="checkbox" id="tDecomp" checked><span class="swatch" style="background:linear-gradient(90deg,var(--c-sin) 50%,var(--c-cos) 50%)"></span><span class="txt">중력의 분해</span><span class="sym">sin·cos</span></label>
+      <label class="toggle"><input type="checkbox" id="tNormal" checked><span class="swatch" style="background:var(--c-n)"></span><span class="txt">수직항력</span><span class="sym">N</span></label>
+      <label class="toggle"><input type="checkbox" id="tFricV"><span class="swatch" style="background:var(--c-fric)"></span><span class="txt">마찰력</span><span class="sym">f</span></label>
+      <label class="toggle"><input type="checkbox" id="tNet"><span class="swatch" style="background:var(--c-net)"></span><span class="txt">알짜힘</span><span class="sym">F</span></label>
+    </div>
+
+    <div class="group">
+      <h2>마찰</h2>
+      <label class="toggle" style="margin-bottom:10px;"><input type="checkbox" id="tFric"><span class="txt">빗면에 마찰 적용</span></label>
+      <div class="field">
+        <div class="field-top">
+          <label for="mu">마찰계수 μ</label>
+          <span class="readout" id="muOut">0.30</span>
+        </div>
+        <input type="range" id="mu" min="0" max="1" step="0.05" value="0.3" disabled>
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>닮음 확인</h2>
+      <label class="toggle" style="margin-bottom:8px;"><input type="checkbox" id="tSim"><span class="txt">빗면·힘 삼각형 대응 색칠</span></label>
+      <div class="btnrow" style="margin-bottom:2px;">
+        <button id="btnFlip" class="wide">삼각형 접어 넣기 ▸</button>
+      </div>
+
+      <div class="proof dim" id="proof">
+        <div class="prow"><span class="lbl">sin θ</span><span class="frac">높이 h / 빗변 L</span><span class="val" id="p1">–</span></div>
+        <div class="prow"><span class="lbl"></span><span class="frac">mg sinθ / mg</span><span class="val" id="p2">–</span></div>
+        <div class="prow" style="border-top:1px solid var(--line);"><span class="lbl">cos θ</span><span class="frac">밑변 b / 빗변 L</span><span class="val" id="p3">–</span></div>
+        <div class="prow"><span class="lbl"></span><span class="frac">mg cosθ / mg</span><span class="val" id="p4">–</span></div>
+        <div class="note" id="proofNote">두 삼각형은 세 각이 모두 같으므로 닮음입니다. 빗변 L ↔ mg, 높이 h ↔ mg sinθ, 밑변 b ↔ mg cosθ가 서로 대응합니다.</div>
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>운동</h2>
+      <div class="btnrow">
+        <button id="btnPlay" class="primary">놓아 보기</button>
+        <button id="btnReset">처음으로</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>측정값</h2>
+      <table class="data">
+        <tr><td class="k"><span class="bar" style="background:var(--c-mg)"></span>중력 mg</td><td class="v" id="vG">–</td></tr>
+        <tr><td class="k"><span class="bar" style="background:var(--c-sin)"></span>빗면 방향 mg sinθ</td><td class="v" id="vS">–</td></tr>
+        <tr><td class="k"><span class="bar" style="background:var(--c-cos)"></span>수직 방향 mg cosθ</td><td class="v" id="vC">–</td></tr>
+        <tr><td class="k"><span class="bar" style="background:var(--c-n)"></span>수직항력 N</td><td class="v" id="vN">–</td></tr>
+        <tr id="rowFmax" class="muted"><td class="k"><span class="bar" style="background:#D8DEE6"></span>최대 정지마찰력 μN</td><td class="v" id="vFmax">–</td></tr>
+        <tr><td class="k"><span class="bar" style="background:var(--c-fric)"></span>마찰력 f</td><td class="v" id="vF">–</td></tr>
+        <tr><td class="k"><span class="bar" style="background:var(--c-net)"></span>알짜힘 F</td><td class="v" id="vNet">–</td></tr>
+        <tr><td class="k"><span class="bar" style="background:#D8DEE6"></span>가속도 a</td><td class="v" id="vA">–</td></tr>
+      </table>
+      <div class="state" id="stateBox">정지해 있습니다</div>
+    </div>
+  </aside>
+
+  <main class="stage">
+    <canvas id="cv"></canvas>
+    <div class="hint">g = 9.8 m/s²  ·  빗면 길이 5.0 m</div>
+  </main>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ───────── colors ───────── */
+const C = {
+  mg:'#D62828', sin:'#1F6FEB', cos:'#7A3FD1',
+  n:'#0E8A6A', fric:'#E07A00', net:'#C2185B',
+  ink:'#14181F', ink2:'#5A6472', ink3:'#98A1AE',
+  line:'#E4E8EE', ramp:'#EEF1F6', rampEdge:'#C7CFDA',
+  block:'#2B323D'
+};
+const G = 9.8;
+const RAMP_METERS = 5.0;
+
+/* ───────── DOM ───────── */
+const $ = id => document.getElementById(id);
+const cv = $('cv'), ctx = cv.getContext('2d');
+const el = {
+  ang:$('ang'), angOut:$('angOut'), mass:$('mass'), massOut:$('massOut'),
+  mu:$('mu'), muOut:$('muOut'),
+  tGrav:$('tGrav'), tDecomp:$('tDecomp'), tNormal:$('tNormal'),
+  tFricV:$('tFricV'), tNet:$('tNet'), tFric:$('tFric'), tSim:$('tSim'),
+  btnFlip:$('btnFlip'), btnPlay:$('btnPlay'), btnReset:$('btnReset'), btnDir:$('btnDir'),
+  proof:$('proof'), p1:$('p1'), p2:$('p2'), p3:$('p3'), p4:$('p4'),
+  vG:$('vG'), vS:$('vS'), vC:$('vC'), vN:$('vN'), vF:$('vF'),
+  vFmax:$('vFmax'), rowFmax:$('rowFmax'), vNet:$('vNet'), vA:$('vA'),
+  stateBox:$('stateBox')
+};
+
+/* ───────── state ───────── */
+const S = {
+  theta: 30*Math.PI/180,
+  dir: -1,         // +1 = 오른쪽으로 올라가는 빗면, -1 = 왼쪽으로 올라가는 빗면
+  m: 3,
+  mu: 0.3,
+  friction: false,
+  playing: false,
+  d: 0,            // distance of block centre from ramp top, in metres
+  v: 0,            // speed along slope (m/s), + = down
+  moving: false,
+  flipT: null,     // null | 0..1
+  flipping: false
+};
+
+/* ───────── canvas sizing ───────── */
+let W=0, H=0;
+function resize(){
+  const r = cv.parentElement.getBoundingClientRect();
+  W = Math.max(320, r.width); H = Math.max(300, r.height);
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = Math.round(W*dpr); cv.height = Math.round(H*dpr);
+  cv.style.width = W+'px'; cv.style.height = H+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize', resize);
+
+/* ───────── geometry ───────── */
+function geo(){
+  const th = S.theta, sin = Math.sin(th), cos = Math.cos(th), s = S.dir;
+  const L = Math.min(520, (W-250)/Math.max(cos,0.25), (H-250)/Math.max(sin,0.11));
+  const b = L*cos, h = L*sin;
+  const baseY = H - 78;
+  const xL = (W - b)/2;                          // left end of the base
+  const A = {x: s>0 ? xL   : xL+b, y:baseY};     // θ vertex
+  const B = {x: s>0 ? xL+b : xL,   y:baseY};     // right-angle vertex
+  const Cv= {x: B.x,               y:baseY-h};   // top of the ramp
+  const u = {x:-s*cos, y: sin};                  // down-slope unit
+  const n = {x:-s*sin, y:-cos};                  // outward normal
+  return {th,sin,cos,s,L,b,h,A,B,C:Cv,u,n,baseY,pxPerM:L/RAMP_METERS};
+}
+
+/* ───────── physics ───────── */
+function forces(){
+  const th=S.theta, m=S.m, mg=m*G;
+  const along = mg*Math.sin(th);
+  const perp  = mg*Math.cos(th);
+  const N = perp;
+  const mu = S.friction ? S.mu : 0;
+  const fmax = mu*N;
+  let f, net, moving = S.moving;
+
+  if(!moving){
+    if(along <= fmax + 1e-9){ f = along; net = 0; }
+    else { moving = true; f = fmax; net = along - f; }
+  } else {
+    f = fmax; net = along - f;
+  }
+  return {mg, along, perp, N, f, fmax, net, a:net/m, moving, mu};
+}
+
+function step(dt){
+  const g_ = geo();
+  const F = forces();
+  const halfLenM = blockHalfAlongM(g_);
+  const dMin = halfLenM, dMax = RAMP_METERS - halfLenM;
+
+  if(!S.playing){ return; }
+
+  if(!S.moving){
+    if(F.moving) S.moving = true;
+    else return;
+  }
+  S.v += F.a*dt;
+  if(S.v < 0) S.v = 0;
+  S.d += S.v*dt;
+  if(S.d >= dMax){ S.d = dMax; S.v = 0; S.moving = false; S.playing = false; syncPlayBtn(); }
+  if(S.d < dMin) S.d = dMin;
+}
+
+function blockSizePx(){ return 40 + (S.m-1)*3.2; }          // 40 → 69 px
+function blockHalfAlongM(g_){ return (blockSizePx()/2)/g_.pxPerM; }
+
+/* force → pixel length scale: mg arrow grows from 72px (1kg) to 165px (10kg) */
+function forceScale(){
+  const mgLen = 72 + (S.m-1)/9*93;
+  return mgLen/(S.m*G);
+}
+
+/* ───────── drawing helpers ───────── */
+function line(x1,y1,x2,y2,color,w,dash){
+  ctx.save();
+  ctx.strokeStyle=color; ctx.lineWidth=w||1.5; ctx.lineCap='round';
+  if(dash) ctx.setLineDash(dash);
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  ctx.restore();
+}
+const HEAD_LEN = 15;   // 화살촉 길이 — 힘의 크기와 무관하게 고정
+const HEAD_HW  = 6.5;  // 화살촉 반폭 — 고정
+function arrow(x1,y1,x2,y2,color,w){
+  const dx=x2-x1, dy=y2-y1, len=Math.hypot(dx,dy);
+  if(len<1.5) return;
+  const ux=dx/len, uy=dy/len;
+  const head = Math.min(HEAD_LEN, len);          // 아주 짧을 때만 잘림
+  const hw   = HEAD_HW * (head/HEAD_LEN);
+  const bx = x2-ux*head, by = y2-uy*head;
+  ctx.save();
+  ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=w||2.6; ctx.lineCap='butt';
+  if(len>head+0.5){ ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(bx,by); ctx.stroke(); }
+  const px=-uy, py=ux;
+  ctx.beginPath();
+  ctx.moveTo(x2,y2);
+  ctx.lineTo(bx+px*hw, by+py*hw);
+  ctx.lineTo(bx-px*hw, by-py*hw);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+const TEXT_SCALE = 1.5;
+function tag(text,x,y,color,size){
+  size = Math.round((size||12)*TEXT_SCALE);
+  ctx.save();
+  ctx.font = '600 '+size+'px ui-monospace, "SF Mono", Menlo, monospace';
+  const w = ctx.measureText(text).width;
+  const pw = w+12, ph = size+10;
+  ctx.fillStyle='rgba(255,255,255,.92)';
+  roundRect(x-pw/2, y-ph/2, pw, ph, 4); ctx.fill();
+  ctx.fillStyle=color; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(text,x,y);
+  ctx.restore();
+}
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
+function rightAngle(px,py,d1,d2,size,color){
+  const p1={x:px+d1.x*size, y:py+d1.y*size};
+  const p2={x:px+d2.x*size, y:py+d2.y*size};
+  const p3={x:px+(d1.x+d2.x)*size, y:py+(d1.y+d2.y)*size};
+  ctx.save(); ctx.strokeStyle=color; ctx.lineWidth=1.3;
+  ctx.beginPath(); ctx.moveTo(p1.x,p1.y); ctx.lineTo(p3.x,p3.y); ctx.lineTo(p2.x,p2.y); ctx.stroke();
+  ctx.restore();
+}
+/* angle arc between two unit directions */
+function angleArc(px,py,dirA,dirB,r,color,label){
+  const a1=Math.atan2(dirA.y,dirA.x), a2=Math.atan2(dirB.y,dirB.x);
+  let diff = a2-a1;
+  while(diff> Math.PI) diff-=2*Math.PI;
+  while(diff<-Math.PI) diff+=2*Math.PI;
+  ctx.save();
+  ctx.strokeStyle=color; ctx.lineWidth=1.6;
+  ctx.beginPath(); ctx.arc(px,py,r,a1,a1+diff,diff<0); ctx.stroke();
+  ctx.restore();
+  if(label){
+    const mid=a1+diff/2;
+    tag(label, px+Math.cos(mid)*(r+22), py+Math.sin(mid)*(r+22), color, 12);
+  }
+}
+
+/* ───────── main render ───────── */
+function render(){
+  ctx.clearRect(0,0,W,H);
+  const g_=geo(), F=forces(), sc=forceScale();
+  const sim = el.tSim.checked;
+  const th=g_.th;
+
+  /* ground */
+  ctx.save();
+  ctx.strokeStyle=C.line; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(24, g_.baseY); ctx.lineTo(W-24, g_.baseY); ctx.stroke();
+  ctx.strokeStyle='#EFF2F6'; ctx.lineWidth=1;
+  for(let x=28;x<W-24;x+=11){
+    ctx.beginPath(); ctx.moveTo(x, g_.baseY); ctx.lineTo(x-7, g_.baseY+8); ctx.stroke();
+  }
+  ctx.restore();
+
+  /* ramp body */
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(g_.A.x,g_.A.y); ctx.lineTo(g_.B.x,g_.B.y); ctx.lineTo(g_.C.x,g_.C.y); ctx.closePath();
+  ctx.fillStyle=C.ramp; ctx.fill();
+  ctx.strokeStyle=C.rampEdge; ctx.lineWidth=1.4; ctx.stroke();
+  ctx.restore();
+
+  /* ramp sides, coloured when similarity mode is on */
+  if(sim){
+    line(g_.A.x,g_.A.y,g_.C.x,g_.C.y,C.mg,4.5);
+    line(g_.A.x,g_.A.y,g_.B.x,g_.B.y,C.cos,4.5);
+    line(g_.B.x,g_.B.y,g_.C.x,g_.C.y,C.sin,4.5);
+    const midL={x:(g_.A.x+g_.C.x)/2, y:(g_.A.y+g_.C.y)/2};
+    tag('L', midL.x + g_.n.x*26, midL.y + g_.n.y*26, C.mg, 12);
+    tag('b', (g_.A.x+g_.B.x)/2, g_.A.y+25, C.cos, 12);
+    tag('h', g_.B.x + g_.s*24, (g_.B.y+g_.C.y)/2, C.sin, 12);
+  }
+
+  /* friction hatching on the slope */
+  if(S.friction && S.mu>0){
+    ctx.save(); ctx.strokeStyle='rgba(224,122,0,.5)'; ctx.lineWidth=1.2;
+    const steps=Math.floor(g_.L/9);
+    for(let i=1;i<steps;i++){
+      const t=i/steps;
+      const px=g_.C.x+g_.u.x*g_.L*t, py=g_.C.y+g_.u.y*g_.L*t;
+      ctx.beginPath();
+      ctx.moveTo(px,py);
+      ctx.lineTo(px - g_.n.x*5 + g_.u.x*4, py - g_.n.y*5 + g_.u.y*4);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  /* angle θ at the base vertex */
+  angleArc(g_.A.x,g_.A.y,{x:g_.s,y:0},{x:g_.s*g_.cos,y:-g_.sin}, 54,
+           sim?C.ink:C.ink2, (S.theta*180/Math.PI).toFixed(0)+'°');
+  rightAngle(g_.B.x,g_.B.y,{x:-g_.s,y:0},{x:0,y:-1},15,C.ink3);
+
+  /* block */
+  const size=blockSizePx();
+  const dPx=S.d*g_.pxPerM;
+  const contact={x:g_.C.x+g_.u.x*dPx, y:g_.C.y+g_.u.y*dPx};
+  const P={x:contact.x+g_.n.x*size/2, y:contact.y+g_.n.y*size/2};
+
+  ctx.save();
+  ctx.translate(P.x,P.y); ctx.rotate(-g_.s*th);
+  ctx.fillStyle=C.block;
+  roundRect(-size/2,-size/2,size,size,4); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.9)';
+  ctx.font='600 15px ui-monospace, "SF Mono", Menlo, monospace';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(S.m.toFixed(1), 0, 0);
+  ctx.restore();
+
+  /* force vectors */
+  const gV   = {x:0, y:F.mg*sc};
+  const cosV = {x:-g_.n.x*F.perp*sc,  y:-g_.n.y*F.perp*sc};   // into surface
+  const sinV = {x: g_.u.x*F.along*sc, y: g_.u.y*F.along*sc};  // down-slope
+  const Q    = {x:P.x+cosV.x, y:P.y+cosV.y};
+  const P2   = {x:P.x+gV.x,   y:P.y+gV.y};
+  const showDecomp = el.tDecomp.checked || sim;
+
+  /* decomposition triangle */
+  if(showDecomp){
+    ctx.save();
+    ctx.beginPath(); ctx.moveTo(P.x,P.y); ctx.lineTo(Q.x,Q.y); ctx.lineTo(P2.x,P2.y); ctx.closePath();
+    ctx.fillStyle = sim ? 'rgba(31,111,235,.07)' : 'rgba(90,100,114,.05)';
+    ctx.fill(); ctx.restore();
+
+    line(Q.x,Q.y,P2.x,P2.y, sim?C.sin:'#B9C1CC', sim?3:1.4, sim?null:[4,4]);
+    line(P.x+sinV.x, P.y+sinV.y, P2.x, P2.y, '#C6CDD7', 1.3, [4,4]);
+    if(sim){
+      line(P.x,P.y,P2.x,P2.y,C.mg,4.5);
+      line(P.x,P.y,Q.x,Q.y,C.cos,4.5);
+      rightAngle(Q.x,Q.y,{x:g_.n.x,y:g_.n.y},{x:g_.u.x,y:g_.u.y},14,C.ink3);
+      angleArc(P.x,P.y,{x:0,y:1},{x:-g_.n.x,y:-g_.n.y},44,C.ink,(S.theta*180/Math.PI).toFixed(0)+'°');
+    }
+  }
+
+  /* N */
+  if(el.tNormal.checked){
+    const nV={x:g_.n.x*F.N*sc, y:g_.n.y*F.N*sc};
+    arrow(P.x,P.y,P.x+nV.x,P.y+nV.y,C.n,3);
+    tag('N', P.x+nV.x+g_.n.x*20, P.y+nV.y+g_.n.y*20, C.n);
+  }
+  /* friction */
+  if(el.tFricV.checked && S.friction && F.f>0.01){
+    const fx=-g_.u.x*F.f*sc, fy=-g_.u.y*F.f*sc;
+    const ox=g_.n.x*-4, oy=g_.n.y*-4;
+    arrow(P.x+ox,P.y+oy,P.x+ox+fx,P.y+oy+fy,C.fric,3);
+    tag('f', P.x+ox+fx-g_.u.x*22 - g_.n.x*17, P.y+oy+fy-g_.u.y*22 - g_.n.y*17, C.fric);
+  }
+  /* decomposition arrows */
+  if(showDecomp && !sim){
+    arrow(P.x,P.y,P.x+sinV.x,P.y+sinV.y,C.sin,3);
+    arrow(P.x,P.y,Q.x,Q.y,C.cos,3);
+    tag('mg sinθ', P.x+sinV.x+g_.u.x*34 - g_.n.x*17, P.y+sinV.y+g_.u.y*34 - g_.n.y*17, C.sin, 11);
+    tag('mg cosθ', Q.x - g_.n.x*30, Q.y - g_.n.y*30, C.cos, 11);
+  } else if(sim){
+    tag('mg sinθ', (Q.x+P2.x)/2 - g_.n.x*32, (Q.y+P2.y)/2 - g_.n.y*32, C.sin, 11);
+    tag('mg cosθ', (P.x+Q.x)/2 - g_.u.x*32, (P.y+Q.y)/2 - g_.u.y*32, C.cos, 11);
+  }
+  /* gravity */
+  if(el.tGrav.checked){
+    arrow(P.x,P.y,P2.x,P2.y,C.mg,3);
+    tag('mg', P2.x - g_.s*30, P2.y+8, C.mg);
+  }
+  /* net force */
+  if(el.tNet.checked){
+    const off=size/2+30;
+    const ox=P.x+g_.n.x*off, oy=P.y+g_.n.y*off;
+    if(Math.abs(F.net)>0.01){
+      const nx=g_.u.x*F.net*sc, ny=g_.u.y*F.net*sc;
+      arrow(ox,oy,ox+nx,oy+ny,C.net,3);
+      tag('F = '+F.net.toFixed(1)+' N', ox+nx+g_.u.x*42 - g_.n.x*6, oy+ny+g_.u.y*42 - g_.n.y*6, C.net, 11);
+    } else {
+      tag('F = 0  (평형)', ox, oy, C.net, 11);
+    }
+  }
+
+  /* flip animation ghost */
+  if(S.flipT !== null) drawGhost(g_, F, sc, P);
+}
+
+/* the incline triangle folding into the force triangle */
+function drawGhost(g_, F, sc, P){
+  const t = S.flipT;
+  const e = t<0.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2;
+  const Gm = F.mg*sc, L=g_.L;
+  const k = Gm/L;
+  // M maps incline triangle (local, origin at A) onto the force triangle
+  const m11=k*g_.sin, m12=k*g_.s*g_.cos, m21=k*g_.s*g_.cos, m22=-k*g_.sin;
+  const a11=(1-e)+e*m11, a12=e*m12, a21=e*m21, a22=(1-e)+e*m22;
+  const ox=(1-e)*g_.A.x + e*P.x, oy=(1-e)*g_.A.y + e*P.y;
+  const loc=[[0,0],[g_.s*g_.b,0],[g_.s*g_.b,-g_.h]];
+  const pt = loc.map(p=>({x:ox+a11*p[0]+a12*p[1], y:oy+a21*p[0]+a22*p[1]}));
+
+  ctx.save();
+  ctx.globalAlpha = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(pt[0].x,pt[0].y); ctx.lineTo(pt[1].x,pt[1].y); ctx.lineTo(pt[2].x,pt[2].y); ctx.closePath();
+  ctx.fillStyle='rgba(122,63,209,.10)'; ctx.fill();
+  ctx.restore();
+  line(pt[0].x,pt[0].y,pt[2].x,pt[2].y,C.mg,3.5);
+  line(pt[0].x,pt[0].y,pt[1].x,pt[1].y,C.cos,3.5);
+  line(pt[1].x,pt[1].y,pt[2].x,pt[2].y,C.sin,3.5);
+
+  const cap = t<0.98 ? '빗면 삼각형을 힘의 삼각형 위로 겹치는 중' : '두 삼각형이 정확히 겹칩니다 — 닮음';
+  ctx.save();
+  ctx.font='600 19px system-ui, sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  const w=ctx.measureText(cap).width;
+  ctx.fillStyle='rgba(20,24,31,.92)';
+  roundRect(W/2-w/2-18, 18, w+36, 42, 21); ctx.fill();
+  ctx.fillStyle='#fff'; ctx.fillText(cap, W/2, 39);
+  ctx.restore();
+}
+
+/* ───────── sidebar sync ───────── */
+function syncPanel(){
+  const F=forces(), deg=S.theta*180/Math.PI;
+  el.angOut.textContent = deg.toFixed(0)+'°';
+  el.massOut.textContent = S.m.toFixed(1)+' kg';
+  el.muOut.textContent = S.mu.toFixed(2);
+
+  el.vG.textContent  = F.mg.toFixed(1)+' N';
+  el.vS.textContent  = F.along.toFixed(1)+' N';
+  el.vC.textContent  = F.perp.toFixed(1)+' N';
+  el.vN.textContent  = F.N.toFixed(1)+' N';
+  el.vF.textContent  = S.friction ? F.f.toFixed(1)+' N' : '0.0 N';
+  el.vFmax.textContent = S.friction ? F.fmax.toFixed(1)+' N' : '–';
+  el.rowFmax.style.display = S.friction ? '' : 'none';
+  el.vNet.textContent = F.net.toFixed(1)+' N';
+  el.vA.textContent   = F.a.toFixed(2)+' m/s²';
+
+  const moving = S.moving && S.playing;
+  el.stateBox.className = 'state' + (moving?' moving':'');
+  if(moving) el.stateBox.textContent = '미끄러지는 중 · v = '+S.v.toFixed(2)+' m/s';
+  else if(S.friction && F.net===0 && F.along>0) el.stateBox.textContent = '정지 · 정지마찰력이 mg sinθ와 균형';
+  else if(F.along===0) el.stateBox.textContent = '수평면 · 빗면 방향 힘 없음';
+  else if(!S.playing) el.stateBox.textContent = '정지 · 놓으면 미끄러집니다';
+  else el.stateBox.textContent = '정지해 있습니다';
+
+  const sin=Math.sin(S.theta), cos=Math.cos(S.theta);
+  el.p1.textContent = sin.toFixed(3);
+  el.p2.textContent = sin.toFixed(3);
+  el.p3.textContent = cos.toFixed(3);
+  el.p4.textContent = cos.toFixed(3);
+  el.proof.classList.toggle('dim', !el.tSim.checked);
+}
+
+function syncPlayBtn(){
+  el.btnPlay.textContent = S.playing ? '멈추기' : '놓아 보기';
+  el.btnPlay.classList.toggle('primary', !S.playing);
+}
+
+function resetBlock(){
+  const g_=geo();
+  S.d = blockHalfAlongM(g_) + 0.12;
+  S.v = 0; S.moving = false; S.playing = false;
+  syncPlayBtn();
+}
+
+/* ───────── events ───────── */
+el.ang.addEventListener('input', e=>{
+  S.theta = (+e.target.value)*Math.PI/180;
+  if(!S.moving) S.v=0;
+  syncPanel();
+});
+el.mass.addEventListener('input', e=>{ S.m = +e.target.value; syncPanel(); });
+el.mu.addEventListener('input', e=>{ S.mu = +e.target.value; syncPanel(); });
+el.tFric.addEventListener('change', e=>{
+  S.friction = e.target.checked;
+  el.mu.disabled = !S.friction;
+  if(S.friction && !el.tFricV.checked) el.tFricV.checked = true;
+  syncPanel();
+});
+[el.tGrav,el.tDecomp,el.tNormal,el.tFricV,el.tNet,el.tSim].forEach(c=>{
+  c.addEventListener('change', ()=>{
+    if(c===el.tSim && c.checked) el.tDecomp.checked = true;
+    syncPanel();
+  });
+});
+el.btnPlay.addEventListener('click', ()=>{
+  const g_=geo();
+  if(S.d >= RAMP_METERS - blockHalfAlongM(g_) - 0.02) resetBlock();
+  S.playing = !S.playing;
+  if(S.playing){ S.flipT=null; S.flipping=false; el.btnFlip.textContent='삼각형 접어 넣기 ▸'; }
+  syncPlayBtn();
+});
+el.btnReset.addEventListener('click', ()=>{ resetBlock(); syncPanel(); });
+el.btnDir.addEventListener('click', ()=>{
+  S.dir *= -1;
+  S.flipT = null; S.flipping = false;
+  el.btnFlip.textContent = '삼각형 접어 넣기 ▸';
+  resetBlock(); syncPanel();
+});
+el.btnFlip.addEventListener('click', ()=>{
+  S.playing=false; syncPlayBtn();
+  el.tSim.checked = true; el.tDecomp.checked = true;
+  S.flipT = 0; S.flipping = true;
+  el.btnFlip.textContent = '다시 접어 보기 ↻';
+  syncPanel();
+});
+
+/* ───────── loop ───────── */
+let last = performance.now();
+function loop(now){
+  let dt = (now-last)/1000; last = now;
+  if(dt>0.05) dt=0.05;
+
+  if(S.flipping){
+    S.flipT += dt/1.5;
+    if(S.flipT >= 1){ S.flipT = 1; S.flipping = false; }
+  }
+  step(dt);
+  render();
+  syncPanel();
+  requestAnimationFrame(loop);
+}
+
+resize();
+resetBlock();
+syncPanel();
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
