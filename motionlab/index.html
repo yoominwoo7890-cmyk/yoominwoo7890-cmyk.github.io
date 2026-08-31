@@ -1960,10 +1960,9 @@ speedSlider.addEventListener('input', ()=>{
 });
 dtSlider.addEventListener('input', ()=>{
   dtVal.textContent = dtInterval().toFixed(2)+' s';
-  const lastT = dots.length ? dots[dots.length-1].t : 0;
-  nextDotTime = lastT + dtInterval();
-  runDots = computeRunDots();
-  resizeCanvas();
+  /* 이미 찍힌 잔상은 예전 간격으로 기록돼 있다. 그대로 두고 이어 찍으면
+     한 궤적 안에 간격이 섞여 시각 라벨과 표의 t 가 어긋나므로 처음부터 다시 만든다. */
+  resetSim();
 });
 
 // Δt 단위 스텝 이동 (일시정지 상태로 전환)
