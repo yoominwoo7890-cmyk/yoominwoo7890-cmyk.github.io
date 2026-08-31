@@ -1499,34 +1499,31 @@ function tableLayout(){
   if(tblOn.vy) qs.push({k:'vy', head:'vy'});
   if(tblOn.p)  qs.push({k:'p',  head:'p'});
   if(!qs.length || runDots < 1) return null;
-  const bw = TBL.TCOL + qs.length*TBL.QCOL;
-  // 시간을 세로로 쌓는다. 한 덩이에 다 못 넣으면 행 높이를 줄이고, 그래도 넘치면 옆으로 잇는다.
-  const usable = SIM_H - TBL.PAD*2 - TBL.HH - TBL.FOOT;
-  let RH = TBL.RH, groups = 1, per = runDots;
-  fit:
-  for(const rh of [22, 18, 15, 13]){
-    for(let g = 1; g <= 2; g++){
-      const p = Math.ceil(runDots/g);
-      if(p*rh <= usable){ RH = rh; groups = g; per = p; break fit; }
-    }
-    RH = rh; groups = 2; per = Math.ceil(runDots/2);
-  }
-  return {qs, bw, RH, groups, per, w: groups*bw + (groups-1)*TBL.GAP + TBL.PAD*2};
+  /* 표는 언제나 세로 한 단으로 그린다.
+     단을 늘리면 표 폭이 두 배가 되고, 그러면 섬광 간격을 바꿀 때마다
+     캔버스 표시 크기가 출렁인다. 대신 행 높이를 줄여서 맞추고,
+     그래도 넘치면 뒷부분을 생략하고 몇 개가 빠졌는지 각주에 적는다. */
+  const r = tableRows();
+  return {qs, bw: TBL.TCOL + qs.length*TBL.QCOL, RH:r.RH, shown:r.shown, cut:r.cut,
+          w: TBL.TCOL + qs.length*TBL.QCOL + TBL.PAD*2};
 }
 function tableAreaW(){ const L = tableLayout(); return L ? L.w : 0; }
+
+/* 세로 한 단에 몇 행을 어떤 높이로 넣을지. 넘치면 뒤를 자른다. */
+function tableRows(){
+  const usable = SIM_H - TBL.PAD*2 - TBL.HH - TBL.FOOT;
+  for(const rh of [22, 18, 15, 13])
+    if(runDots*rh <= usable) return {RH:rh, shown:runDots, cut:0};
+  const RH = 13, shown = Math.floor(usable/RH);
+  return {RH, shown, cut:runDots - shown};
+}
 
 /* 항목을 qCount 개 켰다고 가정했을 때의 표 폭.
    화면 배율을 정할 때 '전부 켠 경우(4개)'로 자리를 미리 잡아 두려고 쓴다. */
 function tableWidthFor(qCount){
   if(qCount < 1 || runDots < 1) return 0;
-  const bw = TBL.TCOL + qCount*TBL.QCOL;
-  const usable = SIM_H - TBL.PAD*2 - TBL.HH - TBL.FOOT;
-  let groups = 2;
-  fit:
-  for(const rh of [22, 18, 15, 13])
-    for(let g = 1; g <= 2; g++)
-      if(Math.ceil(runDots/g)*rh <= usable){ groups = g; break fit; }
-  return groups*bw + (groups-1)*TBL.GAP + TBL.PAD*2;
+  // 항상 한 단이므로 섬광 개수와 무관하다 → 캔버스 표시 크기가 Δt 에 흔들리지 않는다
+  return TBL.TCOL + qCount*TBL.QCOL + TBL.PAD*2;
 }
 
 function drawDataTable(){
@@ -1548,9 +1545,9 @@ function drawDataTable(){
   ctx.beginPath(); ctx.moveTo(SIM_W+0.75, 0); ctx.lineTo(SIM_W+0.75, H); ctx.stroke();
   ctx.textBaseline = 'middle';
 
-  for(let g=0; g<L.groups; g++){
-    const gx = SIM_W + TBL.PAD + g*(L.bw + TBL.GAP), gy = TBL.PAD;
-    const i0 = g*L.per, i1 = Math.min(runDots, i0 + L.per);
+  {
+    const gx = SIM_W + TBL.PAD, gy = TBL.PAD;
+    const i0 = 0, i1 = L.shown;
     const bottom = gy + TBL.HH + (i1-i0)*L.RH;
 
     for(let i=i0; i<i1; i++){                       // 얼룩 배경으로 행 구분
@@ -1590,7 +1587,8 @@ function drawDataTable(){
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
   ctx.font = F(9); ctx.fillStyle = '#7A8792';
   ctx.fillText('t: s · v, vx, vy: m/s · p: kg·m/s', SIM_W+TBL.PAD, SIM_H-22);
-  ctx.fillText('vx 오른쪽 +, vy 위쪽 +' + (tblOn.p ? ' · m='+mass().toFixed(1)+'kg' : ''),
+  ctx.fillText('vx 오른쪽 +, vy 위쪽 +' + (tblOn.p ? ' · m='+mass().toFixed(1)+'kg' : '')
+               + (L.cut ? '  · 이하 '+L.cut+'개 생략' : ''),
                SIM_W+TBL.PAD, SIM_H-6);
   ctx.restore();
 }
