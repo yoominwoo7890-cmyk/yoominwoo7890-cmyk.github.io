@@ -1,1 +1,1053 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#e9eef3; --card:#ffffff; --ink:#111820; --muted:#66707c;
+  --line:#d3dbe4; --grid:#dce4ed;
+  --vec:#d81f26;      /* 힘 = 빨강 */
+  --vel:#1150c8;      /* 속도 = 파랑 */
+  --ok:#0d7a5f; --warn:#b45309;
+  --shadow:0 1px 0 rgba(17,24,32,.06), 0 8px 24px -12px rgba(17,24,32,.28);
+  --r:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:'IBM Plex Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  color:var(--ink); background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),
+                   linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:26px 26px;
+  -webkit-font-smoothing:antialiased; line-height:1.6;
+}
+.wrap{max-width:1080px;margin:0 auto;padding:22px 18px 80px}
+.wrap.narrow{max-width:760px}
 
+/* ── 헤더 ─────────────────────────────── */
+.topbar{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+  border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:22px}
+.brand{font-weight:700;font-size:17px;letter-spacing:-.02em}
+.brand span{color:var(--vec)}
+.who{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--muted)}
+
+/* ── 단계 표시 ─────────────────────────── */
+.eyebrow{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.eyebrow b{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;
+  color:var(--vec);letter-spacing:.12em}
+.eyebrow i{flex:1;height:1px;background:var(--line);font-style:normal}
+h1{font-size:26px;font-weight:700;letter-spacing:-.03em;margin:0 0 4px}
+h2{font-size:17px;font-weight:600;letter-spacing:-.02em;margin:26px 0 10px}
+.lede{color:var(--muted);font-size:14.5px;margin:0 0 20px}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:var(--shadow);padding:20px}
+.card + .card{margin-top:16px}
+
+/* ── 버튼 / 입력 ────────────────────────── */
+button{font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;
+  border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink);
+  padding:10px 16px;transition:.13s}
+button:hover{border-color:var(--ink)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible,textarea:focus-visible,
+.opt:focus-visible{outline:2px solid var(--vel);outline-offset:2px}
+.btn-primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn-primary:hover{background:#000}
+.btn-vec{background:var(--vec);color:#fff;border-color:var(--vec)}
+.btn-ghost{background:transparent}
+.btn-mini{padding:5px 11px;font-size:12.5px;border-radius:6px;font-weight:600}
+input[type=text],textarea{width:100%;font-family:inherit;font-size:15px;color:var(--ink);
+  border:1px solid var(--line);border-radius:8px;padding:11px 13px;background:#fdfefe}
+textarea{min-height:120px;resize:vertical;line-height:1.65}
+label.fld{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:14px 0 6px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+/* ── 보기 그리드 ────────────────────────── */
+.optgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+@media(max-width:640px){.optgrid{grid-template-columns:1fr}}
+.opt{position:relative;background:#fff;border:1.5px solid var(--line);border-radius:var(--r);
+  padding:12px 12px 10px;cursor:pointer;transition:.13s;text-align:left;width:100%;display:block}
+.opt:hover{border-color:#9aa5b1}
+.opt.sel{border-color:var(--vec);box-shadow:0 0 0 3px rgba(216,31,38,.13)}
+.opt .tag{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:var(--muted)}
+.opt.sel .tag{color:var(--vec)}
+.opt svg{width:100%;height:auto;display:block}
+.opt.static{cursor:default}
+.opt.static:hover{border-color:var(--line)}
+
+/* ── 개표 스탬프(시그니처) ───────────────── */
+.stamp{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;pointer-events:none}
+.stamp .num{font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:76px;
+  line-height:1;color:var(--vec);
+  width:132px;height:132px;border:3px solid var(--vec);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.82);
+  animation:stampIn .34s cubic-bezier(.2,.9,.3,1.4) both}
+.stamp .pct{margin-top:9px;font-family:'IBM Plex Mono',monospace;font-size:13px;
+  font-weight:600;color:var(--vec);background:rgba(255,255,255,.9);padding:2px 8px;border-radius:99px}
+@keyframes stampIn{from{transform:scale(1.5);opacity:0}to{transform:scale(1);opacity:1}}
+@media(prefers-reduced-motion:reduce){.stamp .num{animation:none}}
+
+/* ── 안내 박스 ─────────────────────────── */
+.note{border-left:3px solid var(--vec);background:#fff;padding:12px 14px;
+  border-radius:0 8px 8px 0;font-size:14px;margin:14px 0}
+.note.ok{border-color:var(--ok)}
+.pill{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:11.5px;
+  font-weight:600;padding:3px 9px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+.pill.on{background:var(--ok);border-color:var(--ok);color:#fff}
+.pill.vec{background:var(--vec);border-color:var(--vec);color:#fff}
+
+/* ── 대기 화면 ─────────────────────────── */
+.wait{text-align:center;padding:64px 20px}
+.wait .dots{font-family:'IBM Plex Mono',monospace;font-size:34px;letter-spacing:.3em;color:var(--vec)}
+.wait h3{font-size:19px;margin:14px 0 6px;font-weight:600}
+.wait p{color:var(--muted);font-size:14px;margin:0}
+
+/* ── 시뮬레이션 ────────────────────────── */
+.simwrap{background:#fff;border-radius:var(--r);padding:12px;border:1px solid var(--line)}
+canvas{width:100%;height:auto;display:block;border-radius:6px}
+.simbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.simbar input[type=range]{width:150px;accent-color:var(--vec)}
+.hud{font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--muted);
+  display:flex;gap:18px;flex-wrap:wrap;margin-top:10px}
+.hud b{color:var(--ink);font-weight:600}
+.verdict{margin-top:12px;font-size:15px;font-weight:600;padding:12px 14px;border-radius:8px}
+.verdict.match{background:#e7f6f0;color:var(--ok);border:1px solid #b9e2d4}
+.verdict.nomatch{background:#fdecec;color:var(--vec);border:1px solid #f5c6c8}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);
+  font-family:'IBM Plex Mono',monospace;margin-top:8px}
+.legend i{display:inline-block;width:22px;height:0;border-top:2px solid;margin-right:6px;vertical-align:middle}
+
+.err{color:var(--vec);font-size:13.5px;margin-top:8px;font-weight:500}
+.hide{display:none !important}
+.center{text-align:center}
+</style>
+</head>
+<body>
+
+<!-- ══════════════ 학생 화면 ══════════════ -->
+<div id="studentApp" class="wrap narrow">
+  <div class="topbar">
+    <div class="brand">힘과 운동 <span>·</span> 개념 탐구</div>
+    <div class="who" id="sWho"></div>
+    <button class="btn-ghost btn-mini hide" id="sOut">나가기</button>
+  </div>
+
+  <!-- 입장 -->
+  <div id="gate" class="card">
+    <div class="eyebrow"><b>ENTER</b><i></i></div>
+    <h1>수업에 들어가기</h1>
+    <p class="lede">학번과 이름을 입력하면 선생님 화면에 응답이 모입니다.</p>
+    <label class="fld" for="inNo">학번</label>
+    <input type="text" id="inNo" placeholder="예: 10315" autocomplete="off">
+    <label class="fld" for="inName">이름</label>
+    <input type="text" id="inName" placeholder="예: 김하늘" autocomplete="off">
+    <div class="row" style="margin-top:16px">
+      <button class="btn-primary" id="btnEnter">입장하기</button>
+    </div>
+    <div class="err hide" id="gateErr"></div>
+  </div>
+
+  <!-- 단계별 화면 -->
+  <div id="sBody" class="hide"></div>
+</div>
+
+
+
+<script type="module">
+/* ═════════════════════════════════════════
+   0. Firebase 연결
+   ═════════════════════════════════════════ */
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+import { getAuth, signInAnonymously, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, onSnapshot, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
+
+/* ▼▼▼ 여기에 Firebase 콘솔에서 복사한 값을 붙여넣으세요 ▼▼▼ */
+const firebaseConfig = {
+  apiKey: "AIzaSyCJwS8qyO9Ew9MgXo9zLWqxI1jPmLqWxzg",
+  authDomain: "debating-about-throwing-a-ball.firebaseapp.com",
+  projectId: "debating-about-throwing-a-ball",
+  storageBucket: "debating-about-throwing-a-ball.firebasestorage.app",
+  messagingSenderId: "318859589063",
+  appId: "1:318859589063:web:2d4a83fe63384aaa92d5e2"
+};
+/* ▲▲▲ 여기까지 ▲▲▲ */
+
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
+
+/* ═════════════════════════════════════════
+   1. 공통
+   ═════════════════════════════════════════ */
+
+const OPTIONS = [
+  { id:'OPT_G',  no:2, label:'중력만',                correct:true  },
+  { id:'OPT_T',  no:3, label:'던진 힘(접선)만',        correct:false },
+  { id:'OPT_GT', no:4, label:'중력 + 던진 힘(접선)',   correct:false },
+  { id:'OPT_GH', no:5, label:'중력 + 던진 힘(수평)',   correct:false }
+];
+const OPT = {}; OPTIONS.forEach(function(o){ OPT[o.id]=o; });
+const STAGE_TITLES = ['대기실','문제','정답과 이유는?','토론 후 생각 작성','시뮬레이션 관찰'];
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function showErr(el,msg){ el.textContent = (msg && msg.message) ? msg.message : msg; el.classList.remove('hide'); }
+
+/** 기존 화면 코드가 그대로 쓰도록 남겨둔 호출 창구. 이제 Firestore로 간다. */
+function call(fn){
+  const args = Array.prototype.slice.call(arguments, 1);
+  const f = API[fn];
+  if(!f) return Promise.reject(new Error('알 수 없는 요청: ' + fn));
+  return f.apply(null, args);
+}
+
+function shuffle(a){
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=a[i]; a[i]=a[j]; a[j]=t; }
+  return a;
+}
+
+/* ═════════════════════════════════════════
+   2. 데이터 계층 (Firestore)
+   ═════════════════════════════════════════ */
+
+let UID = null;   // 익명 로그인으로 받는 이 브라우저의 고유 번호
+
+const API = {
+  /** 입장. 학번·이름을 저장하고 보기 순서를 정한다. */
+  registerStudent: async function(no, name){
+    no = String(no||'').trim(); name = String(name||'').trim();
+    if(!no || !name) throw new Error('학번과 이름을 모두 입력하세요.');
+    if(!UID) throw new Error('연결 중입니다. 잠시 후 다시 눌러주세요.');
+
+    const ref = doc(db, 'students', UID);
+    const snap = await getDoc(ref);
+    if(snap.exists()){
+      const d = snap.data();
+      return { session: UID, studentNo: d.no, name: d.name, order: d.order };
+    }
+    const order = shuffle(OPTIONS.map(function(o){ return o.id; }));
+    await setDoc(ref, { no: no, name: name, order: order, joinedAt: serverTimestamp() });
+    return { session: UID, studentNo: no, name: name, order: order };
+  },
+
+  /** 새로고침 후 이어서 참여 */
+  restoreSession: async function(){
+    if(!UID) return null;
+    const snap = await getDoc(doc(db, 'students', UID));
+    if(!snap.exists()) return null;
+    const d = snap.data();
+    return { session: UID, studentNo: d.no, name: d.name, order: d.order };
+  },
+
+  /** 2단계: 답과 이유 */
+  submitVote: async function(session, optId, reason, displayPos){
+    const o = OPT[optId];
+    if(!o) throw new Error('보기를 선택하세요.');
+    if(!String(reason||'').trim()) throw new Error('그렇게 생각한 이유를 적어주세요.');
+    await setDoc(doc(db, 'responses', UID), {
+      no: S.no, name: S.name, optId: o.id, optNo: o.no, optLabel: o.label,
+      displayPos: displayPos || 0, reason: String(reason).trim(), at: serverTimestamp()
+    });
+    return { ok: true };
+  },
+
+  /** 3단계: 토론 후 생각 */
+  submitPostThought: async function(session, text, changed){
+    if(!String(text||'').trim()) throw new Error('토론 후 생각을 적어주세요.');
+    await setDoc(doc(db, 'posts', UID), {
+      no: S.no, name: S.name, text: String(text).trim(),
+      changed: changed || '', at: serverTimestamp()
+    });
+    return { ok: true };
+  },
+
+  /** 4단계: 시뮬레이션 관찰 기록 */
+  submitSimLog: async function(session, force, note){
+    const o = OPT[force];
+    await setDoc(doc(db, 'sims', UID), {
+      no: S.no, name: S.name,
+      force: o ? (o.no + '번 · ' + o.label) : '',
+      note: String(note||'').trim(), at: serverTimestamp()
+    });
+    return { ok: true };
+  }
+};
+
+/** 내가 쓴 답을 한 번에 읽어온다 (단계가 바뀔 때만 호출) */
+async function loadMine(stage){
+  const out = {};
+  if(!UID) return out;
+  const grab = async function(coll){
+    try { const s = await getDoc(doc(db, coll, UID)); return s.exists() ? s.data() : null; }
+    catch(e){ return null; }
+  };
+  if(stage >= 2){ const r = await grab('responses');
+    if(r){ out.myVote = r.optId; out.myReason = r.reason; } }
+  if(stage >= 3){ const p = await grab('posts');
+    if(p){ out.myPost = p.text; out.myChanged = p.changed; } }
+  if(stage >= 4){ const g = await grab('sims');
+    if(g){ out.mySimForce = g.force; out.mySimNote = g.note; } }
+  return out;
+}
+
+/* ═════════════════════════════════════════
+   3. 학생 앱
+   ═════════════════════════════════════════ */
+
+const S = { session:null, order:null, name:'', no:'', stage:-1, reveal:false,
+            renderedKey:'', data:{}, mine:{} };
+
+let unsubControl = null, unsubTally = null;
+
+function initStudent(){
+  $('btnEnter').onclick = doEnter;
+  $('inName').addEventListener('keydown', function(e){ if(e.key==='Enter') doEnter(); });
+  $('sOut').onclick = studentLogout;
+
+  // 익명 로그인 → 이 브라우저에 고유 번호가 생긴다. 학생은 아무것도 안 해도 된다.
+  onAuthStateChanged(auth, async function(user){
+    if(!user){ try{ await signInAnonymously(auth); }catch(e){ showErr($('gateErr'), '연결 실패: '+e.message); } return; }
+    UID = user.uid;
+    try {
+      const me = await API.restoreSession();
+      if(me){ enterClass(me); }
+    } catch(e){ /* 처음 접속 */ }
+  });
+}
+
+function doEnter(){
+  const b = $('btnEnter');
+  $('gateErr').classList.add('hide');
+  b.disabled = true; b.textContent = '입장 중…';
+  call('registerStudent', $('inNo').value, $('inName').value)
+    .then(function(me){ enterClass(me); })
+    .catch(function(e){ showErr($('gateErr'), e); b.disabled=false; b.textContent='입장하기'; });
+}
+
+function enterClass(me){
+  S.session = me.session; S.order = me.order; S.name = me.name; S.no = me.studentNo;
+  $('gate').classList.add('hide');
+  $('sBody').classList.remove('hide');
+  $('sOut').classList.remove('hide');
+  $('sWho').textContent = S.no + ' ' + S.name;
+  listen();
+}
+
+/** 폴링이 아니라 실시간 구독. 교사가 단계를 바꾸면 즉시 반영된다. */
+function listen(){
+  stopListen();
+  unsubControl = onSnapshot(doc(db, 'control', 'state'), function(snap){
+    const c = snap.exists() ? snap.data() : { stage: 0, reveal: false };
+    applyState(Number(c.stage)||0, !!c.reveal);
+  }, function(){ /* 일시적 오류는 무시. 자동 재연결됨 */ });
+
+  unsubTally = onSnapshot(doc(db, 'public', 'tally'), function(snap){
+    S.counts = snap.exists() ? snap.data() : null;
+    if(S.reveal) draw();
+  }, function(){});
+}
+function stopListen(){
+  if(unsubControl){ unsubControl(); unsubControl = null; }
+  if(unsubTally){ unsubTally(); unsubTally = null; }
+}
+
+async function applyState(stage, reveal){
+  const stageChanged = (stage !== S.stage);
+  S.stage = stage; S.reveal = reveal;
+  if(stageChanged){ S.mine = await loadMine(stage); }
+  draw();
+}
+
+function draw(){
+  const d = Object.assign({
+    stage: S.stage, reveal: S.reveal, stageName: STAGE_TITLES[S.stage] || '',
+    order: S.order, name: S.name, studentNo: S.no,
+    counts: S.counts || null
+  }, S.mine);
+
+  S.data = d;
+  const key = [d.stage, d.reveal, d.counts?d.counts.total:0,
+               !!d.myVote, !!d.myPost, !!d.mySimNote].join('|');
+  if(key === S.renderedKey) return;
+  S.renderedKey = key;
+  renderStudent(d);
+}
+
+/** 제출 후 내 답을 다시 읽어 화면을 갱신한다 */
+async function refreshMine(){
+  S.mine = await loadMine(S.stage);
+  S.renderedKey = '';
+  draw();
+}
+
+function studentLogout(){
+  if(!confirm('수업에서 나갑니다. 같은 기기로 다시 들어오면 이어서 참여할 수 있습니다.')) return;
+  stopListen();
+  S.session = null; S.renderedKey = ''; S.mine = {}; S.stage = -1;
+  $('sBody').innerHTML = ''; $('sBody').classList.add('hide');
+  $('sWho').textContent = '';
+  $('sOut').classList.add('hide');
+  $('gate').classList.remove('hide');
+  $('btnEnter').disabled = false; $('btnEnter').textContent = '입장하기';
+  $('inNo').value = ''; $('inName').value = ''; $('inNo').focus();
+}
+
+/* ═════════════════════════════════════════
+   4. 그림(SVG)
+   ═════════════════════════════════════════ */
+/* ═════════════════════════════════════════
+   1. 그림(SVG) 생성 — 이미지 1~5를 벡터로 재현
+   ═════════════════════════════════════════ */
+const TR = { x0:22, y0:26, vx:58, k:15, tMax:4.15, tB:1.8, tC:3.35 };
+let uid = 0;
+
+function tx(t,off){ return TR.x0 + (off||0) + TR.vx*t; }
+function ty(t){ return TR.y0 + TR.k*t*t; }
+function trajD(off){
+  let d='';
+  for(let t=0;t<=TR.tMax+1e-9;t+=0.05){
+    d += (d?'L':'M') + tx(t,off).toFixed(1) + ' ' + ty(t).toFixed(1);
+  }
+  return d;
+}
+function ball(t,label,off){
+  const x=tx(t,off), y=ty(t);
+  return '<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="9" fill="#b9bec6" stroke="#4b5158" stroke-width="1.6"/>'
+       + (label ? '<text x="'+x.toFixed(1)+'" y="'+(y-15).toFixed(1)+'" text-anchor="middle" '
+                + 'font-size="16" font-weight="700" fill="#111820">'+label+'</text>' : '');
+}
+function arrow(x1,y1,x2,y2,mid){
+  return '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" '
+       + 'stroke="var(--vec)" stroke-width="3" marker-end="url(#ah'+mid+')"/>';
+}
+function txt(x,y,s,anchor){
+  return '<text x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" text-anchor="'+(anchor||'middle')+'" '
+       + 'font-size="15" font-weight="600" fill="var(--vec)">'+s+'</text>';
+}
+
+/** 보기 그림. optId: OPT_G / OPT_T / OPT_GT / OPT_GH */
+function optionSVG(optId){
+  const id = ++uid;
+  const bx = tx(TR.tB), by = ty(TR.tB);
+  // B점 접선 방향 단위벡터  (dx/dt, dy/dt) = (58, 30t)
+  const dx = TR.vx, dy = 2*TR.k*TR.tB, L = Math.hypot(dx,dy);
+  const ux = dx/L, uy = dy/L;
+
+  let g = '';
+  const hasG = (optId==='OPT_G'||optId==='OPT_GT'||optId==='OPT_GH');
+  const hasT = (optId==='OPT_T'||optId==='OPT_GT');
+  const hasH = (optId==='OPT_GH');
+
+  if(hasG){ g += arrow(bx,by,bx,by+58,id) + txt(bx,by+79,'중력'); }
+  if(hasT){ g += arrow(bx,by,bx+ux*70,by+uy*70,id) + txt(bx+80,by+64,'던진 힘'); }
+  if(hasH){ g += arrow(bx,by,bx+78,by,id) + txt(bx+86,by-14,'던진 힘'); }
+
+  return '<svg viewBox="0 0 320 312" xmlns="http://www.w3.org/2000/svg" role="img">'
+    + '<defs><marker id="ah'+id+'" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5.5" '
+    + 'markerHeight="5.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--vec)"/></marker></defs>'
+    + '<path d="'+trajD(0)+'" fill="none" stroke="#111820" stroke-width="2.6" stroke-dasharray="9 8" stroke-linecap="round"/>'
+    + ball(0,'A') + ball(TR.tC,'C') + ball(TR.tB,'B') + g
+    + '</svg>';
+}
+
+/** 문제 그림(이미지 1) */
+function problemSVG(){
+  const id = ++uid, off = 118;
+  return '<svg viewBox="0 0 420 312" xmlns="http://www.w3.org/2000/svg" role="img">'
+    + '<defs><marker id="ah'+id+'" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5.5" '
+    + 'markerHeight="5.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#111820"/></marker></defs>'
+    + '<path d="'+trajD(off)+'" fill="none" stroke="#111820" stroke-width="2.6" stroke-dasharray="9 8" stroke-linecap="round"/>'
+    + '<line x1="14" y1="'+TR.y0+'" x2="'+(tx(0,off)-14)+'" y2="'+TR.y0+'" stroke="#111820" stroke-width="3.4" marker-end="url(#ah'+id+')"/>'
+    + '<text x="14" y="'+(TR.y0+26)+'" font-size="14.5" font-weight="600" fill="#66707c">수평 방향으로</text>'
+    + '<text x="14" y="'+(TR.y0+45)+'" font-size="14.5" font-weight="600" fill="#66707c">던진 운동</text>'
+    + ball(0,'A',off) + ball(TR.tB,'B',off) + ball(TR.tC,'C',off)
+    + '</svg>';
+}
+
+/* ═════════════════════════════════════════
+   2. 학생 앱
+   ═════════════════════════════════════════ */
+/* ═════════════════════════════════════════
+   5. 화면 그리기
+   ═════════════════════════════════════════ */
+function eyebrow(n){
+  return '<div class="eyebrow"><b>' + String(n).padStart(2,'0') + ' / 04</b><i></i></div>';
+}
+
+function renderStudent(d){
+  const b = $('sBody');
+  if(d.stage === 0){
+    b.innerHTML = '<div class="card wait"><div class="dots">· · ·</div>'
+      + '<h3>선생님을 기다리는 중</h3><p>곧 첫 화면이 열립니다. 이 창을 닫지 마세요.</p></div>';
+    return;
+  }
+  if(d.stage === 1) return renderProblem(b);
+  if(d.stage === 2) return renderVote(b, d);
+  if(d.stage === 3) return renderPost(b, d);
+  if(d.stage === 4) return renderSim(b, d);
+}
+
+/* ── 01 문제 ───────────────────────────── */
+function renderProblem(b){
+  b.innerHTML = eyebrow(1)
+    + '<h1>문제</h1>'
+    + '<p class="lede">그림을 보고 상황을 머릿속에 그려 보세요.</p>'
+    + '<div class="card">'
+      + '<p style="margin:0 0 14px;font-size:15.5px;font-weight:500">'
+      + '공을 수평 방향으로 던졌습니다. 공이 <b>B</b> 위치에 있을 때, 공에 작용하는 힘을 '
+      + '화살표로 표시한 것으로 가장 적절한 것을 골라봅시다.</p>'
+      + '<p class="pill">단, 공기 저항은 무시하고 · 공의 운동 궤적은 지구의 크기에 비해 충분히 작다</p>'
+      + '<div style="margin-top:18px">' + problemSVG() + '</div>'
+    + '</div>'
+    + '<div class="note">B 위치에서 공에 <b>실제로 작용하는 힘</b>이 무엇일지 생각해 두세요. 다음 화면에서 보기를 고릅니다.</div>';
+}
+
+/* ── 02 정답과 이유는? ──────────────────── */
+function renderVote(b, d){
+  const order = S.order || OPTIONS.map(function(o){return o.id;});
+  const counts = d.counts ? d.counts.counts : null;
+  const total  = d.counts ? d.counts.total : 0;
+
+  let grid = '<div class="optgrid">';
+  order.forEach(function(id, i){
+    let stamp = '';
+    if(d.reveal && counts){
+      const c = counts[id] || 0;
+      const pct = total ? Math.round(c/total*100) : 0;
+      stamp = '<div class="stamp"><div class="num">'+c+'</div><div class="pct">'+pct+'%</div></div>';
+    }
+    grid += '<button class="opt' + (d.myVote===id?' sel':'') + (d.reveal?' static':'') + '" '
+          + 'data-opt="'+id+'" data-pos="'+(i+1)+'"'+(d.reveal?' disabled':'')+'>'
+          + '<div class="tag">보기 ' + (i+1) + '</div>' + optionSVG(id) + stamp + '</button>';
+  });
+  grid += '</div>';
+
+  if(d.reveal){
+    b.innerHTML = eyebrow(2) + '<h1>우리 반의 투표 결과</h1>'
+      + '<p class="lede">숫자는 그 보기를 고른 사람 수입니다. 아직 정답은 공개하지 않습니다.</p>'
+      + '<div class="card">' + grid + '</div>'
+      + '<div class="note">내가 고른 것과 다른 보기를 고른 친구가 있다면, <b>왜 그렇게 생각했는지</b> 서로 물어보세요.</div>'
+      + (d.myReason ? '<div class="card"><h2 style="margin-top:0">내가 쓴 이유</h2><p style="margin:0;white-space:pre-wrap">'+esc(d.myReason)+'</p></div>' : '');
+    return;
+  }
+
+  b.innerHTML = eyebrow(2) + '<h1>정답과 이유는?</h1>'
+    + '<p class="lede">B 위치에서 공에 작용하는 힘을 바르게 나타낸 것을 하나 고르고, 그렇게 생각한 이유를 적어주세요.</p>'
+    + '<div class="card">' + grid
+      + '<label class="fld" for="reason">그렇게 생각한 이유</label>'
+      + '<textarea id="reason" placeholder="예: 손을 떠난 뒤에도 앞으로 나아가니까…">'+esc(d.myReason||'')+'</textarea>'
+      + '<div class="row" style="margin-top:14px">'
+        + '<button class="btn-vec" id="btnVote">' + (d.myVote?'다시 제출하기':'제출하기') + '</button>'
+        + (d.myVote?'<span class="pill on">제출 완료</span>':'')
+      + '</div>'
+      + '<div class="err hide" id="voteErr"></div>'
+    + '</div>';
+
+  let picked = d.myVote || null, pickedPos = 0;
+  const btns = b.querySelectorAll('.opt');
+  btns.forEach(function(el){
+    el.onclick = function(){
+      btns.forEach(function(x){ x.classList.remove('sel'); });
+      el.classList.add('sel');
+      picked = el.dataset.opt; pickedPos = Number(el.dataset.pos);
+    };
+  });
+  $('btnVote').onclick = function(){
+    $('voteErr').classList.add('hide');
+    const reason = $('reason').value.trim();
+    if(!picked){ showErr($('voteErr'),'보기를 하나 골라주세요.'); return; }
+    if(!reason){ showErr($('voteErr'),'그렇게 생각한 이유를 적어주세요.'); return; }
+    $('btnVote').disabled = true; $('btnVote').textContent = '제출 중…';
+    call('submitVote', S.session, picked, reason, pickedPos)
+      .then(function(){ S.renderedKey=''; refreshMine(); })
+      .catch(function(e){
+        showErr($('voteErr'), e);
+        $('btnVote').disabled=false; $('btnVote').textContent='제출하기';
+      });
+  };
+}
+
+/* ── 03 토론 후 생각 작성 ────────────────── */
+function renderPost(b, d){
+  const mine = d.myVote ? OPT[d.myVote] : null;
+  b.innerHTML = eyebrow(3) + '<h1>토론 후 생각 작성</h1>'
+    + '<p class="lede">친구들의 이야기를 듣고 나서, 지금 내 생각을 다시 적어주세요.</p>'
+    + (mine
+        ? '<div class="card"><h2 style="margin-top:0">토론 전 내 답</h2>'
+          + '<div class="optgrid" style="grid-template-columns:1fr">'
+          + '<div class="opt static sel"><div class="tag">내가 고른 보기</div>' + optionSVG(mine.id) + '</div></div>'
+          + '<label class="fld">그때 쓴 이유</label>'
+          + '<p style="margin:0;white-space:pre-wrap;font-size:14.5px">' + esc(d.myReason||'') + '</p></div>'
+        : '')
+    + '<div class="card">'
+      + '<label class="fld">토론 후, 생각이 바뀌었나요?</label>'
+      + '<div class="row" id="chgRow">'
+        + ['그대로다','조금 바뀌었다','완전히 바뀌었다'].map(function(t){
+            return '<button class="chg'+(d.myChanged===t?' btn-primary':'')+'" data-v="'+t+'">'+t+'</button>'; }).join('')
+      + '</div>'
+      + '<label class="fld" for="post">지금 내 생각</label>'
+      + '<textarea id="post" placeholder="어떤 이야기를 듣고 어떻게 생각이 달라졌는지, 또는 왜 생각이 그대로인지 적어주세요.">'+esc(d.myPost||'')+'</textarea>'
+      + '<div class="row" style="margin-top:14px">'
+        + '<button class="btn-vec" id="btnPost">' + (d.myPost?'다시 제출하기':'제출하기') + '</button>'
+        + (d.myPost?'<span class="pill on">제출 완료</span>':'')
+      + '</div><div class="err hide" id="postErr"></div>'
+    + '</div>';
+
+  let changed = d.myChanged || '';
+  b.querySelectorAll('.chg').forEach(function(el){
+    el.onclick = function(){
+      b.querySelectorAll('.chg').forEach(function(x){ x.classList.remove('btn-primary'); });
+      el.classList.add('btn-primary'); changed = el.dataset.v;
+    };
+  });
+  $('btnPost').onclick = function(){
+    $('postErr').classList.add('hide');
+    const t = $('post').value.trim();
+    if(!t){ showErr($('postErr'),'지금 내 생각을 적어주세요.'); return; }
+    $('btnPost').disabled = true; $('btnPost').textContent='제출 중…';
+    call('submitPostThought', S.session, t, changed)
+      .then(function(){ S.renderedKey=''; refreshMine(); })
+      .catch(function(e){ showErr($('postErr'),e); $('btnPost').disabled=false; $('btnPost').textContent='제출하기'; });
+  };
+}
+
+/* ── 04 시뮬레이션 관찰 ─────────────────── */
+function renderSim(b, d){
+  let grid = '<div class="optgrid">';
+  OPTIONS.forEach(function(o){
+    grid += '<button class="opt" data-opt="'+o.id+'"><div class="tag">'+o.no+'번</div>'
+          + optionSVG(o.id) + '</button>';
+  });
+  grid += '</div>';
+
+  b.innerHTML = eyebrow(4) + '<h1>시뮬레이션 관찰</h1>'
+    + '<p class="lede">문제의 <b>B 위치</b>에서 출발합니다. 공은 이미 A에서 던져져 비스듬히 내려오는 중이고, '
+      + '고른 보기의 힘이 <b>B 이후로도 계속 작용한다고 가정하고</b> 컴퓨터가 그대로 계산합니다. '
+      + '힘이 있으면 그 방향으로 가속이 일어납니다. 실제 공(빈 원)과 나란히 달리게 해 두었으니 '
+      + '잔상 간격과 아래 속도 값을 비교해 보세요. 중력가속도는 10 m/s²입니다.</p>'
+    + '<div class="card"><h2 style="margin-top:0">힘을 하나 고르세요</h2>' + grid + '</div>'
+    + '<div class="card">'
+      + '<div class="simwrap"><canvas id="cv" width="800" height="520"></canvas>'
+        + '<div class="legend">'
+          + '<span><i style="border-color:#2c3a49;border-top-style:dashed"></i>실제 관측 (빈 원)</span>'
+          + '<span><i style="border-color:#1150c8"></i>고른 힘이 작용할 때의 예측</span>'
+          + '<span><i style="border-color:#d81f26"></i>공에 작용하는 힘</span>'
+        + '</div>'
+        + '<div class="hud" id="hud"></div>'
+      + '</div>'
+      + '<div class="simbar">'
+        + '<button class="btn-vec" id="btnPlay" disabled>재생</button>'
+        + '<button id="btnReset" disabled>처음으로</button>'
+        + '<span style="font-size:13px;color:var(--muted)">속도</span>'
+        + '<input type="range" id="spd" min="10" max="100" value="50">'
+        + '<span class="pill" id="spdLab">0.50×</span>'
+        + '<label style="font-size:13px;display:flex;align-items:center;gap:6px;margin-left:auto">'
+          + '<input type="checkbox" id="strobe" checked> 0.2초 간격 잔상</label>'
+        + '<label style="font-size:13px;display:flex;align-items:center;gap:6px">'
+          + '<input type="checkbox" id="velchk"> 속도 화살표</label>'
+      + '</div>'
+      + '<div class="hint" id="simtip" style="margin-top:10px;font-size:13px;color:var(--muted)"></div>'
+      + '<div id="verdict"></div>'
+    + '</div>'
+    + '<div class="card">'
+      + '<label class="fld" for="simnote">관찰 기록 — 왜 이런 결과가 나왔을까요?</label>'
+      + '<textarea id="simnote" placeholder="예: 던진 힘을 넣었더니 공이 점점 빨라져서 실제 궤적과 어긋났다.">'+esc(d.mySimNote||'')+'</textarea>'
+      + '<div class="row" style="margin-top:14px">'
+        + '<button class="btn-primary" id="btnSim">' + (d.mySimNote?'다시 제출하기':'제출하기') + '</button>'
+        + (d.mySimNote?'<span class="pill on">제출 완료</span>':'')
+      + '</div><div class="err hide" id="simErr"></div>'
+    + '</div>';
+
+  let chosen = null;
+  b.querySelectorAll('.opt').forEach(function(el){
+    el.onclick = function(){
+      b.querySelectorAll('.opt').forEach(function(x){ x.classList.remove('sel'); });
+      el.classList.add('sel');
+      chosen = el.dataset.opt;
+      $('btnPlay').disabled = false; $('btnReset').disabled = false;
+      SIM.load(chosen);
+      const tip = $('simtip');
+      if(tip) tip.innerHTML = (chosen==='OPT_GT')
+        ? '4번의 던진 힘은 <b>속도 방향</b>이라 처음부터 비스듬히 기울어 있습니다. '
+          + '공이 더 가파르게 떨어질수록 화살표도 함께 눕습니다. (5번은 끝까지 수평입니다)'
+        : (chosen==='OPT_T')
+        ? '중력이 빠져 있으니 궤적을 아래로 <b>휘게 할 것이 없습니다.</b> 선이 어떻게 되는지 보세요.'
+        : '';
+      SIM.play();                       // 고르면 바로 움직이기 시작한다
+    };
+  });
+  $('btnPlay').onclick  = function(){ SIM.toggle(); };
+  $('btnReset').onclick = function(){ SIM.reset(); };
+  $('spd').oninput = function(){
+    SIM.speed = Number(this.value)/100;
+    $('spdLab').textContent = SIM.speed.toFixed(2)+'×';
+  };
+  $('strobe').onchange = function(){ SIM.strobe = this.checked; SIM.draw(); };
+  $('velchk').onchange = function(){ SIM.showVel = this.checked; SIM.draw(); };
+  $('btnSim').onclick = function(){
+    $('simErr').classList.add('hide');
+    const note = $('simnote').value.trim();
+    if(!chosen){ showErr($('simErr'),'먼저 힘을 하나 골라 시뮬레이션을 돌려보세요.'); return; }
+    if(!note){ showErr($('simErr'),'관찰한 내용을 적어주세요.'); return; }
+    $('btnSim').disabled = true; $('btnSim').textContent='제출 중…';
+    call('submitSimLog', S.session, chosen, note)
+      .then(function(){ S.renderedKey=''; refreshMine(); })
+      .catch(function(e){ showErr($('simErr'),e); $('btnSim').disabled=false; $('btnSim').textContent='제출하기'; });
+  };
+
+  SIM.init($('cv'));
+}
+
+/* ═════════════════════════════════════════
+   3. 물리 시뮬레이션  (g = 10 m/s²)
+   ═════════════════════════════════════════ */
+/* ═════════════════════════════════════════
+   6. 시뮬레이션 (g = 10 m/s²)
+   ═════════════════════════════════════════ */
+const SIM = {
+  ctx:null, cv:null, raf:null, timer:null, fallback:null, last:0,
+  playing:false, speed:0.5, strobe:true, showVel:false,
+  optId:null, full:null, t:0, p:null, v:null, path:[], marks:[], ref:[], done:false, maxDev:0,
+
+  // 물리 상수
+  g:10, v0:15, F:10, m:1, DT:0.001, TMAX:3.6,
+  // 던진 지점 A. 운동은 여기가 아니라 아래 B에서 시작한다.
+  AX:1.5, AY:-1.5,
+  // A에서 B까지 걸린 시간. 문제 그림의 B 접선 기울기(0.7)와 맞춘 값이다.
+  //   기울기 = g·TB / v0 = 10 × 1.05 / 15 = 0.7
+  TB:1.05,
+  // 화면 좌표 (world → px)
+  SC:15, OX:12, OY:18,
+  // 힘 화살표 길이 배율 (가속도 1 m/s² 당 몇 m 길이로 그릴지)
+  FSC:0.5,
+
+  /** 보기 그림에 그려진 힘을 그대로 분리해서 돌려준다. 합력으로 합치지 않는다. */
+  forces:function(optId, v){
+    const s = Math.hypot(v.x, v.y) || 1;
+    const a = this.F/this.m;                 // 던진 힘의 가속도 크기
+    const G = {x:0, y:-this.g, label:'중력'};
+    switch(optId){
+      case 'OPT_G' : return [G];
+      case 'OPT_T' : return [{x:a*v.x/s, y:a*v.y/s, label:'던진 힘'}];
+      case 'OPT_GT': return [G, {x:a*v.x/s, y:a*v.y/s, label:'던진 힘'}];
+      case 'OPT_GH': return [G, {x:a,     y:0,       label:'던진 힘'}];
+    }
+    return [];
+  },
+  accel:function(optId, v){
+    let ax=0, ay=0;
+    this.forces(optId, v).forEach(function(f){ ax+=f.x; ay+=f.y; });
+    return {x:ax, y:ay};
+  },
+  /** 문제의 B 위치와 그때의 속도. 던진 뒤 TB초 지난 상태다. */
+  stateB:function(){
+    return {
+      x: this.AX + this.v0*this.TB,
+      y: this.AY - 0.5*this.g*this.TB*this.TB,
+      vx: this.v0,
+      vy: -this.g*this.TB
+    };
+  },
+  /** A에서 B까지 이미 지나온 길 (참고용으로 옅게 그린다) */
+  pathAtoB:function(){
+    const pts=[];
+    for(let t=0; t<=this.TB+1e-9; t+=0.02){
+      pts.push({ x:this.AX + this.v0*t, y:this.AY - 0.5*this.g*t*t });
+    }
+    return pts;
+  },
+  simulate:function(optId){
+    const B=this.stateB();
+    const pts=[]; let p={x:B.x,y:B.y}, v={x:B.vx,y:B.vy}, t=0;
+    pts.push({t:0,x:p.x,y:p.y,vx:v.x,vy:v.y});
+    while(t < this.TMAX){
+      // 2차 정확도(중점법)
+      const a1=this.accel(optId,v);
+      const vm={x:v.x+a1.x*this.DT/2, y:v.y+a1.y*this.DT/2};
+      const a2=this.accel(optId,vm);
+      p={x:p.x+vm.x*this.DT, y:p.y+vm.y*this.DT};
+      v={x:v.x+a2.x*this.DT, y:v.y+a2.y*this.DT};
+      t+=this.DT;
+      pts.push({t:t,x:p.x,y:p.y,vx:v.x,vy:v.y});
+      if(p.x>52 || p.y<-31) break;
+    }
+    return pts;
+  },
+  px:function(x){ return this.OX + this.SC*x; },
+  py:function(y){ return this.OY - this.SC*y; },
+
+  init:function(cv){
+    this.cv=cv; this.ctx=cv.getContext('2d');
+    this.ref = this.simulate('OPT_G');
+    this.optId=null; this.reset();
+  },
+  load:function(optId){
+    this.optId=optId; this.full=this.simulate(optId);
+    // 실제 궤적과의 최대 어긋남(같은 시각 기준)
+    let dev=0;
+    for(let i=0;i<Math.min(this.full.length,this.ref.length);i+=50){
+      dev=Math.max(dev, Math.hypot(this.full[i].x-this.ref[i].x, this.full[i].y-this.ref[i].y));
+    }
+    this.maxDev=dev;
+    this.reset();
+  },
+  reset:function(){
+    this.playing=false; this.done=false; this.t=0; this.last=0; this.path=[]; this.marks=[];
+    this.stopTimers();
+    const bp=$('btnPlay'); if(bp) bp.textContent='재생';
+    const vd=$('verdict'); if(vd) vd.innerHTML='';
+    this.draw();
+  },
+  stopTimers:function(){
+    if(this.raf){ cancelAnimationFrame(this.raf); this.raf=null; }
+    if(this.timer){ clearInterval(this.timer); this.timer=null; }
+    if(this.fallback){ clearTimeout(this.fallback); this.fallback=null; }
+  },
+  toggle:function(){
+    if(!this.full) return;
+    if(this.done) this.reset();
+    this.playing = !this.playing;
+    const bp=$('btnPlay'); if(bp) bp.textContent = this.playing ? '일시정지' : '재생';
+    if(this.playing) this.start(); else this.stopTimers();
+  },
+  play:function(){
+    if(!this.full) return;
+    this.reset();
+    this.playing = true;
+    const bp=$('btnPlay'); if(bp) bp.textContent='일시정지';
+    this.start();
+  },
+  start:function(){
+    this.stopTimers();
+    this.last = 0;                       // 첫 프레임에서 기준 시각을 새로 잡는다
+    const self = this;
+    const step = function(now){
+      if(!self.playing) return;
+      if(typeof now !== 'number') now = Date.now();
+      if(!self.last) self.last = now;
+      let dt = (now - self.last)/1000;
+      if(!(dt > 0)) dt = 0;              // 음수·NaN이면 이 프레임은 건너뛴다
+      self.last = now;
+      self.advance(Math.min(dt, 0.05) * self.speed);
+      if(self.playing) self.raf = requestAnimationFrame(step);
+    };
+    if(typeof requestAnimationFrame === 'function'){
+      this.raf = requestAnimationFrame(step);
+    }
+    // requestAnimationFrame이 돌지 않는 환경 대비 — 진행이 없으면 타이머로 바꾼다
+    const t0 = this.t;
+    this.fallback = setTimeout(function(){
+      if(self.playing && self.t === t0){
+        self.timer = setInterval(function(){
+          if(self.playing) self.advance(0.033 * self.speed); else self.stopTimers();
+        }, 33);
+      }
+    }, 300);
+  },
+  advance:function(dt){
+    this.t += dt;
+    const end = this.full[this.full.length-1].t;
+    if(this.t >= end){
+      this.t = end; this.playing = false; this.done = true;
+      this.stopTimers();
+      const bp=$('btnPlay'); if(bp) bp.textContent='다시 보기';
+      this.showVerdict();
+    }
+    this.draw();
+  },
+  stateAt:function(arr,t){
+    const i=Math.min(arr.length-1, Math.round(t/this.DT));
+    return arr[i];
+  },
+  draw:function(){
+    const c=this.ctx, W=this.cv.width, H=this.cv.height;
+    c.clearRect(0,0,W,H);
+    c.fillStyle='#ffffff'; c.fillRect(0,0,W,H);
+
+    // 격자 (5 m)
+    c.strokeStyle='rgba(17,24,32,.08)'; c.lineWidth=1;
+    for(let x=0;x<=50;x+=5){ c.beginPath(); c.moveTo(this.px(x),0); c.lineTo(this.px(x),H); c.stroke(); }
+    for(let y=0;y>=-33;y-=5){ c.beginPath(); c.moveTo(0,this.py(y)); c.lineTo(W,this.py(y)); c.stroke(); }
+    c.fillStyle='rgba(102,112,124,.9)'; c.font='11px "IBM Plex Mono",monospace';
+    for(let x=10;x<=50;x+=10) c.fillText(x+' m', this.px(x)+4, H-8);
+    for(let y=-10;y>=-30;y-=10) c.fillText(y+' m', 6, this.py(y)-5);
+
+    // 이미 지나온 A→B 구간 — 옅은 회색 실선
+    const ab = this.pathAtoB();
+    c.strokeStyle='#c3ccd6'; c.lineWidth=2.4; c.beginPath();
+    ab.forEach(function(q,i){ i?c.lineTo(this.px(q.x),this.py(q.y)):c.moveTo(this.px(q.x),this.py(q.y)); }, this);
+    c.stroke();
+    // A 지점 표시
+    c.beginPath(); c.arc(this.px(this.AX),this.py(this.AY),6,0,7);
+    c.fillStyle='#c3ccd6'; c.fill();
+    c.font='600 13px "IBM Plex Sans KR",sans-serif'; c.fillStyle='#8894a4';
+    c.fillText('A 던진 곳', this.px(this.AX)+11, this.py(this.AY)+5);
+
+    // 실제 관측 궤적 — 보기 그림과 같은 검은 점선
+    c.setLineDash([9,8]); c.lineCap='round';
+    c.strokeStyle='#2c3a49'; c.lineWidth=2.6; c.beginPath();
+    this.ref.forEach(function(p,i){ i?c.lineTo(this.px(p.x),this.py(p.y)):c.moveTo(this.px(p.x),this.py(p.y)); }, this);
+    c.stroke(); c.setLineDash([]); c.lineCap='butt';
+
+    if(!this.optId){
+      c.fillStyle='#66707c'; c.font='600 16px "IBM Plex Sans KR",sans-serif';
+      c.fillText('위에서 힘을 하나 고르면 B에서부터 그 힘대로 움직입니다.', 24, 34);
+      const h=$('hud'); if(h) h.innerHTML='';
+      return;
+    }
+
+    const idx = Math.min(this.full.length-1, Math.round(this.t/this.DT));
+    const s = this.full[idx];                    // 고른 힘이 작용할 때의 공
+    const r = this.stateAt(this.ref, this.t);    // 실제 관측되는 공 (같은 시각)
+
+    // 출발점 B 표시
+    const B = this.stateB();
+    c.beginPath(); c.arc(this.px(B.x),this.py(B.y),5,0,7);
+    c.fillStyle='#8894a4'; c.fill();
+    c.font='700 14px "IBM Plex Sans KR",sans-serif'; c.fillStyle='#4a5c70';
+    c.fillText('B (출발)', this.px(B.x)-16, this.py(B.y)-14);
+
+    // 지금 어떤 보기가 걸려 있는지 항상 표시
+    const o = OPT[this.optId];
+    c.font='700 15px "IBM Plex Sans KR",sans-serif'; c.fillStyle='#111820';
+    c.textAlign='right';
+    c.fillText(o.no+'번 · '+o.label, this.cv.width-14, 26);
+    c.textAlign='start';
+
+    // 예측 궤적 (현재 시각까지)
+    c.strokeStyle='#1150c8'; c.lineWidth=2.8; c.lineJoin='round'; c.beginPath();
+    for(let i=0;i<=idx;i+=5){ const p=this.full[i];
+      i?c.lineTo(this.px(p.x),this.py(p.y)):c.moveTo(this.px(p.x),this.py(p.y)); }
+    c.stroke();
+
+    // 0.2초 잔상 — 두 공을 같은 시각에 찍어 간격을 직접 비교하게 한다
+    if(this.strobe){
+      for(let tt=0; tt<=this.t+1e-6; tt+=0.2){
+        const q=this.stateAt(this.ref,tt);
+        c.fillStyle='rgba(44,58,73,.30)';
+        c.beginPath(); c.arc(this.px(q.x),this.py(q.y),3.2,0,7); c.fill();
+        const p=this.stateAt(this.full,tt);
+        c.fillStyle='rgba(17,80,200,.45)';
+        c.beginPath(); c.arc(this.px(p.x),this.py(p.y),3.4,0,7); c.fill();
+      }
+    }
+
+    // 실제 공 — 속이 빈 회색 원. 예측 공과 겹치면 정답이라는 뜻.
+    c.beginPath(); c.arc(this.px(r.x),this.py(r.y),12,0,7);
+    c.strokeStyle='#8894a4'; c.lineWidth=2.4; c.stroke();
+
+    // 속도 화살표 — 기본은 숨김 (보기 그림에는 없으므로)
+    if(this.showVel) this.vector(s.x,s.y, s.vx*0.5, s.vy*0.5, '#0b8a6f', 'v');
+
+    // 힘 화살표 — 보기 그림 그대로, 합력이 아니라 각각 따로
+    const fs = this.forces(this.optId, {x:s.vx, y:s.vy});
+    fs.forEach(function(f){
+      this.vector(s.x, s.y, f.x*this.FSC, f.y*this.FSC, '#d81f26', f.label);
+    }, this);
+
+    // 예측 공 — 보기 그림과 같은 회색 구
+    c.beginPath(); c.arc(this.px(s.x),this.py(s.y),9,0,7);
+    c.fillStyle='#a9b4c0'; c.fill(); c.strokeStyle='#4a5c70'; c.lineWidth=1.8; c.stroke();
+
+    // 두 공이 충분히 떨어지면 각각 이름을 붙인다
+    if(Math.hypot(this.px(s.x)-this.px(r.x), this.py(s.y)-this.py(r.y)) > 26){
+      c.font='700 13px "IBM Plex Sans KR",sans-serif'; c.textAlign='center';
+      c.lineWidth=4; c.strokeStyle='#fff';
+      c.strokeText('실제', this.px(r.x), this.py(r.y)-20);
+      c.fillStyle='#66707c'; c.fillText('실제', this.px(r.x), this.py(r.y)-20);
+      c.lineWidth=4; c.strokeStyle='#fff';
+      c.strokeText('예측', this.px(s.x), this.py(s.y)-20);
+      c.fillStyle='#1150c8'; c.fillText('예측', this.px(s.x), this.py(s.y)-20);
+      c.textAlign='start';
+    }
+
+    const h=$('hud');
+    if(h) h.innerHTML =
+      '<span>t <b>'+s.t.toFixed(2)+' s</b></span>'
+    + '<span style="color:#1150c8">예측 &nbsp;vx <b style="color:#1150c8">'+s.vx.toFixed(1)+'</b>'
+      + ' &nbsp;vy <b style="color:#1150c8">'+s.vy.toFixed(1)+'</b>'
+      + ' &nbsp;속력 <b style="color:#1150c8">'+Math.hypot(s.vx,s.vy).toFixed(1)+' m/s</b></span>'
+    + '<span>실제 &nbsp;vx <b>'+r.vx.toFixed(1)+'</b>'
+      + ' &nbsp;vy <b>'+r.vy.toFixed(1)+'</b>'
+      + ' &nbsp;속력 <b>'+Math.hypot(r.vx,r.vy).toFixed(1)+' m/s</b></span>';
+  },
+  vector:function(x,y,dx,dy,color,label){
+    if(Math.hypot(dx,dy)<0.05) return;
+    const c=this.ctx, x1=this.px(x), y1=this.py(y),
+          x2=this.px(x+dx), y2=this.py(y+dy),
+          ang=Math.atan2(y2-y1,x2-x1);
+    c.strokeStyle=color; c.fillStyle=color; c.lineWidth=3.2; c.lineCap='round';
+    c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.stroke();
+    c.beginPath(); c.moveTo(x2,y2);
+    c.lineTo(x2-12*Math.cos(ang-0.4), y2-12*Math.sin(ang-0.4));
+    c.lineTo(x2-12*Math.cos(ang+0.4), y2-12*Math.sin(ang+0.4));
+    c.closePath(); c.fill();
+    if(label){
+      // 화살표 끝에서 진행 방향으로 조금 더 나간 자리에 이름을 쓴다
+      let lx = x2 + 20*Math.cos(ang), ly = y2 + 20*Math.sin(ang);
+      lx = Math.min(Math.max(lx, 34), this.cv.width-34);       // 화면 밖으로 나가지 않게
+      ly = Math.min(Math.max(ly, 14), this.cv.height-14);
+      c.font='700 15px "IBM Plex Sans KR",sans-serif';
+      c.textAlign='center'; c.textBaseline='middle';
+      c.lineWidth=4; c.strokeStyle='#fff';
+      c.strokeText(label, lx, ly);          // 흰 테두리로 배경과 분리
+      c.fillStyle=color; c.fillText(label, lx, ly);
+      c.textAlign='start'; c.textBaseline='alphabetic';
+    }
+  },
+  showVerdict:function(){
+    const el=$('verdict'); if(!el) return;
+    const o=OPT[this.optId];
+    const end=this.full[this.full.length-1];
+    const ref=this.stateAt(this.ref, end.t);
+    if(this.maxDev < 0.25){
+      el.className='verdict match';
+      el.innerHTML='예측 궤적이 실제 관측 궤적과 <b>완전히 겹칩니다.</b> 두 공이 끝까지 함께 움직였습니다.<br>'
+        + 'B를 지난 뒤에도 수평 방향으로는 힘이 없었고, 그래서 vx가 '+end.vx.toFixed(1)
+        + ' m/s로 <b>변하지 않았습니다.</b> 아래로 휘는 것은 오직 중력 때문이고, '
+        + '앞으로 나아가는 운동은 아무 힘 없이도 그대로 유지됩니다.';
+    }else{
+      el.className='verdict nomatch';
+      let why='';
+      if(this.optId==='OPT_T')
+        why='힘이 속도 방향뿐이라 <b>진행 방향이 조금도 꺾이지 않았습니다.</b> 궤적이 휘지 않고 '
+          + '<b>완전한 직선</b>으로 뻗어 나갔고, 속력만 18.3 → '+Math.hypot(end.vx,end.vy).toFixed(1)
+          + ' m/s로 커졌습니다. 궤적을 아래로 휘게 하는 것은 중력인데, 그 중력이 빠졌기 때문입니다.';
+      if(this.optId==='OPT_GT')
+        why='속도 방향으로 힘이 계속 더해져 <b>진행 방향으로 가속</b>됐습니다. vx가 15 → '+end.vx.toFixed(1)+' m/s로 커지면서 '
+          + '잔상 간격이 점점 벌어졌습니다. 실제 공의 vx는 '+ref.vx.toFixed(1)+' m/s 그대로입니다.';
+      if(this.optId==='OPT_GH')
+        why='수평 방향으로 힘이 있으니 <b>수평 방향으로 가속</b>됐습니다. vx가 15 → '+end.vx.toFixed(1)+' m/s로 커져 '
+          + '잔상의 가로 간격이 점점 넓어졌습니다. 실제 공은 가로 간격이 일정합니다.';
+      el.innerHTML='<b>힘이 있는 방향으로 정말 가속이 일어났습니다.</b> 그 결과 실제 관측 궤적과 어긋납니다. '
+        + '(최대 '+this.maxDev.toFixed(1)+' m 차이)<br>'+why
+        + '<br>실제 공은 이렇게 움직이지 않았으므로, 이 힘은 <b>공에 작용하고 있지 않습니다.</b>';
+    }
+  }
+};
+
+
+/* ═════════════════════════════════════════
+   시작
+   ═════════════════════════════════════════ */
+initStudent();
+
+/* ═════════════════════════════════════════
+   7. 시작
+   ═════════════════════════════════════════ */
+initStudent();
+</script>
+</body>
+</html>
