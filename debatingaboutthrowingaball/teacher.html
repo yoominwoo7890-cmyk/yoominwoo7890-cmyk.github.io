@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#e9eef3; --card:#ffffff; --ink:#111820; --muted:#66707c;
+  --line:#d3dbe4; --grid:#dce4ed;
+  --vec:#d81f26;      /* 힘 = 빨강 */
+  --vel:#1150c8;      /* 속도 = 파랑 */
+  --ok:#0d7a5f; --warn:#b45309;
+  --shadow:0 1px 0 rgba(17,24,32,.06), 0 8px 24px -12px rgba(17,24,32,.28);
+  --r:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:'IBM Plex Sans KR',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  color:var(--ink); background-color:var(--paper);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),
+                   linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:26px 26px;
+  -webkit-font-smoothing:antialiased; line-height:1.6;
+}
+.wrap{max-width:1080px;margin:0 auto;padding:22px 18px 80px}
+
+/* ── 헤더 ─────────────────────────────── */
+.topbar{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+  border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:22px}
+.brand{font-weight:700;font-size:17px;letter-spacing:-.02em}
+.brand span{color:var(--vec)}
+.who{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:12.5px;color:var(--muted)}
+
+/* ── 단계 표시 ─────────────────────────── */
+.eyebrow{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.eyebrow b{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;
+  color:var(--vec);letter-spacing:.12em}
+.eyebrow i{flex:1;height:1px;background:var(--line);font-style:normal}
+h1{font-size:26px;font-weight:700;letter-spacing:-.03em;margin:0 0 4px}
+h2{font-size:17px;font-weight:600;letter-spacing:-.02em;margin:26px 0 10px}
+.lede{color:var(--muted);font-size:14.5px;margin:0 0 20px}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  box-shadow:var(--shadow);padding:20px}
+.card + .card{margin-top:16px}
+
+/* ── 버튼 / 입력 ────────────────────────── */
+button{font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;
+  border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink);
+  padding:10px 16px;transition:.13s}
+button:hover{border-color:var(--ink)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible,textarea:focus-visible,
+.opt:focus-visible{outline:2px solid var(--vel);outline-offset:2px}
+.btn-primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn-primary:hover{background:#000}
+.btn-vec{background:var(--vec);color:#fff;border-color:var(--vec)}
+.btn-ghost{background:transparent}
+.btn-mini{padding:5px 11px;font-size:12.5px;border-radius:6px;font-weight:600}
+input[type=text],textarea{width:100%;font-family:inherit;font-size:15px;color:var(--ink);
+  border:1px solid var(--line);border-radius:8px;padding:11px 13px;background:#fdfefe}
+textarea{min-height:120px;resize:vertical;line-height:1.65}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+/* ── 보기 그리드 ────────────────────────── */
+.optgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+@media(max-width:640px){.optgrid{grid-template-columns:1fr}}
+.opt{position:relative;background:#fff;border:1.5px solid var(--line);border-radius:var(--r);
+  padding:12px 12px 10px;cursor:pointer;transition:.13s;text-align:left;width:100%;display:block}
+.opt:hover{border-color:#9aa5b1}
+.opt.sel{border-color:var(--vec);box-shadow:0 0 0 3px rgba(216,31,38,.13)}
+.opt .tag{font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:var(--muted)}
+.opt.sel .tag{color:var(--vec)}
+.opt svg{width:100%;height:auto;display:block}
+.opt.static{cursor:default}
+.opt.static:hover{border-color:var(--line)}
+
+/* ── 개표 스탬프(시그니처) ───────────────── */
+.stamp{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;pointer-events:none}
+.stamp .num{font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:76px;
+  line-height:1;color:var(--vec);
+  width:132px;height:132px;border:3px solid var(--vec);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.82);
+  animation:stampIn .34s cubic-bezier(.2,.9,.3,1.4) both}
+.stamp .pct{margin-top:9px;font-family:'IBM Plex Mono',monospace;font-size:13px;
+  font-weight:600;color:var(--vec);background:rgba(255,255,255,.9);padding:2px 8px;border-radius:99px}
+@keyframes stampIn{from{transform:scale(1.5);opacity:0}to{transform:scale(1);opacity:1}}
+@media(prefers-reduced-motion:reduce){.stamp .num{animation:none}}
+
+/* ── 안내 박스 ─────────────────────────── */
+.note{border-left:3px solid var(--vec);background:#fff;padding:12px 14px;
+  border-radius:0 8px 8px 0;font-size:14px;margin:14px 0}
+.note.ok{border-color:var(--ok)}
+.pill{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:11.5px;
+  font-weight:600;padding:3px 9px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+.pill.on{background:var(--ok);border-color:var(--ok);color:#fff}
+.pill.vec{background:var(--vec);border-color:var(--vec);color:#fff}
+
+/* ── 대기 화면 ─────────────────────────── */
+
+/* ── 교사 대시보드 ──────────────────────── */
+.tgrid{display:grid;grid-template-columns:270px 1fr;gap:16px;align-items:start}
+@media(max-width:860px){.tgrid{grid-template-columns:1fr}}
+.stagebtns{display:flex;flex-direction:column;gap:7px}
+.stagebtn{display:flex;align-items:center;gap:10px;justify-content:flex-start;width:100%}
+.stagebtn.cur{background:var(--ink);color:#fff;border-color:var(--ink)}
+.stagebtn .n{font-family:'IBM Plex Mono',monospace;font-size:12px;opacity:.65}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:11.5px;letter-spacing:.06em;color:var(--muted);text-transform:uppercase;
+   font-family:'IBM Plex Mono',monospace;font-weight:600}
+td.mono{font-family:'IBM Plex Mono',monospace}
+.bar{height:26px;background:var(--vec);border-radius:4px;min-width:3px}
+.barrow{display:grid;grid-template-columns:150px 1fr 52px;gap:10px;align-items:center;margin-bottom:8px;font-size:13.5px}
+.correct{color:var(--ok);font-weight:600}
+.wrongm{color:var(--muted)}
+.stat{display:flex;gap:22px;flex-wrap:wrap;font-family:'IBM Plex Mono',monospace;font-size:13px}
+.stat b{display:block;font-size:24px;font-weight:700;font-family:'IBM Plex Mono',monospace}
+input[type=password]{font-family:inherit;font-size:14px;color:var(--ink);
+  border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:#fff}
+.scroll{max-height:420px;overflow:auto}
+
+/* ── 시뮬레이션 ────────────────────────── */
+canvas{width:100%;height:auto;display:block;border-radius:6px}
+
+.err{color:var(--vec);font-size:13.5px;margin-top:8px;font-weight:500}
+.hide{display:none !important}
+</style>
+</head>
+<body>
+
+<!-- ══════════════ 교사 화면 ══════════════ -->
+<div id="teacherApp" class="wrap">
+  <div class="topbar">
+    <div class="brand">교사 대시보드 <span>·</span> 힘과 운동</div>
+    <div class="who" id="tWho"></div>
+    <button class="btn-ghost btn-mini hide" id="tOut">로그아웃</button>
+  </div>
+
+  <div id="tGate" class="card" style="max-width:420px;margin:40px auto">
+    <div class="eyebrow"><b>TEACHER</b><i></i></div>
+    <h1>비밀번호 입력</h1>
+    <p class="lede">교사만 접근할 수 있는 화면입니다.</p>
+    <input type="password" id="tPw" placeholder="비밀번호"
+      style="width:100%;font-family:inherit;font-size:15px;border:1px solid var(--line);border-radius:8px;padding:11px 13px">
+    <div class="row" style="margin-top:14px">
+      <button class="btn-primary" id="btnLogin">들어가기</button>
+    </div>
+    <div class="err hide" id="tErr"></div>
+  </div>
+
+  <div id="tBody" class="hide"></div>
+</div>
+
+<script type="module">
+/* ═════════════════════════════════════════
+   0. Firebase 연결
+   ═════════════════════════════════════════ */
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+import { getAuth, signInAnonymously, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js";
+import { getFirestore, doc, collection, setDoc, getDocs, deleteDoc,
+         onSnapshot, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
+
+/* ▼▼▼ 여기에 Firebase 콘솔에서 복사한 값을 붙여넣으세요 (index.html 과 같은 값) ▼▼▼ */
+const firebaseConfig = {
+    apiKey: "AIzaSyCJwS8qyO9Ew9MgXo9zLWqxI1jPmLqWxzg",
+    authDomain: "debating-about-throwing-a-ball.firebaseapp.com",
+    projectId: "debating-about-throwing-a-ball",
+    storageBucket: "debating-about-throwing-a-ball.firebasestorage.app",
+    messagingSenderId: "318859589063",
+    appId: "1:318859589063:web:2d4a83fe63384aaa92d5e2"
+  };
+/* ▲▲▲ 여기까지 ▲▲▲ */
+
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
+
+/* ═════════════════════════════════════════
+   1. 공통
+   ═════════════════════════════════════════ */
+
+const OPTIONS = [
+  { id:'OPT_G',  no:2, label:'중력만',                correct:true  },
+  { id:'OPT_T',  no:3, label:'던진 힘(접선)만',        correct:false },
+  { id:'OPT_GT', no:4, label:'중력 + 던진 힘(접선)',   correct:false },
+  { id:'OPT_GH', no:5, label:'중력 + 던진 힘(수평)',   correct:false }
+];
+const OPT = {}; OPTIONS.forEach(function(o){ OPT[o.id]=o; });
+const STAGE_TITLES = ['대기실','문제','정답과 이유는?','토론 후 생각 작성','시뮬레이션 관찰'];
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function showErr(el,msg){ el.textContent = (msg && msg.message) ? msg.message : msg; el.classList.remove('hide'); }
+function fmt(ts){
+  if(!ts || !ts.toDate) return '';
+  const d = ts.toDate();
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+
+/* ═════════════════════════════════════════
+   2. 교사 상태
+   ═════════════════════════════════════════ */
+
+const T = { pass:null, tab:'votes', sig:null,
+            students:[], votes:[], posts:[], sims:[],
+            stage:0, reveal:false, msgTimer:null };
+
+let UID = null;
+let subs = [];
+
+function stopSubs(){ subs.forEach(function(u){ try{ u(); }catch(e){} }); subs = []; }
+
+/* ═════════════════════════════════════════
+   3. 로그인
+   ═════════════════════════════════════════ */
+
+function initTeacher(){
+  $('btnLogin').onclick = doLogin;
+  $('tPw').addEventListener('keydown', function(e){ if(e.key==='Enter') doLogin(); });
+  $('tOut').onclick = teacherLogout;
+
+  onAuthStateChanged(auth, async function(user){
+    if(!user){ try{ await signInAnonymously(auth); }catch(e){ showErr($('tErr'),'연결 실패: '+e.message); } return; }
+    UID = user.uid;
+    const saved = sessionStorage.getItem('phys_pass');
+    if(saved){ $('tPw').value = saved; doLogin(true); }
+  });
+}
+
+/**
+ * 비밀번호는 코드에 없다. 보안 규칙(Firestore Rules)에 적혀 있고,
+ * 맞는 값을 함께 보내야만 쓰기가 통과한다. 그래서 이 파일을 봐도 알 수 없다.
+ */
+async function doLogin(silent){
+  const pw = $('tPw').value;
+  const b = $('btnLogin');
+  $('tErr').classList.add('hide');
+  if(!pw){ if(!silent) showErr($('tErr'),'비밀번호를 입력하세요.'); return; }
+  b.disabled = true; b.textContent = '확인 중…';
+  try {
+    // 현재 단계를 그대로 다시 쓰며 비밀번호를 검사받는다
+    await setDoc(doc(db,'control','state'),
+      { stage: T.stage, reveal: T.reveal, pass: pw, at: serverTimestamp() }, { merge:true });
+    T.pass = pw;
+    sessionStorage.setItem('phys_pass', pw);
+    openDash();
+  } catch(e){
+    sessionStorage.removeItem('phys_pass');
+    showErr($('tErr'), '비밀번호가 맞지 않습니다.');
+  }
+  b.disabled = false; b.textContent = '들어가기';
+}
+
+function teacherLogout(){
+  if(!confirm('로그아웃합니다. 수업 진행 단계는 그대로 유지됩니다.')) return;
+  stopSubs();
+  T.pass = null; T.sig = null;
+  sessionStorage.removeItem('phys_pass');
+  $('tBody').innerHTML = ''; $('tBody').classList.add('hide');
+  $('tWho').textContent = '';
+  $('tOut').classList.add('hide');
+  $('tGate').classList.remove('hide');
+  $('tPw').value = ''; $('tPw').focus();
+}
+
+/* ═════════════════════════════════════════
+   4. 실시간 구독
+   ═════════════════════════════════════════ */
+
+function openDash(){
+  $('tGate').classList.add('hide');
+  $('tBody').classList.remove('hide');
+  $('tOut').classList.remove('hide');
+  listen();
+}
+
+function listen(){
+  stopSubs();
+  const watch = function(coll, key, map){
+    subs.push(onSnapshot(collection(db, coll), function(snap){
+      const arr = [];
+      snap.forEach(function(d){ arr.push(map(d.id, d.data())); });
+      arr.sort(function(a,b){ return String(a.no).localeCompare(String(b.no)); });
+      T[key] = arr;
+      if(key === 'votes') pushTally();
+      render();
+    }, function(e){ console.warn(coll, e.message); }));
+  };
+
+  subs.push(onSnapshot(doc(db,'control','state'), function(s){
+    const c = s.exists() ? s.data() : {};
+    T.stage = Number(c.stage)||0; T.reveal = !!c.reveal;
+    render();
+  }));
+
+  watch('students', 'students', function(id,d){ return { id:id, no:d.no, name:d.name }; });
+  watch('responses','votes',    function(id,d){ return { id:id, no:d.no, name:d.name, optId:d.optId,
+                                   optNo:d.optNo, optLabel:d.optLabel, reason:d.reason, time:fmt(d.at) }; });
+  watch('posts',    'posts',    function(id,d){ return { id:id, no:d.no, name:d.name,
+                                   text:d.text, changed:d.changed, time:fmt(d.at) }; });
+  watch('sims',     'sims',     function(id,d){ return { id:id, no:d.no, name:d.name,
+                                   force:d.force, note:d.note, time:fmt(d.at) }; });
+}
+
+/** 집계는 학생이 직접 못 읽으므로, 교사 화면이 공개용 문서에 옮겨 적는다. */
+async function pushTally(){
+  if(!T.pass) return;
+  const counts = {}; OPTIONS.forEach(function(o){ counts[o.id] = 0; });
+  T.votes.forEach(function(v){ if(counts.hasOwnProperty(v.optId)) counts[v.optId]++; });
+  try {
+    await setDoc(doc(db,'public','tally'),
+      { counts: counts, total: T.votes.length, pass: T.pass, at: serverTimestamp() });
+  } catch(e){ /* 비밀번호가 바뀐 경우 등 */ }
+}
+
+/* ═════════════════════════════════════════
+   5. 교사 조작
+   ═════════════════════════════════════════ */
+
+async function setStage(n){
+  await setDoc(doc(db,'control','state'),
+    { stage: n, reveal: (n===2 ? T.reveal : false), pass: T.pass, at: serverTimestamp() }, { merge:true });
+}
+async function setReveal(on){
+  await setDoc(doc(db,'control','state'),
+    { stage: T.stage, reveal: !!on, pass: T.pass, at: serverTimestamp() }, { merge:true });
+}
+
+function tMsg(text, isError){
+  const el = $('tMsg'); if(!el) return;
+  el.style.color = isError ? 'var(--vec)' : 'var(--ok)';
+  el.textContent = text;
+  clearTimeout(T.msgTimer);
+  T.msgTimer = setTimeout(function(){ if($('tMsg')) $('tMsg').textContent=''; }, 6000);
+}
+
+/** 응답을 CSV 파일로 내려받는다 (스프레드시트 대신) */
+function downloadCsv(){
+  const byId = {};
+  const put = function(arr, fn){ arr.forEach(function(r){
+    if(!byId[r.id]) byId[r.id] = { no:r.no, name:r.name }; fn(byId[r.id], r); }); };
+  put(T.students, function(o,r){});
+  put(T.votes, function(o,r){ o.optNo=r.optNo; o.optLabel=r.optLabel; o.reason=r.reason;
+                              o.correct = (r.optId==='OPT_G') ? 'O' : 'X'; });
+  put(T.posts, function(o,r){ o.post=r.text; o.changed=r.changed; });
+  put(T.sims,  function(o,r){ o.simForce=r.force; o.simNote=r.note; });
+
+  const head = ['학번','이름','선택(번호)','선택(내용)','정답 여부','선택한 이유',
+                '토론 후 생각','생각 변화','시뮬레이션 선택','관찰 기록'];
+  const q = function(v){ return '"' + String(v==null?'':v).replace(/"/g,'""') + '"'; };
+  const rows = Object.keys(byId)
+    .map(function(k){ return byId[k]; })
+    .sort(function(a,b){ return String(a.no).localeCompare(String(b.no)); })
+    .map(function(o){ return [o.no,o.name,o.optNo,o.optLabel,o.correct,o.reason,
+                              o.post,o.changed,o.simForce,o.simNote].map(q).join(','); });
+
+  const csv = '\uFEFF' + head.map(q).join(',') + '\n' + rows.join('\n');
+  const url = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+  const a = document.createElement('a');
+  const d = new Date();
+  a.href = url;
+  a.download = '힘과운동_응답_' + d.getFullYear()
+             + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0') + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  tMsg('CSV 파일을 내려받았습니다. (' + rows.length + '명)');
+}
+
+/** 학생 응답을 모두 지운다 */
+async function resetClass(){
+  if(!confirm('학생 응답과 접속 기록을 모두 지웁니다. 계속할까요?')) return;
+  tMsg('지우는 중…');
+  try {
+    for(const coll of ['responses','posts','sims','students']){
+      const snap = await getDocs(collection(db, coll));
+      for(const d of snap.docs){ await deleteDoc(doc(db, coll, d.id)); }
+    }
+    await setDoc(doc(db,'public','tally'),
+      { counts:{}, total:0, pass:T.pass, at:serverTimestamp() });
+    await setStage(0);
+    tMsg('모두 지웠습니다.');
+  } catch(e){ tMsg('지우기 실패: ' + e.message, true); }
+}
+
+/* ═════════════════════════════════════════
+   6. 그림(SVG)
+   ═════════════════════════════════════════ */
+const TR = { x0:22, y0:26, vx:58, k:15, tMax:4.15, tB:1.8, tC:3.35 };
+let uid = 0;
+
+function tx(t,off){ return TR.x0 + (off||0) + TR.vx*t; }
+function ty(t){ return TR.y0 + TR.k*t*t; }
+function trajD(off){
+  let d='';
+  for(let t=0;t<=TR.tMax+1e-9;t+=0.05){
+    d += (d?'L':'M') + tx(t,off).toFixed(1) + ' ' + ty(t).toFixed(1);
+  }
+  return d;
+}
+function ball(t,label,off){
+  const x=tx(t,off), y=ty(t);
+  return '<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="9" fill="#b9bec6" stroke="#4b5158" stroke-width="1.6"/>'
+       + (label ? '<text x="'+x.toFixed(1)+'" y="'+(y-15).toFixed(1)+'" text-anchor="middle" '
+                + 'font-size="16" font-weight="700" fill="#111820">'+label+'</text>' : '');
+}
+function arrow(x1,y1,x2,y2,mid){
+  return '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2.toFixed(1)+'" y2="'+y2.toFixed(1)+'" '
+       + 'stroke="var(--vec)" stroke-width="3" marker-end="url(#ah'+mid+')"/>';
+}
+function txt(x,y,s,anchor){
+  return '<text x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" text-anchor="'+(anchor||'middle')+'" '
+       + 'font-size="15" font-weight="600" fill="var(--vec)">'+s+'</text>';
+}
+
+/** 보기 그림. optId: OPT_G / OPT_T / OPT_GT / OPT_GH */
+function optionSVG(optId){
+  const id = ++uid;
+  const bx = tx(TR.tB), by = ty(TR.tB);
+  // B점 접선 방향 단위벡터  (dx/dt, dy/dt) = (58, 30t)
+  const dx = TR.vx, dy = 2*TR.k*TR.tB, L = Math.hypot(dx,dy);
+  const ux = dx/L, uy = dy/L;
+
+  let g = '';
+  const hasG = (optId==='OPT_G'||optId==='OPT_GT'||optId==='OPT_GH');
+  const hasT = (optId==='OPT_T'||optId==='OPT_GT');
+  const hasH = (optId==='OPT_GH');
+
+  if(hasG){ g += arrow(bx,by,bx,by+58,id) + txt(bx,by+79,'중력'); }
+  if(hasT){ g += arrow(bx,by,bx+ux*70,by+uy*70,id) + txt(bx+80,by+64,'던진 힘'); }
+  if(hasH){ g += arrow(bx,by,bx+78,by,id) + txt(bx+86,by-14,'던진 힘'); }
+
+  return '<svg viewBox="0 0 320 312" xmlns="http://www.w3.org/2000/svg" role="img">'
+    + '<defs><marker id="ah'+id+'" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5.5" '
+    + 'markerHeight="5.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--vec)"/></marker></defs>'
+    + '<path d="'+trajD(0)+'" fill="none" stroke="#111820" stroke-width="2.6" stroke-dasharray="9 8" stroke-linecap="round"/>'
+    + ball(0,'A') + ball(TR.tC,'C') + ball(TR.tB,'B') + g
+    + '</svg>';
+}
+
+/** 문제 그림(이미지 1) */
+function problemSVG(){
+  const id = ++uid, off = 118;
+  return '<svg viewBox="0 0 420 312" xmlns="http://www.w3.org/2000/svg" role="img">'
+    + '<defs><marker id="ah'+id+'" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5.5" '
+    + 'markerHeight="5.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#111820"/></marker></defs>'
+    + '<path d="'+trajD(off)+'" fill="none" stroke="#111820" stroke-width="2.6" stroke-dasharray="9 8" stroke-linecap="round"/>'
+    + '<line x1="14" y1="'+TR.y0+'" x2="'+(tx(0,off)-14)+'" y2="'+TR.y0+'" stroke="#111820" stroke-width="3.4" marker-end="url(#ah'+id+')"/>'
+    + '<text x="14" y="'+(TR.y0+26)+'" font-size="14.5" font-weight="600" fill="#66707c">수평 방향으로</text>'
+    + '<text x="14" y="'+(TR.y0+45)+'" font-size="14.5" font-weight="600" fill="#66707c">던진 운동</text>'
+    + ball(0,'A',off) + ball(TR.tB,'B',off) + ball(TR.tC,'C',off)
+    + '</svg>';
+}
+
+/* ═════════════════════════════════════════
+   7. 화면 그리기
+   ═════════════════════════════════════════ */
+function render(){
+  const d = {
+    stage: T.stage, stageName: STAGE_TITLES[T.stage] || '', reveal: T.reveal,
+    joined: T.students.length,
+    votes: T.votes, posts: T.posts, sims: T.sims,
+    tally: (function(){
+      const c = {}; OPTIONS.forEach(function(o){ c[o.id]=0; });
+      T.votes.forEach(function(v){ if(c.hasOwnProperty(v.optId)) c[v.optId]++; });
+      return { counts: c, total: T.votes.length };
+    })()
+  };
+  renderTeacher(d);
+}
+
+function renderTeacher(d){
+  $('tWho').textContent = '접속 ' + d.joined + '명 · 현재 ' + String(d.stage).padStart(2,'0') + ' ' + d.stageName;
+
+  // 바뀐 게 없으면 다시 그리지 않는다.
+  // 5초마다 통째로 갈아엎으면 화면이 위로 튀고, 글을 읽던 위치를 잃는다.
+  const sig = JSON.stringify([d, T.tab]);
+  if(sig === T.sig) return;
+  T.sig = sig;
+
+  // 다시 그려야 할 때는 스크롤 위치를 되돌려 준다
+  const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+  const inner = $('tBody').querySelector('.scroll');
+  const innerTop = inner ? inner.scrollTop : 0;
+
+  const stageBtns = STAGE_TITLES.map(function(t,i){
+    return '<button class="stagebtn'+(d.stage===i?' cur':'')+'" data-stage="'+i+'">'
+         + '<span class="n">'+String(i).padStart(2,'0')+'</span> '+t+'</button>';
+  }).join('');
+
+  const totalV = d.tally.total;
+  const bars = OPTIONS.map(function(o){
+    const c = d.tally.counts[o.id]||0;
+    const pct = totalV ? Math.round(c/totalV*100) : 0;
+    return '<div class="barrow"><span class="'+(o.correct?'correct':'wrongm')+'">'
+      + o.no+'번 '+o.label+(o.correct?' ✓':'')+'</span>'
+      + '<div class="bar" style="width:'+(totalV?Math.max(pct,1):0)+'%;'
+      + (o.correct?'':'background:#9aa5b1')+'"></div>'
+      + '<span class="mono">'+c+'명</span></div>';
+  }).join('');
+
+  let table = '';
+  if(T.tab==='votes'){
+    table = '<table><thead><tr><th>학번</th><th>이름</th><th>선택</th><th>선택한 이유</th><th>시각</th></tr></thead><tbody>'
+      + (d.votes.length ? d.votes.map(function(v){
+          const ok = v.optId==='OPT_G';
+          return '<tr><td class="mono">'+esc(v.no)+'</td><td>'+esc(v.name)+'</td>'
+            + '<td class="mono '+(ok?'correct':'wrongm')+'">'+v.optNo+'번 '+(ok?'✓':'')+'<br><span style="font-size:11.5px">'+esc(v.optLabel)+'</span></td>'
+            + '<td style="white-space:pre-wrap">'+esc(v.reason)+'</td>'
+            + '<td class="mono" style="color:var(--muted)">'+esc(v.time)+'</td></tr>';
+        }).join('') : '<tr><td colspan="5" style="color:var(--muted)">아직 제출한 학생이 없습니다.</td></tr>')
+      + '</tbody></table>';
+  }else if(T.tab==='posts'){
+    table = '<table><thead><tr><th>학번</th><th>이름</th><th>생각 변화</th><th>토론 후 생각</th><th>시각</th></tr></thead><tbody>'
+      + (d.posts.length ? d.posts.map(function(v){
+          return '<tr><td class="mono">'+esc(v.no)+'</td><td>'+esc(v.name)+'</td>'
+            + '<td>'+esc(v.changed)+'</td><td style="white-space:pre-wrap">'+esc(v.text)+'</td>'
+            + '<td class="mono" style="color:var(--muted)">'+esc(v.time)+'</td></tr>';
+        }).join('') : '<tr><td colspan="5" style="color:var(--muted)">아직 제출한 학생이 없습니다.</td></tr>')
+      + '</tbody></table>';
+  }else{
+    table = '<table><thead><tr><th>학번</th><th>이름</th><th>고른 힘</th><th>관찰 기록</th><th>시각</th></tr></thead><tbody>'
+      + (d.sims.length ? d.sims.map(function(v){
+          return '<tr><td class="mono">'+esc(v.no)+'</td><td>'+esc(v.name)+'</td>'
+            + '<td class="mono">'+esc(v.force)+'</td><td style="white-space:pre-wrap">'+esc(v.note)+'</td>'
+            + '<td class="mono" style="color:var(--muted)">'+esc(v.time)+'</td></tr>';
+        }).join('') : '<tr><td colspan="5" style="color:var(--muted)">아직 제출한 학생이 없습니다.</td></tr>')
+      + '</tbody></table>';
+  }
+
+  $('tBody').innerHTML =
+    '<div class="tgrid">'
+    + '<div>'
+      + '<div class="card"><div class="eyebrow"><b>STAGE</b><i></i></div>'
+        + '<h2 style="margin:0 0 12px">학생 화면 넘기기</h2>'
+        + '<div class="stagebtns">'+stageBtns+'</div>'
+        + '<div style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px">'
+          + '<div style="font-size:13px;font-weight:600;color:var(--muted);margin-bottom:8px">투표 결과 공개 (02 단계)</div>'
+          + '<button id="btnReveal" class="'+(d.reveal?'btn-vec':'btn-primary')+'" style="width:100%">'
+          + (d.reveal?'결과 감추기':'결과 공개하기')+'</button>'
+          + '<div style="margin-top:8px"><span class="pill '+(d.reveal?'vec':'')+'">'
+          + (d.reveal?'학생 화면에 개표 숫자 표시 중':'학생 화면에는 보기만 보임')+'</span></div>'
+        + '</div>'
+        + '<div style="margin-top:16px;border-top:1px solid var(--line);padding-top:14px" class="row">'
+          + '<button class="btn-ghost" id="btnSummary">CSV 내려받기</button>'
+          + '<button class="btn-ghost" id="btnReset2" style="color:var(--vec);border-color:#f0c4c6">응답 전체 삭제</button>'
+        + '</div>'
+        + '<div id="tMsg" style="font-size:13px;color:var(--ok);margin-top:10px"></div>'
+      + '</div>'
+    + '</div>'
+    + '<div>'
+      + '<div class="card">'
+        + '<div class="stat" style="margin-bottom:16px">'
+          + '<span>접속<b>'+d.joined+'</b></span>'
+          + '<span>답 제출<b>'+d.votes.length+'</b></span>'
+          + '<span>토론 후<b>'+d.posts.length+'</b></span>'
+          + '<span>시뮬<b>'+d.sims.length+'</b></span>'
+        + '</div>'
+        + '<h2 style="margin-top:0">개표 현황</h2>' + bars
+        + '<div class="optgrid" style="margin-top:16px">'
+          + OPTIONS.map(function(o){
+              const c=d.tally.counts[o.id]||0;
+              return '<div class="opt static'+(o.correct?' sel':'')+'">'
+                + '<div class="tag">'+o.no+'번 · '+esc(o.label)+(o.correct?' · 정답':'')+'</div>'
+                + optionSVG(o.id)
+                + (d.reveal?'<div class="stamp"><div class="num">'+c+'</div></div>':'')
+                + '</div>';
+            }).join('')
+        + '</div>'
+      + '</div>'
+      + '<div class="card">'
+        + '<div class="row" style="margin-bottom:12px">'
+          + ['votes','posts','sims'].map(function(k,i){
+              const nm=['02 답과 이유','03 토론 후 생각','04 시뮬 기록'][i];
+              return '<button class="tabb'+(T.tab===k?' btn-primary':'')+'" data-tab="'+k+'">'+nm+'</button>';
+            }).join('')
+        + '</div>'
+        + '<div class="scroll">'+table+'</div>'
+      + '</div>'
+    + '</div></div>';
+
+  const inner2 = $('tBody').querySelector('.scroll');
+  if(inner2 && innerTop) inner2.scrollTop = innerTop;
+  if(scrollY) window.scrollTo(0, scrollY);
+
+  $('tBody').querySelectorAll('.stagebtn').forEach(function(el){
+    el.onclick = function(){ setStage(Number(el.dataset.stage)).catch(function(e){ tMsg('단계 변경 실패: '+e.message, true); }); };
+  });
+  $('btnReveal').onclick = function(){ setReveal(!d.reveal).catch(function(e){ tMsg('공개 전환 실패: '+e.message, true); }); };
+  $('tBody').querySelectorAll('.tabb').forEach(function(el){
+    el.onclick = function(){
+      T.tab = el.dataset.tab;
+      T.sig = null;
+      render();
+    };
+  });
+  $('btnSummary').onclick = downloadCsv;
+  $('btnReset2').onclick = resetClass;
+}
+
+/* ═════════════════════════════════════════
+   8. 시작
+   ═════════════════════════════════════════ */
+initTeacher();
+</script>
+</body>
+</html>
