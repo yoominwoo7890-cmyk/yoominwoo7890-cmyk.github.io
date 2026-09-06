@@ -10,7 +10,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   padding:8px;user-select:none;-webkit-tap-highlight-color:transparent}
 @media(prefers-color-scheme:dark){body{background:#10121a;color:#e8e6df}}
 h1{font-size:13px;font-weight:600;color:#888;letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;text-align:center}
-/* 슬라이더 파라미터: 3개, 모바일에서 2열+1 */
 .params{display:flex;gap:7px;margin-bottom:8px;flex-wrap:wrap}
 .pc{flex:1;min-width:110px;background:#fff;border:0.5px solid #ddd;border-radius:8px;padding:7px 10px}
 @media(prefers-color-scheme:dark){.pc{background:#1c1e28;border-color:#2a2d40}}
@@ -18,12 +17,12 @@ h1{font-size:13px;font-weight:600;color:#888;letter-spacing:.08em;text-transform
 .pv{font-weight:600;color:#222;font-size:12px}
 @media(prefers-color-scheme:dark){.pv{color:#e8e6df}}
 input[type=range]{width:100%;height:6px;accent-color:#1d9e75;touch-action:pan-x;cursor:pointer}
-/* 버튼: 터치 타깃 최소 38px */
 .btns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
 button{cursor:pointer;font-size:11px;font-weight:500;height:38px;padding:0 12px;
   border-radius:8px;border:0.5px solid #ccc;background:#fff;color:#555;
   transition:all .15s;-webkit-tap-highlight-color:transparent;white-space:nowrap}
 button:active{opacity:.7}
+button:focus-visible{outline:2px solid #1d9e75;outline-offset:2px}
 @media(prefers-color-scheme:dark){button{background:#1c1e28;border-color:#2a2d40;color:#9098b0}}
 button.on{background:#e6f7f2;color:#0f6e56;border-color:#5DCAA5}
 @media(prefers-color-scheme:dark){button.on{background:#0d2e22;color:#5DCAA5;border-color:#2d6650}}
@@ -42,7 +41,6 @@ canvas{display:block;width:100%;touch-action:none}
 @media(prefers-color-scheme:dark){.info{background:#1c1e28;border-color:#2a2d40;color:#9098b0}}
 .info b{color:#222}
 @media(prefers-color-scheme:dark){.info b{color:#e8e6df}}
-/* 그래프 wrap을 CSS로 다크모드 처리 */
 .graph-wrap{background:#fff;border:1px solid #e0e0de;border-radius:10px;overflow:hidden;margin-top:8px}
 @media(prefers-color-scheme:dark){.graph-wrap{background:#0c0e14;border-color:#1e2130}}
 .graph-legend{display:flex;gap:14px;margin-top:6px;padding:6px 10px;background:#fff;
@@ -54,7 +52,7 @@ canvas{display:block;width:100%;touch-action:none}
 <h1>전자기유도 · 로런츠 힘</h1>
 <div class="params">
   <div class="pc">
-    <div class="pl">코일 감은 수 <span class="pv" id="vN">3</span></div>
+    <div class="pl">코일 감은 수 N <span class="pv" id="vN">3</span></div>
     <input type="range" id="sN" min="1" max="5" step="1" value="3">
   </div>
   <div class="pc">
@@ -62,323 +60,562 @@ canvas{display:block;width:100%;touch-action:none}
     <input type="range" id="sB" min="0.5" max="3" step="0.1" value="2">
   </div>
   <div class="pc">
-    <div class="pl">단진동 속도 <span class="pv" id="vOscF">0.6 Hz</span></div>
+    <div class="pl">단진동 진동수 <span class="pv" id="vOscF">0.6 Hz</span></div>
     <input type="range" id="sOscF" min="0.1" max="2.0" step="0.1" value="0.6">
   </div>
 </div>
 <div class="btns">
-  <button id="bField"   onclick="tog('field')">자기장 B</button>
-  <button id="bLorentz" onclick="tog('lorentz')">로런츠 힘 F</button>
+  <button id="bField"   onclick="tog('field')">자기력선 B</button>
+  <button id="bLorentz" onclick="tog('lorentz')">전자에 작용하는 힘 F</button>
   <button id="bCurrent" onclick="tog('current')">유도 전류 I</button>
   <button id="bVel"     onclick="tog('vel')">코일 속도 v</button>
-  <button id="bFlip"    onclick="flipMagnet()" style="border-color:#9b59b6;color:#7d3c98">자석 극 반전</button>
+  <button id="bFlip"    onclick="flipMagnet()" style="border-color:#9b59b6;color:#7d3c98">극 반전</button>
   <button id="bOsc"     onclick="togOsc()" style="border-color:#27ae60;color:#1a7a45">단진동 ▶</button>
 </div>
 <div class="cv-wrap"><canvas id="cv"></canvas></div>
 <div class="legend">
-  <div class="li"><div class="lb" style="background:#378ADD"></div>자기장 B</div>
+  <div class="li"><div class="lb" style="background:#378ADD"></div>자기력선 B (굵기 = 세기)</div>
   <div class="li"><div class="lc" style="background:#1a5fb4"></div>전자 e⁻</div>
-  <div class="li"><div class="lb" style="background:#27ae60"></div>로런츠 힘 F</div>
+  <div class="li"><div class="lb" style="background:#27ae60"></div>전자에 작용하는 힘 F</div>
   <div class="li"><div class="lb" style="background:#c0392b"></div>유도 전류 I</div>
   <div class="li"><div class="lb" style="background:#e67e22"></div>코일 속도 v</div>
 </div>
-<div class="info" id="infoBox">자석 또는 코일을 <b>위아래로 드래그</b>하세요. 코일이 움직이면 로런츠 힘 <b>F=qv×B</b>에 의해 전자가 코일을 따라 순환합니다.</div>
+<div class="info" id="infoBox">자석 또는 코일을 위아래로 드래그하세요.</div>
 <div class="graph-wrap"><canvas id="cvGraph"></canvas></div>
 <div class="graph-legend">
   <div class="li"><div class="lb" style="background:#e67e22"></div>상대속도 v_rel</div>
-  <div class="li"><div class="lb" style="background:#c0392b"></div>유도 전류 I (비례)</div>
+  <div class="li"><div class="lb" style="background:#c0392b"></div>유도 기전력 ε = −N·dΦ/dt</div>
 </div>
 
 <script>
+/* ────────────────────────────────────────────────────────────
+   좌표계 메모
+   화면 y는 아래로 증가. 자석은 점 쌍극자로 근사한다.
+   magnetFlip = +1 → N극이 위, -1 → N극이 아래.
+   쌍극자 모멘트의 화면좌표 y성분 my = -magnetFlip.
+   코일을 지나는 자속 Φ ∝ N · B_y(코일 위치)  (법선을 화면 아래쪽으로 잡음)
+   dΦ/dt = N · (∂B_y/∂y) · v_rel,  ε = -dΦ/dt ∝ -N · grad · v_rel
+   ──────────────────────────────────────────────────────────── */
+
 const cv=document.getElementById('cv');
 const ctx=cv.getContext('2d');
 let W=0,H=0;
+
 let nTurns=3,Bstrength=2.0;
-let magnetFlip=-1;
+let magnetFlip=-1;                       // -1 = 아래쪽이 N극 (코일을 향함)
 const show={field:false,lorentz:false,current:false,vel:false};
 
 let magnetY=0.22,coilY=0.72;
 const CX=0.50;
+const MAG_MIN=0.03,MAG_MAX=0.72,COIL_MIN=0.28,COIL_MAX=0.96;
+const VTH=0.0008;                        // 정지로 간주하는 속도 문턱
+
 let dragTarget=null,dragOffY=0;
 let vCoil=0,vMagnet=0;
 let prevCY=0,prevMY=0,prevT=0,firstFrame=true;
 let ePhase=0,eLastDir=1;
 
 let oscOn=false,oscT=0,oscCenter=0.22,oscAmp=0.20,oscFreq=0.6;
-function togOsc(){
-  oscOn=!oscOn;
-  const b=document.getElementById('bOsc');
-  if(oscOn){oscCenter=magnetY;oscT=0;b.textContent='단진동 ■';b.style.background='#eafaf1';}
-  else{b.textContent='단진동 ▶';b.style.background='';}
-}
 
+/* ── 캔버스 ───────────────────────────────────────────────── */
 function resize(){
   const dpr=devicePixelRatio||1;
   const w=cv.parentElement.clientWidth;
   const h=Math.round(Math.max(440,Math.min(580,w*0.92)));
   W=w;H=h;
-  cv.width=w*dpr;cv.height=h*dpr;
+  cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);
   cv.style.width=w+'px';cv.style.height=h+'px';
   ctx.setTransform(dpr,0,0,dpr,0,0);
 }
 window.addEventListener('resize',resize);
 resize();
 
+function isDark(){return matchMedia('(prefers-color-scheme:dark)').matches;}
+function px_(xn){return xn*W;}
+function py_(yn){return yn*H;}
+
+/* ── 자기장 ───────────────────────────────────────────────── */
+/* 자석 중심 기준 상대좌표에서의 쌍극자장. 세기 계수는 뺀 순수 형상. */
+function Bdip(dx,dy,flip){
+  const r=Math.hypot(dx,dy);
+  if(r<5)return{bx:0,by:0,mag:0};
+  const k=4e5,r2=r*r,r3=r2*r;
+  const my=-flip;
+  const mdotr=my*dy;
+  const bx=k*(3*mdotr*dx/r2)/r3;
+  const by=k*(3*mdotr*dy/r2-my)/r3;
+  return{bx,by,mag:Math.hypot(bx,by)};
+}
+function Bvec(qx,qy){
+  const b=Bdip(qx-px_(CX),qy-py_(magnetY),magnetFlip);
+  return{bx:b.bx*Bstrength,by:b.by*Bstrength,mag:b.mag*Bstrength};
+}
+function dBydY(qy){
+  const eps=H*0.005;
+  return(Bvec(px_(CX),qy+eps).by-Bvec(px_(CX),qy-eps).by)/(2*eps);
+}
+
+/* ── 자기력선 캐시 ─────────────────────────────────────────
+   쌍극자 역선의 모양은 자석 위치에 무관하고(평행이동일 뿐),
+   세기에도 무관하다(방향장에서 k가 약분됨).
+   따라서 극성·캔버스 크기가 바뀔 때만 다시 적분한다.        */
+let fieldLines=[],fieldKey='';
+function rebuildFieldLines(){
+  const key=magnetFlip+'|'+Math.round(W)+'|'+Math.round(H);
+  if(key===fieldKey)return;
+  fieldKey=key;
+  fieldLines=[];
+  const mH=H*0.075;
+  const nOff=magnetFlip>0?-mH:mH;        // N극 상대 y
+  const sOff=magnetFlip>0? mH:-mH;       // S극 상대 y
+  const BOUND=Math.max(W,H)*1.8;
+  const STEP=5,MAXS=700,ARROW_EVERY=13;
+  const angs=[-1.57,-1.15,-0.75,-0.38,-0.15,0.15,0.38,0.75,1.15,1.57,
+              -1.95,-2.35,-2.80,1.95,2.35,2.80];
+
+  function trace(startY,forward){
+    let dx=0,dy=0,pts=[];
+    return function(ang){
+      dx=Math.cos(ang)*13;dy=startY+Math.sin(ang)*13;
+      pts=[dx,dy];
+      for(let s=0;s<MAXS;s++){
+        const b=Bdip(dx,dy,magnetFlip);
+        if(b.mag<1e-9)break;
+        const sgn=forward?1:-1;
+        dx+=sgn*b.bx/b.mag*STEP;
+        dy+=sgn*b.by/b.mag*STEP;
+        pts.push(dx,dy);
+        if(Math.abs(dx)>BOUND||Math.abs(dy)>BOUND)break;
+      }
+      return pts;
+    };
+  }
+  const fromN=trace(nOff,true),fromS=trace(sOff,false);
+
+  angs.forEach(function(ang){
+    const onAxis=Math.abs(Math.abs(ang)-Math.PI/2)<0.22;
+    [[fromN(ang),false],[fromS(ang),true]].forEach(function(pair){
+      const pts=pair[0].slice(),rev=pair[1];
+      const arrows=[];
+      for(let i=ARROW_EVERY;i<pts.length/2-1;i+=ARROW_EVERY)arrows.push(i);
+      fieldLines.push({pts,arrows,onAxis,rev});
+    });
+  });
+}
+
+function drawFieldLines(){
+  rebuildFieldLines();
+  const sx=px_(CX),sy=py_(magnetY),s=Bstrength;
+  const aMain=Math.min(0.90,0.22+0.22*s),aSide=Math.min(0.60,0.08+0.15*s);
+  const wMain=1.4+1.0*s,wSide=0.7+0.5*s;
+  ctx.save();
+  ctx.translate(sx,sy);
+  ctx.lineCap='round';
+  fieldLines.forEach(function(L){
+    const a=L.onAxis?aMain:aSide;
+    const p=L.pts;
+    ctx.strokeStyle='rgba(55,138,221,'+a.toFixed(3)+')';
+    ctx.lineWidth=L.onAxis?wMain:wSide;
+    ctx.beginPath();ctx.moveTo(p[0],p[1]);
+    for(let i=2;i<p.length;i+=2)ctx.lineTo(p[i],p[i+1]);
+    ctx.stroke();
+
+    ctx.fillStyle='rgba(55,138,221,'+Math.min(0.95,a+0.15).toFixed(3)+')';
+    const hs=4.5+1.0*s;
+    L.arrows.forEach(function(idx){
+      const i=idx*2;
+      if(i+3>=p.length)return;
+      const ax=p[i],ay=p[i+1];
+      const gx=ax+sx,gy=ay+sy;
+      if(gx<-12||gx>W+12||gy<-12||gy>H+12)return;   // 화면 밖 화살촉 생략
+      let dx=p[i+2]-ax,dy=p[i+3]-ay;
+      if(L.rev){dx=-dx;dy=-dy;}                     // S극에서 역방향 적분한 선
+      const len=Math.hypot(dx,dy)||1;
+      ctx.save();ctx.translate(ax,ay);ctx.rotate(Math.atan2(dy/len,dx/len));
+      ctx.beginPath();ctx.moveTo(hs,0);ctx.lineTo(-hs*0.55,-hs*0.55);ctx.lineTo(-hs*0.55,hs*0.55);
+      ctx.closePath();ctx.fill();ctx.restore();
+    });
+  });
+  ctx.restore();
+}
+
+/* ── 그리기 도우미 ─────────────────────────────────────────── */
+function arrowLine(x1,y1,x2,y2,col,lw,hs){
+  const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy);
+  if(len<3)return;
+  ctx.save();
+  ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=lw||2;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  const aw=hs||9;
+  ctx.translate(x2,y2);ctx.rotate(Math.atan2(dy,dx));
+  ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-aw,-aw*0.42);ctx.lineTo(-aw,aw*0.42);
+  ctx.closePath();ctx.fill();ctx.restore();
+}
+
+function drawMagnet(){
+  const cx=px_(CX),cy=py_(magnetY);
+  const mW=W*0.22,mH=H*0.075;
+  const topIsN=magnetFlip>0;
+  ctx.save();
+  ctx.fillStyle=topIsN?'#c0392b':'#2471a3';
+  ctx.strokeStyle=topIsN?'#922b21':'#1a5276';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.roundRect(cx-mW/2,cy-mH,mW,mH,[6,6,0,0]);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#fff';ctx.font='bold '+Math.round(mH*0.55)+'px sans-serif';
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(topIsN?'N':'S',cx,cy-mH/2);
+  ctx.fillStyle=topIsN?'#2471a3':'#c0392b';
+  ctx.strokeStyle=topIsN?'#1a5276':'#922b21';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.roundRect(cx-mW/2,cy,mW,mH,[0,0,6,6]);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#fff';ctx.fillText(topIsN?'S':'N',cx,cy+mH/2);
+  ctx.restore();
+}
+
+/* ── 코일 ─────────────────────────────────────────────────── */
+function getCoilLayout(){
+  const cx=px_(CX),cy=py_(coilY);
+  return{cx,cy,rx:W*0.28,ry:H*0.10,turnGap:H*0.10*0.55};
+}
+function ellipsePos(ang,turnIdx,L){
+  const oy=(turnIdx-(nTurns-1)/2)*L.turnGap;
+  return{x:L.cx+Math.cos(ang)*L.rx,y:L.cy+oy+Math.sin(ang)*L.ry};
+}
+function tangentVec(ang,L){
+  const tx=-L.rx*Math.sin(ang),ty=L.ry*Math.cos(ang);
+  const len=Math.hypot(tx,ty)||1;
+  return{tx:tx/len,ty:ty/len};
+}
+
+/* eDir = +1 → ePhase 증가 → 앞쪽(화면 아래쪽 반원) 전자가 왼쪽으로 이동
+              → 전류는 앞쪽에서 오른쪽 → 위에서 볼 때 반시계 */
+function drawCoil(vC,vRel,phase,eDir,pass){
+  const L=getCoilLayout();
+  const hasMotion=Math.abs(vRel)>VTH;
+  const N_ELEC=14;
+  const eRadius=Math.min(W,H)*0.011,wireW=Math.min(W,H)*0.036;
+
+  const electrons=[];
+  for(let t=0;t<nTurns;t++){
+    for(let j=0;j<N_ELEC;j++){
+      const ang=(phase+j/N_ELEC)*Math.PI*2;
+      const normAng=((ang%(Math.PI*2))+Math.PI*2)%(Math.PI*2);
+      electrons.push({ang,t,isFront:normAng<Math.PI});
+    }
+  }
+
+  if(pass==='back'){
+    for(let t=nTurns-1;t>=0;t--){
+      ctx.save();
+      ctx.strokeStyle='#9a6c10';ctx.lineWidth=wireW;ctx.lineCap='round';ctx.lineJoin='round';
+      ctx.beginPath();
+      for(let i=0;i<=50;i++){
+        const ang=Math.PI+i/50*Math.PI,p=ellipsePos(ang,t,L);
+        i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y);
+      }
+      ctx.stroke();ctx.restore();
+      electrons.filter(function(e){return e.t===t&&!e.isFront;}).forEach(function(e){
+        const p=ellipsePos(e.ang,t,L);
+        ctx.beginPath();ctx.arc(p.x,p.y,eRadius,0,Math.PI*2);
+        ctx.fillStyle='rgba(26,95,180,0.45)';ctx.fill();
+      });
+    }
+    return;
+  }
+
+  /* front pass */
+  for(let t=0;t<nTurns;t++){
+    ctx.save();
+    const grd=ctx.createLinearGradient(L.cx-L.rx,0,L.cx+L.rx,0);
+    grd.addColorStop(0,'#b8890e');grd.addColorStop(0.5,'#e8b822');grd.addColorStop(1,'#b8890e');
+    ctx.strokeStyle=grd;ctx.lineWidth=wireW;ctx.lineCap='round';ctx.lineJoin='round';
+    ctx.beginPath();
+    for(let i=0;i<=50;i++){
+      const ang=i/50*Math.PI,p=ellipsePos(ang,t,L);
+      i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y);
+    }
+    ctx.stroke();ctx.restore();
+
+    electrons.filter(function(e){return e.t===t&&e.isFront;}).forEach(function(e){
+      const p=ellipsePos(e.ang,t,L);
+      ctx.beginPath();ctx.arc(p.x,p.y,eRadius,0,Math.PI*2);
+      ctx.fillStyle='rgba(26,95,180,0.92)';ctx.fill();
+      ctx.strokeStyle='rgba(140,200,255,0.5)';ctx.lineWidth=1;ctx.stroke();
+      if(show.lorentz&&hasMotion){
+        /* 전자 1개에 작용하는 힘은 감은 수와 무관하므로 N을 곱하지 않는다 */
+        const tv=tangentVec(e.ang,L);
+        const fDir=eDir>=0?1:-1;
+        const fMag=Math.min(eRadius*8,Math.abs(vRel)*Bstrength*H*3+eRadius*1.5);
+        arrowLine(p.x,p.y,p.x+tv.tx*fDir*fMag,p.y+tv.ty*fDir*fMag,'rgba(39,174,96,0.92)',2.5,12);
+      }
+    });
+  }
+
+  if(show.current&&hasMotion){
+    const iDir=eDir>=0?-1:1;                      // 전류는 전자 흐름의 반대
+    const iMag=Math.min(L.rx*0.32,Math.abs(vRel)*Bstrength*H*2.5+L.rx*0.12);
+    for(let t=0;t<nTurns;t++){
+      const ang=Math.PI*0.5,p=ellipsePos(ang,t,L),tv=tangentVec(ang,L);
+      const offY=-eRadius*2.5;
+      arrowLine(p.x-tv.tx*iDir*iMag*0.5,p.y+offY-tv.ty*iDir*iMag*0.5,
+                p.x+tv.tx*iDir*iMag*0.5,p.y+offY+tv.ty*iDir*iMag*0.5,
+                'rgba(192,46,26,0.88)',2.5,11);
+    }
+    const top=ellipsePos(Math.PI*0.5,0,L);
+    ctx.fillStyle='rgba(192,46,26,0.88)';ctx.font='bold 10px sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='bottom';
+    ctx.fillText('I '+(eDir>=0?'반시계':'시계')+' (위에서 볼 때)',top.x,top.y-eRadius*4);
+  }
+
+  if(show.vel){
+    const vLen=Math.min(H*0.28,Math.abs(vC)*H*16+(Math.abs(vC)>VTH?H*0.10:0));
+    if(vLen>5){
+      const vDir=vC>0?1:-1,vx=L.cx-L.rx-W*0.06;
+      arrowLine(vx,L.cy,vx,L.cy+vDir*vLen,'#e67e22',4,18);
+      ctx.fillStyle='#e67e22';ctx.font='bold 11px sans-serif';
+      ctx.textAlign='right';ctx.textBaseline='middle';
+      ctx.fillText('v',vx-6,L.cy+vDir*vLen*0.5);
+    }
+  }
+
+  ctx.fillStyle=isDark()?'#7b8296':'#888';
+  ctx.font='10px sans-serif';ctx.textAlign='center';ctx.textBaseline='top';
+  ctx.fillText('코일 ('+nTurns+'회 감기)',L.cx,L.cy+L.ry+(nTurns-1)*L.turnGap/2+10);
+}
+
+function drawAxis(){
+  const ax=px_(CX);
+  ctx.save();
+  ctx.strokeStyle=isDark()?'rgba(255,255,255,0.09)':'rgba(0,0,0,0.07)';
+  ctx.lineWidth=1;ctx.setLineDash([5,7]);
+  ctx.beginPath();ctx.moveTo(ax,0);ctx.lineTo(ax,H);ctx.stroke();
+  ctx.setLineDash([]);ctx.restore();
+}
+
+/* ── 입력 ─────────────────────────────────────────────────── */
+function getEvY(e){
+  const r=cv.getBoundingClientRect();
+  return(e.touches?e.touches[0]:e).clientY-r.top;
+}
+function hitTest(ey){
+  const L=getCoilLayout();
+  if(Math.abs(ey-py_(magnetY))<H*0.09+16)return'magnet';
+  if(Math.abs(ey-py_(coilY))<L.ry+nTurns*L.turnGap/2+16)return'coil';
+  return null;
+}
+function onDown(e){
+  const y=getEvY(e);
+  dragTarget=hitTest(y);
+  if(dragTarget==='magnet')dragOffY=y-py_(magnetY);
+  if(dragTarget==='coil')dragOffY=y-py_(coilY);
+}
+function onMove(e){
+  if(!dragTarget)return;
+  e.preventDefault();
+  const y=getEvY(e);
+  if(dragTarget==='magnet')magnetY=Math.max(MAG_MIN,Math.min(MAG_MAX,(y-dragOffY)/H));
+  if(dragTarget==='coil')coilY=Math.max(COIL_MIN,Math.min(COIL_MAX,(y-dragOffY)/H));
+}
+function onUp(){
+  if(dragTarget==='magnet'&&oscOn){oscCenter=magnetY;oscT=0;}
+  dragTarget=null;
+}
+cv.addEventListener('mousedown',onDown);
+cv.addEventListener('mousemove',onMove);
+cv.addEventListener('mouseup',onUp);
+cv.addEventListener('mouseleave',onUp);
+cv.addEventListener('touchstart',function(e){e.preventDefault();onDown(e);},{passive:false});
+cv.addEventListener('touchmove',function(e){e.preventDefault();onMove(e);},{passive:false});
+cv.addEventListener('touchend',function(e){e.preventDefault();onUp();},{passive:false});
+
 function tog(k){
   show[k]=!show[k];
   const m={field:'bField',lorentz:'bLorentz',current:'bCurrent',vel:'bVel'};
   document.getElementById(m[k]).className=show[k]?'on':'';
 }
-function flipMagnet(){
-  magnetFlip*=-1;
+function updateFlipButton(){
   const b=document.getElementById('bFlip');
-  b.textContent=magnetFlip>0?'자석 극 반전':'자석 극 반전 (S↕N)';
+  b.textContent=magnetFlip>0?'극 반전 (위 N · 아래 S)':'극 반전 (위 S · 아래 N)';
   b.style.background=magnetFlip<0?'#f5eafb':'';
   b.style.color=magnetFlip<0?'#6c3483':'#7d3c98';
 }
-document.getElementById('sN').addEventListener('input',function(){nTurns=parseInt(this.value);document.getElementById('vN').textContent=nTurns;});
-document.getElementById('sB').addEventListener('input',function(){Bstrength=parseFloat(this.value);document.getElementById('vB').textContent=Bstrength.toFixed(1);});
-document.getElementById('sOscF').addEventListener('input',function(){oscFreq=parseFloat(this.value);document.getElementById('vOscF').textContent=oscFreq.toFixed(1)+' Hz';});
+function flipMagnet(){magnetFlip*=-1;updateFlipButton();}
+updateFlipButton();
 
-// ── 그래프 ───────────────────────────────────────────────────
+function togOsc(){
+  oscOn=!oscOn;
+  const b=document.getElementById('bOsc');
+  if(oscOn){
+    oscCenter=Math.max(MAG_MIN,Math.min(MAG_MAX,magnetY));
+    oscT=0;b.textContent='단진동 ■';b.style.background='#eafaf1';
+  }else{
+    b.textContent='단진동 ▶';b.style.background='';
+  }
+}
+document.getElementById('sN').addEventListener('input',function(){
+  nTurns=parseInt(this.value,10);document.getElementById('vN').textContent=nTurns;});
+document.getElementById('sB').addEventListener('input',function(){
+  Bstrength=parseFloat(this.value);document.getElementById('vB').textContent=Bstrength.toFixed(1);});
+document.getElementById('sOscF').addEventListener('input',function(){
+  oscFreq=parseFloat(this.value);document.getElementById('vOscF').textContent=oscFreq.toFixed(1)+' Hz';});
+
+/* ── 그래프 ───────────────────────────────────────────────── */
 const cvG=document.getElementById('cvGraph');
 const ctG=cvG.getContext('2d');
 let GW=0,GH=0;
-const GBUF=300;
+const GBUF=300,SAMPLE_DT=1/60;            // 고정 샘플 간격 → 시간축 5초
 const vRelBuf=new Array(GBUF).fill(0);
-const iBuf=new Array(GBUF).fill(0);
-let gPtr=0;
+const emfBuf=new Array(GBUF).fill(0);
+let gPtr=0,sampleAcc=0;
+let vScale=0.3,eScale=0.3;
+
 function resizeGraph(){
   const dpr=devicePixelRatio||1;
   const w=cvG.parentElement.clientWidth;
   const h=Math.round(Math.max(130,Math.min(180,w*0.28)));
   GW=w;GH=h;
-  cvG.width=w*dpr;cvG.height=h*dpr;
+  cvG.width=Math.round(w*dpr);cvG.height=Math.round(h*dpr);
   cvG.style.width=w+'px';cvG.style.height=h+'px';
   ctG.setTransform(dpr,0,0,dpr,0,0);
 }
 window.addEventListener('resize',resizeGraph);
 resizeGraph();
-function pushGraphData(vRel,iVal){vRelBuf[gPtr]=vRel;iBuf[gPtr]=iVal;gPtr=(gPtr+1)%GBUF;}
+
+function pushSamples(dt,vRel,emf){
+  sampleAcc+=dt;
+  let n=0;
+  while(sampleAcc>=SAMPLE_DT&&n<8){       // 프레임 드롭 시 최대 8칸까지만 보정
+    vRelBuf[gPtr]=vRel;emfBuf[gPtr]=emf;
+    gPtr=(gPtr+1)%GBUF;sampleAcc-=SAMPLE_DT;n++;
+  }
+  if(sampleAcc>SAMPLE_DT*8)sampleAcc=0;
+}
 function drawGraph(){
   const PL=36,PR=10,PT=18,PB=22;
-  const gW=GW-PL-PR,gH=GH-PT-PB;
-  const d=isDark();
+  const gW=GW-PL-PR,gH=GH-PT-PB,d=isDark();
   ctG.clearRect(0,0,GW,GH);
   ctG.fillStyle=d?'#0c0e14':'#fafaf8';ctG.fillRect(0,0,GW,GH);
-  let maxV=0.001,maxI=0.001;
-  for(let i=0;i<GBUF;i++){maxV=Math.max(maxV,Math.abs(vRelBuf[i]));maxI=Math.max(maxI,Math.abs(iBuf[i]));}
-  ctG.save();ctG.strokeStyle=d?'rgba(255,255,255,0.07)':'rgba(0,0,0,0.07)';ctG.lineWidth=1;
-  [-1,-0.5,0,0.5,1].forEach(function(t){
+
+  /* 감쇠 피크홀드: 스케일이 튀지 않도록 부드럽게 추종 */
+  let vPeak=0,ePeak=0;
+  for(let i=0;i<GBUF;i++){
+    vPeak=Math.max(vPeak,Math.abs(vRelBuf[i]));
+    ePeak=Math.max(ePeak,Math.abs(emfBuf[i]));
+  }
+  vScale+=(Math.max(vPeak,0.15)-vScale)*0.05;
+  eScale+=(Math.max(ePeak,0.15)-eScale)*0.05;
+
+  ctG.save();
+  ctG.strokeStyle=d?'rgba(255,255,255,0.07)':'rgba(0,0,0,0.07)';ctG.lineWidth=1;
+  [-1,-0.5,0.5,1].forEach(function(t){
     const gy=PT+gH/2-t*gH/2;
     ctG.beginPath();ctG.moveTo(PL,gy);ctG.lineTo(PL+gW,gy);ctG.stroke();
-    if(t===0){ctG.strokeStyle=d?'rgba(255,255,255,0.20)':'rgba(0,0,0,0.18)';ctG.beginPath();ctG.moveTo(PL,gy);ctG.lineTo(PL+gW,gy);ctG.stroke();ctG.strokeStyle=d?'rgba(255,255,255,0.07)':'rgba(0,0,0,0.07)';}
   });
+  ctG.strokeStyle=d?'rgba(255,255,255,0.20)':'rgba(0,0,0,0.18)';
+  ctG.beginPath();ctG.moveTo(PL,PT+gH/2);ctG.lineTo(PL+gW,PT+gH/2);ctG.stroke();
   ctG.fillStyle=d?'#666':'#aaa';ctG.font='9px sans-serif';ctG.textAlign='right';
   ctG.fillText('+',PL-3,PT+4);ctG.fillText('0',PL-3,PT+gH/2+3);ctG.fillText('−',PL-3,PT+gH-2);
-  ctG.textAlign='center';ctG.fillStyle=d?'#555':'#bbb';ctG.font='9px sans-serif';
-  ctG.fillText('← 과거',PL+gW*0.2,GH-5);ctG.fillText('현재 →',PL+gW*0.85,GH-5);ctG.restore();
-  ctG.save();ctG.strokeStyle=d?'rgba(255,255,255,0.12)':'rgba(0,0,0,0.12)';ctG.lineWidth=1;ctG.strokeRect(PL,PT,gW,gH);ctG.restore();
-  ctG.fillStyle=d?'#666':'#888';ctG.font='bold 9px sans-serif';ctG.textAlign='left';ctG.fillText('상대속도 · 유도전류',PL+4,PT+11);
-  function drawLine(buf,color,maxVal){
+  ctG.textAlign='center';ctG.fillStyle=d?'#555':'#bbb';
+  ctG.fillText('← 5초 전',PL+gW*0.14,GH-5);ctG.fillText('현재 →',PL+gW*0.88,GH-5);
+  ctG.restore();
+
+  ctG.save();ctG.strokeStyle=d?'rgba(255,255,255,0.12)':'rgba(0,0,0,0.12)';
+  ctG.lineWidth=1;ctG.strokeRect(PL,PT,gW,gH);ctG.restore();
+  ctG.fillStyle=d?'#666':'#888';ctG.font='bold 9px sans-serif';ctG.textAlign='left';
+  ctG.fillText('상대속도 · 유도 기전력',PL+4,PT+11);
+
+  function line(buf,color,scale){
     ctG.save();ctG.strokeStyle=color;ctG.lineWidth=1.6;ctG.lineJoin='round';ctG.beginPath();
-    for(let i=0;i<GBUF;i++){const idx=(gPtr+i)%GBUF;const x=PL+i/GBUF*gW;const v=buf[idx];const y=PT+gH/2-(v/maxVal)*(gH/2)*0.88;i===0?ctG.moveTo(x,y):ctG.lineTo(x,y);}
+    for(let i=0;i<GBUF;i++){
+      const idx=(gPtr+i)%GBUF;
+      const x=PL+i/(GBUF-1)*gW;
+      const y=PT+gH/2-Math.max(-1,Math.min(1,buf[idx]/scale))*(gH/2)*0.88;
+      i===0?ctG.moveTo(x,y):ctG.lineTo(x,y);
+    }
     ctG.stroke();ctG.restore();
   }
-  drawLine(vRelBuf,'rgba(230,126,34,0.85)',maxV);
-  drawLine(iBuf,'rgba(192,46,26,0.85)',maxI);
+  line(vRelBuf,'rgba(230,126,34,0.85)',vScale);
+  line(emfBuf,'rgba(192,46,26,0.85)',eScale);
 }
 
-function isDark(){return matchMedia('(prefers-color-scheme:dark)').matches;}
-function px_(xn){return xn*W;}
-function py_(yn){return yn*H;}
-function Bvec(qx,qy){
-  const sx=px_(CX),sy=py_(magnetY);
-  const dx=qx-sx,dy=qy-sy;
-  const r=Math.hypot(dx,dy);
-  if(r<5)return{bx:0,by:0,mag:0};
-  const k=Bstrength*4e5,r2=r*r,r3=r2*r;
-  const my_=-magnetFlip;
-  const mdotr=my_*dy;
-  const bx=k*(3*mdotr*dx/r2)/r3;
-  const by_=k*(3*mdotr*dy/r2-my_)/r3;
-  return{bx,by:by_,mag:Math.hypot(bx,by_)};
-}
-function dBydY(qy){
-  const eps=H*0.005;
-  const by1=Bvec(px_(CX),qy+eps).by;
-  const by0=Bvec(px_(CX),qy-eps).by;
-  return(by1-by0)/(2*eps);
-}
-
-function drawFieldLines(){
-  const sx=px_(CX),sy=py_(magnetY);
-  const mH=H*0.075;
-  const nPoleY=magnetFlip>0?sy-mH:sy+mH;
-  const sPoleY=magnetFlip>0?sy+mH:sy-mH;
-  ctx.save();ctx.setLineDash([4,5]);
-  const angs=[-1.57,-1.15,-0.75,-0.38,-0.15,0.15,0.38,0.75,1.15,1.57,-1.95,-2.35,-2.80,1.95,2.35,2.80];
-  for(let i=0;i<angs.length;i++){
-    const ang=angs[i];const r0=13;
-    const onAxis=Math.abs(Math.abs(ang)-Math.PI/2)<0.22;
-    ctx.strokeStyle=onAxis?'rgba(55,138,221,0.65)':'rgba(55,138,221,0.28)';
-    ctx.lineWidth=onAxis?3.6:2.0;
-    ctx.beginPath();let qx=sx+Math.cos(ang)*r0,qy=nPoleY+Math.sin(ang)*r0;ctx.moveTo(qx,qy);
-    for(let s=0;s<300;s++){const b=Bvec(qx,qy);if(b.mag<5e-5)break;const step=5;qx+=b.bx/b.mag*step;qy+=b.by/b.mag*step;if(qx<-20||qx>W+20||qy<-20||qy>H+20)break;ctx.lineTo(qx,qy);}
-    ctx.stroke();
-    ctx.beginPath();qx=sx+Math.cos(ang)*r0;qy=sPoleY+Math.sin(ang)*r0;ctx.moveTo(qx,qy);
-    for(let s=0;s<300;s++){const b=Bvec(qx,qy);if(b.mag<5e-5)break;const step=5;qx-=b.bx/b.mag*step;qy-=b.by/b.mag*step;if(qx<-20||qx>W+20||qy<-20||qy>H+20)break;ctx.lineTo(qx,qy);}
-    ctx.stroke();
+/* ── 설명문 ───────────────────────────────────────────────── */
+let lastInfo='';
+function updateInfo(vRel,vC,eDir){
+  let html;
+  if(Math.abs(vRel)<VTH){
+    html='자석 또는 코일을 <b>위아래로 드래그</b>하세요. '+
+         '상대운동이 있어야 자속이 변하고 기전력이 생깁니다.';
+  }else{
+    const sep=Math.sign(coilY-magnetY)*vRel;              // 거리 변화율
+    const near=sep<0?'가까워지며':'멀어지며';
+    const flux=sep<0?'증가':'감소';
+    const iRot=eDir>=0?'반시계':'시계';
+    const front=eDir>=0?'오른쪽 →':'왼쪽 ←';
+    /* 코일이 정지해 있으면 전자에 v×B가 작용하지 않는다 (유도 전기장) */
+    const src=Math.abs(vC)>VTH
+      ? '원인: 로런츠 힘 <b>F = qv×B</b> (운동 기전력)'
+      : '원인: 변하는 자기장이 만든 <b>유도 전기장</b> (∂B/∂t)';
+    html='자석과 코일이 <b>'+near+'</b> 자속의 크기 <b>'+flux+'</b> → '+
+         '유도 전류 <b>'+iRot+'</b> (위에서 볼 때), 앞쪽 도선에서 <b>'+front+'</b><br>'+
+         src+' · 기전력 ε = −N·dΦ/dt 이므로 감은 수 N에 비례';
   }
-  ctx.setLineDash([]);ctx.restore();
+  if(html!==lastInfo){document.getElementById('infoBox').innerHTML=html;lastInfo=html;}
 }
 
-function arrowLine(x1,y1,x2,y2,col,lw,hs){
-  const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy);if(len<3)return;
-  ctx.save();ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=lw||2;ctx.lineCap='round';
-  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
-  const ang=Math.atan2(dy,dx),aw=hs||9;
-  ctx.translate(x2,y2);ctx.rotate(ang);ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-aw,-aw*0.42);ctx.lineTo(-aw,aw*0.42);ctx.closePath();ctx.fill();ctx.restore();
-}
-
-function drawMagnetHalf(){
-  const cx=px_(CX),cy=py_(magnetY);
-  const mW=W*0.22,mH=H*0.075;
-  const topIsN=magnetFlip>0;
-  ctx.save();
-  ctx.fillStyle=topIsN?'#c0392b':'#2471a3';ctx.strokeStyle=topIsN?'#922b21':'#1a5276';ctx.lineWidth=1.5;
-  ctx.beginPath();ctx.roundRect(cx-mW/2,cy-mH,mW,mH,[6,6,0,0]);ctx.fill();ctx.stroke();
-  ctx.fillStyle='#fff';ctx.font=`bold ${Math.round(mH*0.55)}px sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(topIsN?'N':'S',cx,cy-mH/2);
-  ctx.fillStyle=topIsN?'#2471a3':'#c0392b';ctx.strokeStyle=topIsN?'#1a5276':'#922b21';ctx.lineWidth=1.5;
-  ctx.beginPath();ctx.roundRect(cx-mW/2,cy,mW,mH,[0,0,6,6]);ctx.fill();ctx.stroke();
-  ctx.fillStyle='#fff';ctx.fillText(topIsN?'S':'N',cx,cy+mH/2);ctx.restore();
-}
-
-function getCoilLayout(){
-  const cx=px_(CX),cy=py_(coilY);
-  const rx=W*0.28,ry=H*0.10,turnGap=ry*0.55;
-  return{cx,cy,rx,ry,turnGap};
-}
-function ellipsePos(ang,turnIdx,L){
-  const{cx,cy,rx,ry,turnGap}=L;
-  const oy=(turnIdx-(nTurns-1)/2)*turnGap;
-  return{x:cx+Math.cos(ang)*rx,y:cy+oy+Math.sin(ang)*ry};
-}
-function drawCoil(vC,vM,phase,eDir,coilPass){
-  const L=getCoilLayout();
-  const{cx,cy,rx,ry,turnGap}=L;
-  const vRel=vC-vM;
-  const hasMotion=Math.abs(vRel)>0.0005;
-  const N_ELEC=14,eRadius=Math.min(W,H)*0.011,wireW=Math.min(W,H)*0.036;
-  function tangentVec(ang){const tx=-rx*Math.sin(ang),ty=ry*Math.cos(ang),len=Math.hypot(tx,ty)||1;return{tx:tx/len,ty:ty/len};}
-  const electrons=[];
-  for(let t=0;t<nTurns;t++){
-    for(let j=0;j<N_ELEC;j++){
-      const ang=((phase+j/N_ELEC)*Math.PI*2);
-      const normAng=((ang%(Math.PI*2))+Math.PI*2)%(Math.PI*2);
-      electrons.push({ang,normAng,t,isFront:normAng<Math.PI});
-    }
-  }
-  if(coilPass==='back'||coilPass==='all'){
-    for(let t=nTurns-1;t>=0;t--){
-      ctx.save();ctx.strokeStyle='#9a6c10';ctx.lineWidth=wireW;ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();
-      for(let i=0;i<=50;i++){const ang=Math.PI+i/50*Math.PI;const p=ellipsePos(ang,t,L);i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y);}
-      ctx.stroke();ctx.restore();
-      electrons.filter(e=>e.t===t&&!e.isFront).forEach(e=>{const pos=ellipsePos(e.ang,t,L);ctx.beginPath();ctx.arc(pos.x,pos.y,eRadius,0,Math.PI*2);ctx.fillStyle='rgba(26,95,180,0.45)';ctx.fill();});
-    }
-  }
-  if(coilPass==='front'||coilPass==='all'){
-    for(let t=0;t<nTurns;t++){
-      ctx.save();const grd=ctx.createLinearGradient(cx-rx,0,cx+rx,0);grd.addColorStop(0,'#b8890e');grd.addColorStop(0.5,'#e8b822');grd.addColorStop(1,'#b8890e');
-      ctx.strokeStyle=grd;ctx.lineWidth=wireW;ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();
-      for(let i=0;i<=50;i++){const ang=i/50*Math.PI;const p=ellipsePos(ang,t,L);i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y);}
-      ctx.stroke();ctx.restore();
-      electrons.filter(e=>e.t===t&&e.isFront).forEach(e=>{
-        const pos=ellipsePos(e.ang,t,L);
-        ctx.beginPath();ctx.arc(pos.x,pos.y,eRadius,0,Math.PI*2);ctx.fillStyle='rgba(26,95,180,0.92)';ctx.fill();ctx.strokeStyle='rgba(140,200,255,0.5)';ctx.lineWidth=1;ctx.stroke();
-        if(show.lorentz&&hasMotion){const tv=tangentVec(e.ang);const fDir=eDir>=0?1:-1;const fMag=Math.min(eRadius*8,(Math.abs(vRel)*Bstrength)*H*3+eRadius*1.5);arrowLine(pos.x,pos.y,pos.x+tv.tx*fDir*fMag,pos.y+tv.ty*fDir*fMag,'rgba(39,174,96,0.92)',2.5,12);}
-      });
-    }
-    if(show.current&&hasMotion){
-      for(let t=0;t<nTurns;t++){
-        const ang=Math.PI*0.5,pos=ellipsePos(ang,t,L),tv=tangentVec(ang);
-        const iDir=eDir>=0?-1:1,iMag=Math.min(rx*0.32,(Math.abs(vRel)*Bstrength)*H*2.5+rx*0.12),offY=-eRadius*2.5;
-        arrowLine(pos.x-tv.tx*iDir*iMag*0.5,pos.y+offY-tv.ty*iDir*iMag*0.5,pos.x+tv.tx*iDir*iMag*0.5,pos.y+offY+tv.ty*iDir*iMag*0.5,'rgba(192,46,26,0.88)',2.5,11);
-      }
-      const topPos=ellipsePos(Math.PI*0.5,0,L);
-      ctx.fillStyle='rgba(192,46,26,0.88)';ctx.font='bold 10px sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText('I (코일 내)',topPos.x,topPos.y-eRadius*4);
-      if(Math.abs(vC)>0.0005){
-        const iVertLen=Math.min(H*0.22,Math.abs(vC)*H*14+H*0.08);
-        const iVertSign=vC>0?-1:1,ix=cx+rx+W*0.06;
-        arrowLine(ix,cy,ix,cy+iVertSign*iVertLen,'rgba(192,46,26,0.88)',4,18);
-        ctx.fillStyle='rgba(192,46,26,0.88)';ctx.font='bold 11px sans-serif';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText('I',ix+7,cy+iVertSign*iVertLen*0.5);
-        ctx.font='9px sans-serif';ctx.fillText('(v 반대)',ix+7,cy+iVertSign*iVertLen*0.5+13);
-      }
-    }
-    if(show.vel){
-      const vLen=Math.min(H*0.28,Math.abs(vC)*H*16+(Math.abs(vC)>0.0005?H*0.10:0));
-      if(vLen>5){const vDir=vC>0?1:-1,vx_=cx-rx-W*0.06;arrowLine(vx_,cy,vx_,cy+vDir*vLen,'#e67e22',4,18);ctx.fillStyle='#e67e22';ctx.font='bold 11px sans-serif';ctx.textAlign='right';ctx.textBaseline='middle';ctx.fillText('v',vx_-6,cy+vDir*vLen*0.5);}
-    }
-    ctx.fillStyle='#888';ctx.font='10px sans-serif';ctx.textAlign='center';ctx.textBaseline='top';ctx.fillText(`코일 (${nTurns}회 감기)`,cx,cy+ry+(nTurns-1)*turnGap/2+10);
-  }
-  function tangentVec(ang){const tx=-rx*Math.sin(ang),ty=ry*Math.cos(ang),len=Math.hypot(tx,ty)||1;return{tx:tx/len,ty:ty/len};}
-}
-
-function drawAxis(){
-  const ax=px_(CX);ctx.save();ctx.strokeStyle='rgba(0,0,0,0.07)';ctx.lineWidth=1;ctx.setLineDash([5,7]);ctx.beginPath();ctx.moveTo(ax,0);ctx.lineTo(ax,H);ctx.stroke();ctx.setLineDash([]);ctx.restore();
-}
-
-function getEvY(e){const r=cv.getBoundingClientRect();return(e.touches?e.touches[0]:e).clientY-r.top;}
-function hitTest(ey){
-  const mCY=py_(magnetY),cCY=py_(coilY),L=getCoilLayout();
-  if(Math.abs(ey-mCY)<H*0.09+16)return 'magnet';
-  if(Math.abs(ey-cCY)<L.ry+nTurns*L.turnGap/2+16)return 'coil';
-  return null;
-}
-function onDown(e){const y=getEvY(e);dragTarget=hitTest(y);if(dragTarget==='magnet')dragOffY=y-py_(magnetY);if(dragTarget==='coil')dragOffY=y-py_(coilY);}
-function onMove(e){if(!dragTarget)return;e.preventDefault();const y=getEvY(e);if(dragTarget==='magnet')magnetY=Math.max(0.03,Math.min(0.72,(y-dragOffY)/H));if(dragTarget==='coil')coilY=Math.max(0.28,Math.min(0.96,(y-dragOffY)/H));}
-function onUp(){dragTarget=null;}
-cv.addEventListener('mousedown',onDown);cv.addEventListener('mousemove',onMove);cv.addEventListener('mouseup',onUp);cv.addEventListener('mouseleave',onUp);
-cv.addEventListener('touchstart',e=>{e.preventDefault();onDown(e);},{passive:false});
-cv.addEventListener('touchmove',e=>{e.preventDefault();onMove(e);},{passive:false});
-cv.addEventListener('touchend',e=>{e.preventDefault();onUp();},{passive:false});
-
-function updateInfo(vRel,fZ){
-  const box=document.getElementById('infoBox');
-  if(Math.abs(vRel)<0.0005){box.innerHTML='자석 또는 코일을 <b>위아래로 드래그</b>하세요. 상대운동 시 플럭스 변화 → 로런츠 힘 <b>F=qv×B</b> → 전자 순환 (교류 생성)';return;}
-  const dir=vRel>0?'자석에서 멀어지는 방향(아래)':'자석 쪽(위)으로';
-  const eRot=fZ>0?'반시계 방향':'시계 방향';
-  const iDir=vRel<0?'위쪽 ↑':'아래쪽 ↓';
-  box.innerHTML=`코일이 <b>${dir}</b>으로 이동 → 자속 변화 → 전자 <b>${eRot}</b> 순환<br>→ 유도 전류: <b>${iDir}</b> | 방향을 바꾸면 전류 방향도 반전 (교류)`;
-}
-
+/* ── 메인 루프 ────────────────────────────────────────────── */
+const V_TAU=0.05;                          // 속도 평활 시상수
 function frame(ts){
   if(firstFrame){prevCY=coilY;prevMY=magnetY;prevT=ts;firstFrame=false;}
-  const dt=Math.min((ts-prevT)/1000,0.05)||0.016;prevT=ts;
-  if(oscOn){oscT+=dt;const omega=oscFreq*Math.PI*2;magnetY=oscCenter+oscAmp*Math.sin(oscT*omega);vMagnet=oscAmp*omega*Math.cos(oscT*omega);prevMY=magnetY;}
-  else{vMagnet=(magnetY-prevMY)/dt;prevMY=magnetY;}
-  vCoil=(coilY-prevCY)/dt;prevCY=coilY;
+  const dt=Math.min((ts-prevT)/1000,0.05)||0.016;
+  prevT=ts;
+  const smooth=1-Math.exp(-dt/V_TAU);
+
+  if(oscOn&&dragTarget!=='magnet'){
+    /* 진폭을 드래그 한계 안으로 클램프해 자석이 화면 밖으로 나가지 않게 한다 */
+    const ampMax=Math.max(0,Math.min(oscCenter-MAG_MIN,MAG_MAX-oscCenter));
+    const amp=Math.min(oscAmp,ampMax);
+    const omega=oscFreq*Math.PI*2;
+    oscT+=dt;
+    magnetY=oscCenter+amp*Math.sin(oscT*omega);
+    vMagnet=amp*omega*Math.cos(oscT*omega);   // 해석적 속도
+    prevMY=magnetY;
+  }else{
+    if(oscOn){oscCenter=magnetY;oscT=0;}      // 진동 중 드래그 → 중심 재설정
+    const raw=(magnetY-prevMY)/dt;
+    vMagnet+=(raw-vMagnet)*smooth;
+    prevMY=magnetY;
+  }
+  const rawC=(coilY-prevCY)/dt;
+  vCoil+=(rawC-vCoil)*smooth;
+  prevCY=coilY;
+  if(Math.abs(vCoil)<1e-4)vCoil=0;
+  if(!oscOn&&Math.abs(vMagnet)<1e-4)vMagnet=0;
+
   const vRel=vCoil-vMagnet;
   const grad=dBydY(py_(coilY));
-  const fZ=-vRel*grad;
-  if(Math.abs(vRel)>0.0005)eLastDir=fZ>0?-1:1;
+  const emf=-nTurns*grad*vRel;               // ε = −N·dΦ/dt
+  if(Math.abs(vRel)>VTH)eLastDir=emf>0?-1:1; // 전자 순환 방향
   const eDir=eLastDir;
-  const hasRelMotion=Math.abs(vRel)>0.0005;
-  if(hasRelMotion)ePhase=((ePhase+eLastDir*Math.abs(vRel)*Bstrength*0.4*dt)%1+1)%1;
+  if(Math.abs(vRel)>VTH)
+    ePhase=((ePhase+eDir*Math.abs(vRel)*Bstrength*0.4*dt)%1+1)%1;
 
-  ctx.fillStyle=isDark()?'#0c0e14':'#ffffff';ctx.fillRect(0,0,W,H);
+  ctx.fillStyle=isDark()?'#0c0e14':'#ffffff';
+  ctx.fillRect(0,0,W,H);
   drawAxis();
+
+  /* 자기력선은 축을 포함한 화면 평면 위에 있으므로
+     코일 뒤쪽 반원보다는 앞, 앞쪽 반원보다는 뒤에 그린다 */
+  drawCoil(vCoil,vRel,ePhase,eDir,'back');
   if(show.field)drawFieldLines();
-  const Lcheck=getCoilLayout();
-  const magCY=py_(magnetY),coilCYcheck=py_(coilY),magHcheck=H*0.075;
-  const coilTopCheck=coilCYcheck-Lcheck.ry-(nTurns-1)*Lcheck.turnGap/2;
-  const coilBotCheck=coilCYcheck+Lcheck.ry+(nTurns-1)*Lcheck.turnGap/2;
-  const magnetInCoil=(magCY+magHcheck>coilTopCheck&&magCY-magHcheck<coilBotCheck);
-  if(magnetInCoil){drawCoil(vCoil,vMagnet,ePhase,eDir,'back');drawMagnetHalf();drawCoil(vCoil,vMagnet,ePhase,eDir,'front');}
-  else{drawCoil(vCoil,vMagnet,ePhase,eDir,'all');drawMagnetHalf();}
-  updateInfo(vRel,fZ);
-  const iVal=-fZ*800;pushGraphData(vRel,iVal);drawGraph();
-  ctx.fillStyle='rgba(0,0,0,0.14)';ctx.font='10px sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';ctx.fillText('↕ 드래그: 자석 또는 코일',px_(CX),H-4);
+  drawMagnet();
+  drawCoil(vCoil,vRel,ePhase,eDir,'front');
+
+  updateInfo(vRel,vCoil,eDir);
+  pushSamples(dt,vRel,emf*800);
+  drawGraph();
+
+  ctx.fillStyle=isDark()?'rgba(255,255,255,0.20)':'rgba(0,0,0,0.16)';
+  ctx.font='10px sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';
+  ctx.fillText('↕ 드래그: 자석 또는 코일',px_(CX),H-4);
+
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
