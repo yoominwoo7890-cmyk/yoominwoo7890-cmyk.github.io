@@ -1,1 +1,3620 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>민코프스키 시공간</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#f8fafc;color:#1a1a2e;font-family:'DM Sans',sans-serif;height:100vh;display:flex;overflow:hidden;user-select:none}
+#sidebar{width:196px;flex-shrink:0;background:#f1f5f9;border-right:1px solid #e2e8f0;display:flex;flex-direction:column;padding:8px;gap:6px;overflow-y:auto}
+.grp{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:7px;display:flex;flex-direction:column;gap:5px}
+.btnrow{display:flex;gap:4px}
+.btnrow .btn{text-align:center}
+.btnrow .play{flex:1;background:#1e293b;color:#fff;font-weight:bold;border-color:#1e293b}
+.btnrow #btnReset{width:34px;flex:none}
+.hint{font-size:8px;color:#94a3b8;font-family:'DM Mono',monospace}
+.logo{font-family:'DM Mono',monospace;font-size:10px;color:#64748b;letter-spacing:.08em;text-transform:uppercase}
+.logo b{color:#1a1a2e;font-size:14px;display:block;margin-bottom:2px;letter-spacing:0;text-transform:none;font-family:'DM Sans',sans-serif}
+hr{border:none;border-top:1px solid #e2e8f0;margin:1px 0}
+.sec{font-family:'DM Mono',monospace;font-size:8px;text-transform:uppercase;letter-spacing:.10em;color:#94a3b8}
+.row{display:flex;flex-direction:column;gap:2px}
+.row label{font-size:10px;color:#64748b;display:flex;justify-content:space-between}
+.row label span{font-family:'DM Mono',monospace;color:#1a1a2e;font-weight:500}
+input[type=range]{width:100%;height:4px;-webkit-appearance:none;background:#e2e8f0;border-radius:2px;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:#2563eb;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.seg{display:flex;border:1px solid #e2e8f0;border-radius:5px;overflow:hidden}
+.seg.wrap2{flex-wrap:wrap}
+.seg.wrap2 button{flex:1 1 45%}
+.seg button{flex:1;background:transparent;border:none;padding:5px 3px;font-size:9px;color:#64748b;cursor:pointer;font-family:'DM Mono',monospace;transition:all .15s}
+.seg button.act{background:#1a1a2e;color:#fff}
+.btn{width:100%;padding:5px 6px;border:1px solid #e2e8f0;border-radius:5px;background:#f1f5f9;color:#1a1a2e;font-size:9px;cursor:pointer;font-family:'DM Mono',monospace;transition:all .15s;text-align:left}
+.btn.on{background:#1a1a2e;color:#fff;border-color:#1a1a2e}
+.eq{background:#f8fafc;border-radius:5px;padding:5px;font-family:'DM Mono',monospace;font-size:8px;line-height:1.8;color:#1a1a2e;border:1px solid #e2e8f0}
+.eq .cm{color:#94a3b8}
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#diagWrap{flex:1;position:relative;overflow:hidden}
+#spaceWrap{height:260px;flex-shrink:0;border-top:1px solid #e2e8f0;position:relative;background:#0b1026}
+#spaceLabel{position:absolute;top:6px;left:10px;font-family:'DM Mono',monospace;font-size:9px;color:#94a3b8;letter-spacing:.1em;pointer-events:none}
+canvas{width:100%;height:100%;display:block;cursor:crosshair}
+.tip{position:absolute;background:#1a1a2e;color:#fff;font-family:'DM Mono',monospace;font-size:10px;padding:4px 8px;border-radius:4px;pointer-events:none;white-space:nowrap;display:none;z-index:10}
+</style>
+</head>
+<body>
+<div id="sidebar">
+  <div class="logo"><b>민코프스키 시공간</b>MINKOWSKI SPACETIME · v3.1</div>
 
+  <div class="grp">
+    <div class="sec">① 운동 시나리오</div>
+    <div class="hint">기초 — 현상</div>
+    <div class="seg">
+      <button class="act" id="bInertial">등속</button>
+      <button id="bAccel">등가속</button>
+      <button id="bOrbit">궤도</button>
+    </div>
+    <div class="hint">역설 — 해소</div>
+    <div class="seg wrap2">
+      <button id="bTwin">쌍둥이</button>
+      <button id="bBarn">막대·헛간</button>
+      <button id="bBell">벨</button>
+    </div>
+    <div class="row" id="rowBeta">
+      <label>상대속도 β = v/c <span id="vBeta">0.00</span></label>
+      <input type="range" id="sBeta" min="-0.95" max="0.95" step="0.01" value="0">
+    </div>
+    <div class="row" id="rowAlpha" style="display:none">
+      <label>고유가속도 α <span id="vAlpha">0.3</span> (c²/ly)</label>
+      <input type="range" id="sAlpha" min="0.1" max="5.0" step="0.1" value="0.3">
+    </div>
+    <div class="row" id="rowTurn" style="display:none">
+      <label>반환 구간 (여행시간 비율) <span id="vTurn">순간 반전</span></label>
+      <input type="range" id="sTurn" min="0" max="0.6" step="0.02" value="0">
+    </div>
+    <div class="row" id="rowBreak" style="display:none">
+      <label>실의 한계 γ_b <span id="vBreak">1.50</span></label>
+      <input type="range" id="sBreak" min="1.1" max="3.0" step="0.05" value="1.5">
+    </div>
+    <div class="row" id="rowMass" style="display:none">
+      <div class="sec">블랙홀 질량 M</div>
+      <div class="seg wrap2">
+        <button class="act" id="bM10">10 M☉</button>
+        <button id="bM21">Cyg X-1</button>
+        <button id="bMSgr">Sgr A*</button>
+        <button id="bM87">M87*</button>
+      </div>
+      <div class="hint">M을 바꿔도 그림은 한 픽셀도 안 바뀐다 — 눈금만 바뀜</div>
+    </div>
+    <div class="row" id="rowOrbiter" style="display:none">
+      <div class="sec">궤도체</div>
+      <div class="seg">
+        <button class="act" id="bShip">우주선</button>
+        <button id="bLight">빛</button>
+      </div>
+    </div>
+    <div class="row" id="rowOrbR" style="display:none">
+      <label>궤도 반지름 <span id="vOrbR">—</span></label>
+      <input type="range" id="sOrbR" min="0" max="1" step="0.004" value="0.72">
+      <div class="hint" id="orbNote"></div>
+    </div>
+  </div>
+
+  <div class="grp" id="grpView">
+    <div class="sec">② 관점 (누구의 좌표계?)</div>
+    <div class="seg">
+      <button class="act" id="bViewS">정지계 S</button>
+      <button id="bViewSP">운동계 S'</button>
+    </div>
+  </div>
+
+  <div class="grp">
+    <div class="sec">③ 재생</div>
+    <div class="btnrow">
+      <button class="btn play" id="btnBall">▶ 진행</button>
+      <button class="btn" id="btnReset" title="초기화">↺</button>
+    </div>
+    <div class="row">
+      <label>시간 흐름 속도 <span id="vSpeed">1.00×</span></label>
+      <input type="range" id="sSpeed" min="0.25" max="3" step="0.05" value="1">
+    </div>
+  </div>
+
+  <div class="grp">
+    <div class="sec">④ 학습 모드 · 하나만 선택</div>
+    <button class="btn" id="btnShip">▭  길이수축 (길이 우주선)</button>
+    <button class="btn" id="btnClock">⏱  시간팽창 (고유시간·광시계)</button>
+    <button class="btn" id="btnSignal">📡  도플러 (광신호)</button>
+    <div class="seg" id="segSignal" style="display:none">
+      <button class="act" id="bSigA">A 발사</button>
+      <button id="bSigB">B 발사</button>
+    </div>
+    <div class="hint">같은 버튼을 다시 누르면 해제</div>
+  </div>
+
+  <div class="grp" id="grpInterval">
+    <div class="sec">⑤ 시공간 간격</div>
+    <button class="btn on" id="btnInterval">◇  Δs² 측정 (다이어그램 클릭)</button>
+  </div>
+
+  <div class="grp">
+    <div class="sec">범례</div>
+    <div style="font-size:10px;line-height:2;color:#64748b;font-family:'DM Mono',monospace">
+      <span style="color:#2563eb">─</span> <span id="legendS">정지계 S</span><br>
+      <span style="color:#dc2626">─</span> <span id="legendSP">운동계 S'</span><br>
+      <span id="legendRay"><span style="color:#f59e0b">╌</span> 광선 (45°)</span>
+      <span id="legendHz" style="display:none"><span style="color:#7c3aed">╌</span> 린들러 지평선</span>
+      <span id="legendPh" style="display:none"><span style="color:#7c3aed">╌</span> 광자구 3GM/c²<br><span style="color:#94a3b8">╌</span> 그림자 3√3GM/c²<br><span style="color:#e2e8f0">●</span> 지평선 2GM/c²</span>
+    </div>
+  </div>
+
+  <div class="eq">
+    <div id="eqMink">
+      <div>ds²= −c²dt²+ dx²</div>
+      <div class="cm">── 민코프스키 계량</div>
+    </div>
+    <div id="eqOrbit" style="display:none">
+      <div>ds²=−(1−r_s/r)c²dt²</div>
+      <div>&nbsp;&nbsp;&nbsp;+dr²/(1−r_s/r)+r²dΩ²</div>
+      <div class="cm">── 슈바르츠실트 계량</div>
+      <div style="margin-top:4px">Ω= dφ/dt= √(GM/r³)</div>
+      <div class="cm">── 원궤도 (케플러 그대로)</div>
+      <div style="margin-top:4px">dτ/dt= √(1−3GM/rc²)</div>
+      <div class="cm">── 궤도 시계 (r=3M에서 0)</div>
+    </div>
+    <div id="eqAccel" style="display:none">
+      <div style="margin-top:4px">x²−(ct)²= (c²/α)²</div>
+      <div class="cm">── 쌍곡선 운동</div>
+      <div style="margin-top:4px">ds²=−(1+αρ)²dτ²+dρ²</div>
+      <div class="cm">── 린들러 계량</div>
+    </div>
+  </div>
+</div>
+<div id="main">
+  <div id="diagWrap">
+    <canvas id="cv"></canvas>
+    <div class="tip" id="tip"></div>
+  </div>
+  <div id="spaceWrap">
+    <div id="spaceLabel">SPACE VIEW — 관성계 S의 공간 (t=const 동시면 절단)</div>
+    <canvas id="cvSpace"></canvas>
+  </div>
+</div>
+<script>
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const cvS = document.getElementById('cvSpace');
+const ctxS = cvS.getContext('2d');
+const SPACE_H = 260;
+const tip = document.getElementById('tip');
+const DPR = Math.min(window.devicePixelRatio||1, 2);
+let W=0, H=0, scale=80, OX=0, OY=0;
+let beta=0, alpha=0.3;
+let motionType='inertial', viewMode='S';
+let twinTurnFrac=0; // 쌍둥이: 반환 구간이 전체 좌표시간에서 차지하는 비율 (0=순간 반전)
+let twCamU=0;       // 쌍둥이 S' 관점의 카메라 부스트 = s·v_B(현재) — 매 프레임 갱신
+let twOffX=0, twOffCt=0; // 카메라 평행이동 (부스트 후 좌표): B의 현재 사건을 (0,τ_B)에 고정
+let bnU=0;          // 막대·헛간 카메라 부스트 = s·β (원점=정렬 사건 기준 순수 부스트)
+let bnShared=null;  // drawBarn → drawSpace 공유 (문 상태·플래시·절단 시각)
+let bellBreakG=1.5; // 벨: 실의 파단 한계 γ_b (γ가 이 값에 닿으면 끊어짐)
+let blU=0, blOX=0, blOC=0; // 벨 순간계 카메라: 부스트 + 평행이동 (A를 (0,τ_A)에 고정)
+let blShared=null;  // drawBell → drawSpace 공유
+let bhMass=10;           // 궤도: 중심 블랙홀 질량 [M☉]
+let orbiter='ship';      // 궤도: 'ship' | 'light'
+let orbSlider=0.215;     // 궤도 반지름 슬라이더 (0~1, 로그 사상)
+let orbShared=null;      // drawOrbit → drawSpace 공유
+// 토글 버튼 없이 항상 켜져 있는 표시 플래그.
+// 주의: show4A(4가속도 a^μ)는 등가속 모드의 drawAccel에서만 사용된다.
+// 다른 시나리오의 공(drawBall4V)은 4속도 u^μ만 그린다 — 의도된 현재 동작이며,
+// 범위를 넓히려면 drawBall4V에 a^μ 화살표를 추가할 것.
+let show4V=true, show4A=true, showInterval=true, showRindler=true, showLightCone=true;
+let mouseX=0, mouseY=0, mouseOnCanvas=false;
+let eventPt=null; // 시공간 간격 사건 — 항상 민코프스키(S) 좌표로 저장 (물리적 사건에 고정)
+let animT=0, animating=false, animStart=0, animFrom=0, animTo=0;
+let ballT=0, ballRunning=false, ballPaused=false, ballAnimStart=0, ballPausedAt=0;
+let timeSpeed=1; // 시간 흐름 속도 배율 (애니메이션)
+let showShip=false; // 길이 우주선 모드 (길이 수축 시각화)
+let showClock=false; // 시간팽창 모드 (고유시간 눈금 + 시계)
+let showSignal=false, sigEmitter='A'; // 광신호 모드: A 또는 B가 Δτ=0.5 간격 발사
+const SIG_DTAU=0.5; // 고유시간 눈금(Δτ=0.5)과 동일 — 눈금마다 발신
+let sigPhotons=[]; // drawSignals가 채우고 drawSpace가 읽음 (우주 뷰 광자)
+const L0PX=120; // 고유길이 L0 = 1.5단위 (화면 px)
+const BALL_DUR=4000; // 공 이동 총 시간(ms)
+// 막대·헛간: 길이 축소(Lb=1, Lp=1.5)로 이야기가 고정 화면 안에서 완결 →
+// 스크롤·줌 없이 다른 모드처럼 4초 고정 재생 (시간 진행률이 β와 무관한 상수)
+function ballDur(){ return BALL_DUR; }
+const ANIM_DUR=600;
+const C={s:'#2563eb',sp:'#dc2626',light:'#f59e0b',rind:'#7c3aed',prop:'#059669',grid:'#dde3ec',gridR:'rgba(220,38,38,0.18)'};
+
+let xShift=0; // 좌표평면 수평 이동 (등가속: 출발점 (r0,0)을 화면 중앙에)
+let ctShift=0; // 좌표평면 세로 이동 (막대·헛간: 지금-절단을 y=OY에 고정하는 스크롤, 줌 없음)
+function toScreen(x,ct){return[OX+x*scale-xShift, OY-(ct-ctShift)*scale];}
+function toWorld(sx,sy){return[(sx-OX+xShift)/scale, (OY-sy)/scale+ctShift];}
+function lorentz(x,ct,b){const g=1/Math.sqrt(1-b*b);return[g*(x-b*ct),g*(ct-b*x)];}
+
+function resize(){
+  W=cv.parentElement.clientWidth; H=cv.parentElement.clientHeight;
+  cv.width=W*DPR; cv.height=H*DPR;
+  cv.style.width=W+'px'; cv.style.height=H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  OX=W/2; OY=H*0.62;
+  cvS.width=W*DPR; cvS.height=SPACE_H*DPR;
+  cvS.style.width=W+'px'; cvS.style.height=SPACE_H+'px';
+  ctxS.setTransform(DPR,0,0,DPR,0,0);
+}
+// 렌더링은 mainLoop 하나가 전담한다 (아래 참고). 상태만 바꾸고 draw()는 부르지 않는다.
+window.addEventListener('resize',()=>{resize();});
+
+// 관점 전환 애니메이션: 상태만 설정하고, 진행은 draw() 첫머리의 updateAnim()이 담당.
+// (별도 rAF 루프를 두면 mainLoop과 매 프레임 중복으로 draw가 돌았다)
+function startAnim(from,to){
+  animFrom=from; animTo=to; animT=from;
+  animating=true; animStart=performance.now();
+}
+function updateAnim(){
+  if(!animating) return;
+  const p=Math.min(1,(performance.now()-animStart)/ANIM_DUR);
+  const e=p<0.5?2*p*p:1-Math.pow(-2*p+2,2)/2;
+  animT=animFrom+(animTo-animFrom)*e;
+  if(p>=1){animT=animTo;animating=false;}
+}
+
+function arrowHead(x1,y1,x2,y2,color){
+  const L=9,W2=4,angle=Math.atan2(y2-y1,x2-x1);
+  ctx.fillStyle=color;
+  ctx.save();ctx.translate(x2,y2);ctx.rotate(angle);
+  ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(-L,-W2);ctx.lineTo(-L,W2);
+  ctx.closePath();ctx.fill();ctx.restore();
+}
+
+// ═══════════════ 쌍둥이 역설: 세계선 수학 ═══════════════
+// B의 여정(민코프스키 S 좌표, |x| 크기 좌표로 계산 후 sd로 부호화):
+//   [0,t1] 등속 +β → [t1,t2] 고유가속도 α_t의 쌍곡선 감속·반전 → [t2,T] 등속 −β
+//   Δt_turn = twinTurnFrac·T,  α_t = 2βγ/Δt_turn  (비율 0이면 순간 반전)
+//   반환 구간 해석해: η(τ)=φ−α_t·τ_loc (rapidity 선형 감소), φ=atanh β
+//     t(τ)=t1+(sinhφ−sinhη)/α_t,  x(τ)=x1+(coshφ−coshη)/α_t  → 정점 x1+(γ−1)/α_t
+//   τ_B 총합 = 2t1/γ + 2φ/α_t  (순간 반전 극한에서 T/γ)
+function twinParams(){
+  const bm=Math.min(0.949,Math.abs(beta));
+  const sd=(beta<0)?-1:1;
+  const T=Math.max(1.0,(OY-30)/scale); // 재회 사건이 화면 상단 근처에 오도록
+  if(bm<0.01) return {deg:true,T,sd,bm:0,g:1,phi:0,t1:T/2,t2:T/2,dtT:0,aT:Infinity,x1:0,xApex:0,dTauTurn:0,tauTotal:T};
+  const g=1/Math.sqrt(1-bm*bm), phi=Math.atanh(bm);
+  const dtT=twinTurnFrac*T;
+  const t1=(T-dtT)/2, t2=t1+dtT;
+  let aT=Infinity, dTauTurn=0;
+  if(dtT>1e-6){aT=2*bm*g/dtT; dTauTurn=2*phi/aT;}
+  const x1=bm*t1;
+  const xApex=x1+(dtT>1e-6?(g-1)/aT:0);
+  const tauTotal=2*(t1/g)+dTauTurn;
+  return {deg:false,T,sd,bm,g,phi,dtT,aT,t1,t2,x1,xApex,dTauTurn,tauTotal};
+}
+function twinXm(p,t){ // |x_B|(t)
+  if(p.deg)return 0;
+  if(t<=p.t1)return p.bm*t;
+  if(t>=p.t2)return Math.max(0,p.x1-p.bm*(t-p.t2));
+  const eta=Math.asinh(Math.sinh(p.phi)-p.aT*(t-p.t1));
+  return p.x1+(Math.cosh(p.phi)-Math.cosh(eta))/p.aT;
+}
+function twinVm(p,t){ // d|x|/dt
+  if(p.deg)return 0;
+  if(t<p.t1)return p.bm;
+  if(t>p.t2)return -p.bm;
+  if(p.dtT<=1e-6)return 0;
+  return Math.tanh(Math.asinh(Math.sinh(p.phi)-p.aT*(t-p.t1)));
+}
+function twinTau(p,t){ // B의 경과 고유시간
+  if(p.deg)return t;
+  if(t<=p.t1)return t/p.g;
+  if(t>=p.t2)return p.tauTotal-(p.T-t)/p.g;
+  const eta=Math.asinh(Math.sinh(p.phi)-p.aT*(t-p.t1));
+  return p.t1/p.g+(p.phi-eta)/p.aT;
+}
+function twinEv(p,tau){ // τ_B → [|x|, t] (역함수, 반환 구간 해석해)
+  if(p.deg)return[0,tau];
+  const tc=p.t1/p.g;
+  if(tau<=tc)return[p.bm*p.g*tau, p.g*tau];
+  if(tau>=tc+p.dTauTurn){
+    const t3=tau-tc-p.dTauTurn;
+    return[Math.max(0,p.x1-p.bm*p.g*t3), p.t2+p.g*t3];
+  }
+  const eta=p.phi-p.aT*(tau-tc);
+  return[p.x1+(Math.cosh(p.phi)-Math.cosh(eta))/p.aT,
+         p.t1+(Math.sinh(p.phi)-Math.sinh(eta))/p.aT];
+}
+function twinBendNow(prog){ // 현재 B의 고유가속도 (반환 구간에서만 α_t)
+  if(motionType!=='twin')return 0;
+  const p=twinParams();
+  if(p.deg||p.dtT<=1e-6)return 0;
+  const tN=Math.max(prog,0)*p.T;
+  return (tN>p.t1&&tN<p.t2)?p.aT:0;
+}
+function twinRecvA(p,te){ // A가 t=te에 쏜 빛을 B가 받는 좌표시간
+  // g(t)=|x_B|(t)−(t−te): g(te)≥0, g(T)≤0, 단조감소 → 이분법
+  let lo=te,hi=p.T;
+  for(let i=0;i<40;i++){const m=(lo+hi)/2;(twinXm(p,m)-(m-te)>=0)?lo=m:hi=m;}
+  return (lo+hi)/2;
+}
+// 쌍둥이 모드 화면 사상: S 사건 → 부스트 Λ(twCamU) → 평행이동 → 화면
+// 부스트+평행이동 = 포앵카레 변환: 광선 45°, ds², 직선성 모두 보존.
+// 이동 성분이 필요한 이유: 귀로 세계선은 원점을 지나지 않아, 원점 기준 부스트만으론
+// B의 정지 위치가 x'=γ(x1+βt2)로 밀려나 고속에서 화면 밖으로 사라짐.
+function twS(x,ct){
+  let X=x, CT=ct;
+  if(Math.abs(twCamU)>=1e-9){const r=lorentz(x,ct,twCamU);X=r[0];CT=r[1];}
+  return toScreen(X+twOffX, CT+twOffCt);
+}
+function twInvW(wx,wct){ // 카메라 세계좌표(toWorld 결과) → S 좌표
+  const cx=wx-twOffX, cct=wct-twOffCt;
+  if(Math.abs(twCamU)<1e-9)return[cx,cct];
+  return lorentz(cx,cct,-twCamU);
+}
+
+// ═══════════════ 막대와 헛간 역설: 파라미터 ═══════════════
+// 헛간(고유길이 Lb): S 정지, 문 x=∓Lb/2. 막대(고유길이 Lp>Lb): 속도 β로 통과.
+// 원점 = 두 중심의 정렬 사건 → 핵심 사건이 대칭:
+//   E₁ (뒤끝 입장·앞문 닫힘) = (−Lb/2, −t*), E₂ (앞끝 도달·뒷문 열림) = (+Lb/2, +t*)
+//   t* = (Lb − Lp/γ)/(2β) — t*>0 ⟺ γ>Lp/Lb ⟺ 헛간계에서 밀폐 순간 존재
+//   막대계 시각: t'(E₁) = −t'(E₂) = (Lpγ−Lb)/(2βγ²) > 0 항상
+//   → 막대계에선 언제나 E₂가 먼저 (밀폐 없음).
+//   간격의 성질: β > β* = (Lp²−Lb²)/(Lp²+Lb²) = 5/13 ≈ 0.385 일 때만 공간꼴
+//   (순서가 관점 의존 — 역설의 반전은 이 영역). β < β*에선 시간꼴이라 순서가
+//   절대적(느린 긴 막대: 앞끝 퇴장이 뒤끝 입장보다 먼저임은 모든 계에서 동일).
+function barnParams(){
+  const bm=Math.min(0.949,Math.abs(beta));
+  const sd=(beta<0)?-1:1;
+  const Lb=1.0, Lp=1.5; // 비율 1.5 유지 → β_c=√5/3 동일. 화면 내 완결을 위한 축소
+  if(bm<0.05) return {deg:true,sd,Lb,Lp};
+  const g=1/Math.sqrt(1-bm*bm);
+  const Lc=Lp/g;                       // 헛간계에서 본 막대 길이
+  const tS=(Lb-Lc)/(2*bm);             // t* (부호 = 밀폐 여부)
+  const tp1=g*(bm*Lb/2-tS);            // t'(E₁) = −t'(E₂), 항상 > 0
+  const bC=Math.sqrt(1-(Lb/Lp)*(Lb/Lp)); // 임계속도
+  // 재생 창 = 보이는 화면의 ct 구간 (스크롤·줌 없음, 다른 모드와 동일한 고정 화면)
+  const tLo=-(H-OY-26)/scale, tHi=(OY-34)/scale;
+  return {deg:false,sd,Lb,Lp,bm,g,Lc,tS,tp1,bC,tLo,tHi};
+}
+
+// ═══════════════ 벨의 우주선 역설: 파라미터·수학 ═══════════════
+// 정지 거리 d로 떨어진 두 우주선 A(뒤, x0A=−d/2)·B(앞, x0B=+d/2)가 S 기준
+// 같은 순간(t=0) 동일한 고유가속도 α로 점화. 세계선 = 같은 쌍곡선의 평행이동:
+//   x_i(t) = x0i + (√(1+α²t²)−1)/α,  v(t)=αt/√(1+α²t²),  τ(t)=asinh(αt)/α
+// S에선 매 순간 두 배의 속도·고유시간이 같고 간격도 d로 불변 — 그런데 실은 끊어짐:
+//   속도 v인 실의 자연 길이는 d/γ → 강제 간격 d = γ배 신장. 순간계 간격 = γd.
+//   파단: γ(t)=γ_b ⟺ t_br = √(γ_b²−1)/α  (실 중앙 사건에서 파단으로 모델링)
+// 보른 강체 대조: A와 강체를 이루려면 B는 같은 중심의 동심 쌍곡선(반지름 1/α+d,
+//   즉 고유가속도 α/(1+αd) < α)을 그려야 함 — 실제 B와의 간극 = 실의 신장.
+function bellParams(){
+  const a=alpha, d=1.5, gB=bellBreakG;
+  const tBr=Math.sqrt(Math.max(0,gB*gB-1))/a;
+  const tLo=-0.8, tHi=(OY-34)/scale; // 짧은 점화 전 구간 + 화면 상단까지
+  return {a,d,gB,tBr,tLo,tHi,x0A:-d/2,x0B:d/2};
+}
+function bellX(x0,t){ if(t<=0) return x0; const a=alpha; return x0+(Math.sqrt(1+a*a*t*t)-1)/a; }
+function bellV(t){ if(t<=0) return 0; const a=alpha; return a*t/Math.sqrt(1+a*a*t*t); }
+function bellG(t){ if(t<=0) return 1; const a=alpha; return Math.sqrt(1+a*a*t*t); }
+function bellTau(t){ if(t<=0) return 0; const a=alpha; return Math.asinh(a*t)/a; }
+function bellEvTau(x0,tau){ const a=alpha; const t=Math.sinh(a*tau)/a; return [bellX(x0,t),t]; }
+// 카메라 동시면(기울기 u, A의 사건 (xA,tA) 통과) ∩ 세계선 x0: t 해 (단조 → 이분법)
+// 해는 tA 이상이며 u→1에서 ~1/(1−u)로 커지므로 상한을 동적으로 잡음
+function bellSliceT(x0,tA,xA,u){
+  let lo=tA-1e-9;
+  let hi=tA+Math.min(1200, (Math.max(0,u)*(Math.abs(x0-xA)+10))/(Math.max(1e-3,1-u))+4);
+  for(let i=0;i<60;i++){
+    const m=(lo+hi)/2;
+    (((m-tA)-u*(bellX(x0,m)-xA))<=0)?lo=m:hi=m;
+  }
+  return (lo+hi)/2;
+}
+// 벨 화면 사상: S 사건 → 부스트 Λ(blU) → 평행이동 (A의 현재 사건을 (0,τ_A)에 고정)
+function beS(x,ct){
+  let X=x,CT=ct;
+  if(Math.abs(blU)>=1e-9){const r=lorentz(x,ct,blU);X=r[0];CT=r[1];}
+  return toScreen(X+blOX,CT+blOC);
+}
+function beInvW(wx,wct){ // 카메라 세계좌표 → S 좌표
+  const cx=wx-blOX, cct=wct-blOC;
+  if(Math.abs(blU)<1e-9)return[cx,cct];
+  return lorentz(cx,cct,-blU);
+}
+// 변형률 색: γ의 한계 대비 진행도 → 초록→호박→빨강
+function bellStrainColor(g,gB){
+  const r=Math.max(0,Math.min(1,(g-1)/(gB-1)));
+  const mix=(c1,c2,f)=>c1.map((v,i)=>Math.round(v+(c2[i]-v)*f));
+  const c=r<0.5?mix([34,197,94],[245,158,11],r*2):mix([245,158,11],[239,68,68],(r-0.5)*2);
+  return 'rgb('+c[0]+','+c[1]+','+c[2]+')';
+}
+
+// ═══════════════ 중력 원궤도 (슈바르츠실트): 파라미터·수학 ═══════════════
+// 길이 단위 = M ≡ GM/c² (기하 단위 G=c=1). 적도면 원궤도 r=const:
+//   Ω = dφ/dt = √(M/r³)            ← 좌표시간 기준으로는 케플러 제3법칙이 정확히 성립
+//   좌표 주기 cT = 2π r^{3/2}
+//   좌표 접선속도 v_c = rΩ = √(M/r)
+//   좌표 광속: 접선 √(1−2M/r), 반경 (1−2M/r)  ← 국소 광원뿔이 찌그러지는 이유
+//   국소 정지 관측자가 재는 궤도 속도 v = √(M/r)/√(1−2M/r)  → r=6M에서 정확히 0.5c
+//   dτ/dt = √(1−3M/r)  (중력 + 운동 시간지연의 곱), r=3M에서 0 → 광자구
+// 질량 있는 물체: r>3M에서만 원궤도 존재, r≥6M에서만 안정(ISCO).
+// 빛: 원궤도는 r=3M 하나뿐이고 항상 불안정 → orbiter='light'이면 r을 3으로 고정.
+// 진공 슈바르츠실트 해에서 M은 유일한 스케일이다. 모든 길이·시간을 M으로 재면
+// 방정식에 M이 남지 않으므로 v_국소·dτ/dt·나선의 감김·광원뿔 찌그러짐은 전부 r/M만의
+// 함수다 → M을 바꿔도 그림은 완전히 동일하고, 초·km 환산 계수만 M에 선형으로 바뀐다.
+//   T = 2π(r/M)^{3/2}·GM/c³,   GM☉/c³ = 4.9255 µs,   GM☉/c² = 1.4766 km
+function orbitParams(){
+  const M_km=1.4766*bhMass;   // GM/c² [km]
+  const Rbody=2;              // 사건의 지평선 r_s = 2GM/c² [M]
+  // 빛은 광자구(3M)가 유일한 원궤도, 우주선은 3.2M~60M 로그 스윕
+  const r=(orbiter==='light')?3:3.2*Math.pow(60/3.2,orbSlider);
+  const Om=Math.sqrt(1/(r*r*r));
+  const cT=2*Math.PI*Math.pow(r,1.5);
+  const vCoord=Math.sqrt(1/r);
+  const cTan=Math.sqrt(Math.max(1e-12,1-2/r));
+  const cRad=Math.max(1e-12,1-2/r);
+  const vLoc=Math.min(1,vCoord/cTan);
+  const dtaudt=Math.sqrt(Math.max(0,1-3/r));
+  return {M_km,Rbody,r,Om,cT,vCoord,cTan,cRad,vLoc,dtaudt,
+          dtauStat:cTan,
+          stable:(orbiter==='light')?false:(r>=6),
+          isLight:(orbiter==='light'),
+          secPerM:M_km/299792.458};                      // 기하 길이 1M → 초
+}
+function fmtKm(km){
+  if(km>=9.4607e12) return (km/9.4607e12).toFixed(3)+' 광년';
+  if(km>=1.4e7) return (km/1.495979e8).toFixed(3)+' AU';
+  if(km>=1e6)   return (km/1e6).toFixed(2)+'e6 km';
+  if(km>=100)   return km.toFixed(0)+' km';
+  if(km>=1)     return km.toFixed(2)+' km';
+  return (km*1000).toFixed(0)+' m';
+}
+function fmtSec(s){
+  if(s<1e-3)   return (s*1e6).toFixed(1)+' µs';
+  if(s<1)      return (s*1e3).toFixed(2)+' ms';
+  if(s<120)    return s.toFixed(2)+' s';
+  if(s<7200)   return (s/60).toFixed(1)+' 분';
+  if(s<172800) return (s/3600).toFixed(1)+' 시간';
+  if(s<6.9e7)  return (s/86400).toFixed(1)+' 일';
+  return (s/3.15576e7).toFixed(2)+' 년';
+}
+
+// ═══════════════ DRAW ═══════════════
+// ═══════════════ 공 A/B 위치 계산 ═══════════════
+// 등가속 애니메이션의 시간 상한 (해석적)
+function getAccelParams(){
+  const a_=alpha, r0_=1/a_;
+  // s=0 (S 영화): B가 카메라 기준 화면 오른쪽 안 + 다이어그램 세로 안
+  const xMaxDisp=(W-6-OX)/scale; // 출발점(중앙)부터 오른쪽 여유 (경계 침범 방지)
+  const ctTop=Math.min((OY-10)/scale, Math.sqrt(Math.max(0,Math.pow(xMaxDisp+r0_,2)-r0_*r0_)));
+  // s=1 (S' 영화): 세로 + A가 화면 왼쪽 안 (지평선이 화면 밖인 작은 α 대비)
+  let tauTop=(OY-10)/scale;
+  const leftRoom=(OX+2)/scale;
+  if(r0_>leftRoom){
+    const chMax=1/(1-leftRoom/r0_);
+    tauTop=Math.min(tauTop, Math.acosh(Math.max(1.0001,chMax))/a_);
+  }
+  return {ctTop, tauTop};
+}
+
+function getBallPositions(t, prog){
+  // prog: 0~1 (원점에서 출발, 세계선 위 진행)
+  const a_=alpha, r0_=1/a_; // 로컬 계산
+  let posA, posB;
+
+  if(motionType==='inertial'){
+    const bSP=beta*(1-t), bS=-beta*t;
+    // 원점(ct=0)에서 화면 위 끝까지
+    const ctEnd=(OY-10)/scale;
+    const ct=prog*ctEnd; // 원점(0)부터 출발
+    const[paX,paY]=toScreen(ct*bS, ct);
+    posA={px:paX, py:paY};
+    const[pbX,pbY]=toScreen(ct*bSP, ct);
+    posB={px:pbX, py:pbY};
+
+  } else if(motionType==='twin'){
+    const pTw=twinParams();
+    const tN=Math.max(prog,0)*pTw.T;
+    const xB=pTw.sd*twinXm(pTw,tN), vB=pTw.sd*twinVm(pTw,tN);
+    // A의 "현재" 사건: 관점의 동시면 기준 (S: t=tN / B 순간계: 동시선 교점 tN−v·x_B)
+    // → B 순간계에서 A까지의 화면 거리가 정확히 x_B/γ (길이수축)로 나옴
+    const ctA=(1-t)*tN+t*Math.max(0,Math.min(pTw.T,tN-vB*xB));
+    const pa=twS(0,ctA), pb=twS(xB,tN);
+    posA={px:pa[0],py:pa[1]};
+    posB={px:pb[0],py:pb[1]};
+
+  } else {
+    // 각 관점의 "영화"는 그 좌표계의 시간이 균등하게 흘러야 함:
+    // s=0(S): 좌표시간 ct 균등 진행 / s=1(S'): 린들러 τ 균등 진행
+    const {ctTop,tauTop}=getAccelParams();
+    const ct0=ctTop*prog, tau1=tauTop*prog;
+    // s=0 끝점: S 좌표시간 ct0의 스냅숏 (A: x=r0 정지, B: 쌍곡선 x=√(r0²+ct²))
+    const[pa0x,pa0y]=toScreen(r0_,ct0);
+    const xB0=Math.sqrt(r0_*r0_+ct0*ct0);
+    const[pb0x,pb0y]=toScreen(xB0,ct0);
+    // s=1 끝점: 린들러 시간 tau1의 스냅숏 (B: ρ=0 정지, A: 지평선으로 낙하)
+    const rhoA=r0_/Math.cosh(a_*tau1)-r0_;
+    const[pa1x,pa1y]=toScreen(rhoA,tau1);
+    const[pb1x,pb1y]=toScreen(0,tau1);
+    posA={px:(1-t)*pa0x+t*pa1x,py:(1-t)*pa0y+t*pa1y};
+    posB={px:(1-t)*pb0x+t*pb1x,py:(1-t)*pb0y+t*pb1y};
+  }
+  return {posA, posB};
+}
+
+// 각 공의 순간 시간축(세계선 접선)과 공간축(동시선)의 화면 방향 벡터
+function getBallAxes(t, prog){
+  const a_=alpha, r0_=1/a_;
+  // 반환: {A:{time:[dx,dy], space:[dx,dy]}, B:{...}} (화면 방향, 정규화 전)
+  if(motionType==='inertial'){
+    const bSP=beta*(1-t), bS=-beta*t;
+    // 시간축: 민코프스키 방향 (b,1) → 화면 (b*scale, -scale)
+    // 공간축(동시선): (1,b) → 화면 (scale, -b*scale)
+    return {
+      A:{time:[bS*scale,-scale], space:[scale,-bS*scale]},
+      B:{time:[bSP*scale,-scale], space:[scale,-bSP*scale]}
+    };
+  } else if(motionType==='twin'){
+    const p=twinParams();
+    const tN=Math.max(prog,0)*p.T;
+    const v=p.sd*twinVm(p,tN), u=twCamU;
+    // 시간축=(v,1), 공간축(동시선)=(1,v)를 카메라 부스트로 선형 변환
+    const td=lorentz(v,1,u), sp=lorentz(1,v,u);
+    const tdA=lorentz(0,1,u), spA=lorentz(1,0,u);
+    return {
+      A:{time:[tdA[0]*scale,-tdA[1]*scale], space:[spA[0]*scale,-spA[1]*scale]},
+      B:{time:[td[0]*scale,-td[1]*scale], space:[sp[0]*scale,-sp[1]*scale]}
+    };
+  } else {
+    // s=0 끝점은 S 좌표시간 ct0 사건, s=1 끝점은 린들러 tau1 사건 기준
+    const {ctTop,tauTop}=getAccelParams();
+    const ct0=ctTop*prog, tau1=tauTop*prog;
+    const sh0=ct0/r0_, ch0=Math.sqrt(1+sh0*sh0);        // s=0에서 B의 rapidity 성분
+    const sh1=Math.sinh(a_*tau1), ch1=Math.cosh(a_*tau1); // s=1 사건의 성분
+    // A(관성): s=0 → 시간 (0,-1), 공간 (1,0)
+    //          s=1 → 시간 (dρ/dτ,-1)=(-sh1/ch1²,-1), 공간 ∝ (1, sh1)
+    const A_t0=[0,-scale], A_t1=[(-sh1/(ch1*ch1))*scale,-scale];
+    const A_s0=[scale,0],  A_s1=[scale, sh1*scale];
+    // B(가속): s=0 → 시간 (sh0,-ch0), 공간 (ch0,-sh0) [순간 정지계 축]
+    //          s=1 → 시간 (0,-1), 공간 (1,0)
+    const B_t0=[sh0*scale,-ch0*scale], B_t1=[0,-scale];
+    const B_s0=[ch0*scale,-sh0*scale], B_s1=[scale,0];
+    const L=(v0,v1)=>[v0[0]+(v1[0]-v0[0])*t, v0[1]+(v1[1]-v0[1])*t];
+    return {
+      A:{time:L(A_t0,A_t1), space:L(A_s0,A_s1)},
+      B:{time:L(B_t0,B_t1), space:L(B_s0,B_s1)}
+    };
+  }
+}
+
+function drawBallAxes(pos, axes, color){
+  // 독립 시간/공간 축: 점선인 것 외에는 좌표계 축과 동일한 스타일
+  const norm=v=>{const l=Math.hypot(v[0],v[1])||1;return[v[0]/l,v[1]/l];};
+  const td=norm(axes.time), sd=norm(axes.space);
+  const Lt=250, Ls=180;
+  ctx.save();
+  ctx.strokeStyle=color;ctx.lineWidth=2.5;ctx.setLineDash([6,5]);
+  // 시간축 (세계선 방향)
+  ctx.beginPath();
+  ctx.moveTo(pos.px-td[0]*Lt, pos.py-td[1]*Lt);
+  ctx.lineTo(pos.px+td[0]*Lt, pos.py+td[1]*Lt);
+  ctx.stroke();
+  // 공간축 (동시선)
+  ctx.beginPath();
+  ctx.moveTo(pos.px-sd[0]*Ls, pos.py-sd[1]*Ls);
+  ctx.lineTo(pos.px+sd[0]*Ls, pos.py+sd[1]*Ls);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ═══════════════ 우주 공간 뷰 (로켓 애니메이션) ═══════════════
+// 별 배경 (고정 시드 의사난수)
+const _stars=[];
+(function(){let seed=42;const rnd=()=>{seed=(seed*9301+49297)%233280;return seed/233280;};
+  for(let i=0;i<90;i++)_stars.push({fx:rnd(),fy:rnd(),r:rnd()*1.2+0.3,o:rnd()*0.5+0.3});})();
+// 궤도 모드 전용 별: 절대 물리 위치(km)에 박혀 있는 배경. 각도 a와 로그반지름의
+// 소수부 f만 저장하고, 렌더 때 10의 거듭제곱 껍질을 훑어 화면에 걸리는 것만 그린다.
+// → 궤도 반지름이 커지면 축척(km/px)이 커지므로 별들이 안쪽으로 수렴한다 = 줌아웃.
+const _orbStars=[];
+(function(){let sd=1337;const rnd=()=>{sd=(sd*1103515245+12345)%2147483648;return sd/2147483648;};
+  for(let i=0;i<200;i++)_orbStars.push({a:rnd()*Math.PI*2,f:rnd(),s:rnd()*1.05+0.35,o:rnd()*0.55+0.28});})();
+
+function drawRocketOn(g,cx,cy,color,dir,flame,label,len,ang,girth){
+  len=len||32; // 기본(점 모드) 32px
+  const k=girth||1; // 굵기 배율 (y방향)
+  const half=len/2, noseL=Math.min(12,len*0.3);
+  const d=dir===0?1:dir;
+  g.save();
+  g.translate(cx,cy);
+  if(ang) g.rotate(ang);
+  g.scale(d,1);
+  // 불꽃 (가속 중일 때만, 꼬리에서)
+  if(flame){
+    const fl=(10+Math.random()*7)*k;
+    const grad=g.createLinearGradient(-half-fl,0,-half,0);
+    grad.addColorStop(0,'rgba(245,158,11,0)');
+    grad.addColorStop(0.6,'rgba(245,158,11,0.7)');
+    grad.addColorStop(1,'rgba(255,220,120,0.95)');
+    g.fillStyle=grad;
+    g.beginPath();
+    g.moveTo(-half,-4*k);g.lineTo(-half-fl,0);g.lineTo(-half,4*k);g.closePath();g.fill();
+  }
+  // 본체 (기수 +half, 꼬리 -half)
+  g.fillStyle=color;
+  g.beginPath();
+  g.moveTo(half,0);
+  g.lineTo(half-noseL,-6*k);
+  g.lineTo(-half+4,-6*k);
+  g.lineTo(-half+4,6*k);
+  g.lineTo(half-noseL,6*k);
+  g.closePath();g.fill();
+  // 날개
+  g.beginPath();
+  g.moveTo(-half+8,-6*k);g.lineTo(-half,-11*k);g.lineTo(-half+4,-6*k);g.closePath();g.fill();
+  g.beginPath();
+  g.moveTo(-half+8,6*k);g.lineTo(-half,11*k);g.lineTo(-half+4,6*k);g.closePath();g.fill();
+  // 창
+  g.fillStyle='#fff';
+  g.beginPath();g.arc(half-noseL-4,0,2.8*Math.sqrt(k),0,Math.PI*2);g.fill();
+  g.restore();
+  g.fillStyle=color;g.font='bold 11px DM Mono';g.textAlign='center';
+  g.fillText(label,cx,cy-10-8*k);
+  g.textAlign='left';
+}
+
+function drawRocket(cx,cy,color,dir,flame,label,len){
+  drawRocketOn(ctxS,cx,cy,color,dir,flame,label,len,0,showClock?3.6:1);
+}
+
+// 우주선 내부 광시계: 광자가 위/아래 거울 사이를 왕복 (반주기 = Δτ=0.5)
+// 거울 도착(출발/반사) 순간 = 고유시간 눈금 = 다이어그램의 반짝임과 정확히 동기
+//   ※ 동기가 물리이도록 거울 간격 h를 반주기 조건에서 역산 (아래 h_u 계산 참고)
+// bendA>0 (추력 받는 우주선): 등가원리에 의해 빛이 꼬리 쪽 "중력"으로 휨.
+//   린들러 널 측지선 정확해 = 지평선 중심 원호 (1+αρ)²+(αy)² = A², A=√(1+(αh/2)²)
+//   → 거울 사이를 잇는 경로는 기수(+x) 쪽으로 불룩한 원호 (투척체처럼 앞으로 조준)
+// bendA=0 (관성/자유낙하 우주선): 국소 관성계 → 정확한 수직 직선
+function drawLightClock(cx,cy,tau,len,bendA){
+  // 거울 간격을 물리로 결정: 광자의 거울→거울 소요 고유시간이 정확히 Δτ=0.5
+  //   직선(관성): h = c·Δτ = 0.5
+  //   원호(가속): 반주기 = (2/α)·asinh(αh/2) = 0.5 → h = (2/α)·sinh(α/4)
+  //   (α→0 극한에서 h→0.5로 연속, 이제 눈금 글로우와의 동기가 근사가 아닌 정확)
+  const h_u=bendA>0?(2/bendA)*Math.sinh(bendA*0.25):0.5; // 거울 간격 (단위)
+  const H2=h_u*scale/2;                        // 거울 간격의 절반 (px)
+  const MW=Math.min(13,Math.max(5,len*0.12));  // 거울 폭
+  // 원호 x-오프셋: 클럭은 ρ=0(u=1) 기준 → Δρ(y)=(√(A²-(αy)²)-1)/α
+  let arcX=function(yu){return 0;};
+  let TH=0;
+  if(bendA>0){
+    const Aa=Math.sqrt(1+Math.pow(bendA*h_u/2,2));
+    arcX=function(yu){
+      return ((Math.sqrt(Math.max(0,Aa*Aa-Math.pow(bendA*yu,2)))-1)/bendA)*scale;
+    };
+    TH=Math.atanh(bendA*h_u/(2*Aa)); // tanh 프로파일 파라미터 (= α/4, 반주기 0.5와 정확 일치)
+  }
+  // 경로 가이드 (원호/직선)
+  ctxS.save();
+  ctxS.strokeStyle='rgba(251,191,36,0.3)';ctxS.lineWidth=1;
+  ctxS.beginPath();
+  for(let i=0;i<=16;i++){
+    const yu=-h_u/2+h_u*i/16;
+    const px=cx+arcX(yu), py=cy-yu*scale;
+    if(i===0)ctxS.moveTo(px,py);else ctxS.lineTo(px,py);
+  }
+  ctxS.stroke();
+  ctxS.restore();
+  // 거울 (위/아래) — 원호 끝점(cx)에 정렬
+  ctxS.strokeStyle='rgba(255,255,255,0.85)';ctxS.lineWidth=2;
+  ctxS.beginPath();ctxS.moveTo(cx-MW,cy-H2);ctxS.lineTo(cx+MW,cy-H2);ctxS.stroke();
+  ctxS.beginPath();ctxS.moveTo(cx-MW,cy+H2);ctxS.lineTo(cx+MW,cy+H2);ctxS.stroke();
+  // 광자: τ=0 아래 출발 → τ=0.5 위 반사 → τ=1.0 아래 ...
+  const ph=(tau/0.5)%2;
+  const goingUp=ph<1;
+  const lf=goingUp?ph:ph-1;      // 구간 내 진행도 0..1
+  let yu;                        // 광자 y (단위, 아래=-h/2, 위=+h/2)
+  if(bendA>0){
+    const s=goingUp?(2*lf-1):(1-2*lf);
+    const Aa=Math.sqrt(1+Math.pow(bendA*h_u/2,2));
+    yu=(Aa/bendA)*Math.tanh(TH*s); // 정확한 y(τ) 프로파일 (중앙에서 최고 속력)
+  } else {
+    yu=(goingUp?(2*lf-1):(1-2*lf))*h_u/2;
+  }
+  const pxp=cx+arcX(yu), pyp=cy-yu*scale;
+  ctxS.save();
+  ctxS.shadowColor='#fbbf24';ctxS.shadowBlur=6;
+  ctxS.fillStyle='#fbbf24';
+  ctxS.beginPath();ctxS.arc(pxp,pyp,3,0,Math.PI*2);ctxS.fill();
+  ctxS.restore();
+  // 거울 플래시
+  const k=Math.floor(tau/0.5+1e-9);
+  const g=Math.max(0,1-(tau-k*0.5)/0.35);
+  if(g>0.02&&k>=1){
+    const my=(k%2===0)?cy+H2:cy-H2;
+    ctxS.save();ctxS.globalAlpha=0.85*g;
+    ctxS.shadowColor='#fbbf24';ctxS.shadowBlur=12*g;
+    ctxS.strokeStyle='#fbbf24';ctxS.lineWidth=2.5;
+    ctxS.beginPath();ctxS.moveTo(cx-MW,my);ctxS.lineTo(cx+MW,my);ctxS.stroke();
+    ctxS.restore();
+  }
+}
+
+// 우주선 길이/속도 상태 (다이어그램과 우주 뷰 공용)
+function getShipState(t,prog){
+  let lenA=32,lenB=32,fA=1,fB=1,vA=0,vB=0,rearB=false,offB=0;
+  if(showShip){
+    const L0u=L0PX/scale;
+    if(motionType==='inertial'){
+      const bSP2=beta*(1-t), bS2=-beta*t;
+      fA=Math.sqrt(Math.max(1e-6,1-bS2*bS2));
+      fB=Math.sqrt(Math.max(1e-6,1-bSP2*bSP2));
+      vA=Math.abs(bS2); vB=Math.abs(bSP2);
+      lenA=L0PX*fA; lenB=L0PX*fB;
+    } else {
+      const a_=alpha, r0_=1/a_;
+      const {ctTop,tauTop}=getAccelParams();
+      const p_=Math.max(prog,0.0001);
+      const ct0=ctTop*p_, tau1=tauTop*p_;
+      // 중심 기준 보른 강체: 뒤 R=r0-L0/2, 앞 R=r0+L0/2 (뒤가 지평선 밖이면 클램프)
+      const Rm=Math.max(0.02, r0_-L0u/2), Rp=r0_+L0u/2;
+      const xRear=Math.sqrt(Rm*Rm+ct0*ct0);
+      const xFront=Math.sqrt(Rp*Rp+ct0*ct0);
+      const xBall=Math.sqrt(r0_*r0_+ct0*ct0);
+      const LB0=(xFront-xRear), LB1=(Rp-Rm);
+      lenB=((1-t)*LB0+t*LB1)*scale;
+      fB=lenB/L0PX;
+      vB=(1-t)*(ct0/xBall);
+      // 우주선 중심의 공(실선 세계선) 기준 화면 오프셋
+      const off0=((xRear+xFront)/2-xBall)*scale;
+      const off1=((Rm+Rp)/2-r0_)*scale;
+      offB=(1-t)*off0+t*off1;
+      const invG1=1/Math.cosh(a_*tau1);
+      const LA=((1-t)*1+t*invG1);
+      lenA=L0PX*LA; fA=LA;
+      vA=t*Math.tanh(a_*tau1);
+    }
+  }
+  return {lenA,lenB,fA,fB,vA,vB,rearB,offB};
+}
+
+function drawSpace(t, prog){
+  ctxS.clearRect(0,0,W,SPACE_H);
+  // 우주 배경
+  ctxS.fillStyle='#0b1026';ctxS.fillRect(0,0,W,SPACE_H);
+  if(motionType!=='orbit') for(const st of _stars){
+    ctxS.globalAlpha=st.o;
+    ctxS.fillStyle='#fff';
+    ctxS.beginPath();ctxS.arc(st.fx*W,st.fy*SPACE_H,st.r,0,Math.PI*2);ctxS.fill();
+  }
+  ctxS.globalAlpha=1;
+  const cy=SPACE_H*0.5;
+  // 카메라 오프셋: 등가속에서 출발점(r0,0)이 alpha와 무관하게 화면 중앙(OX)에 오도록
+  // 좌표평면 이동(xShift)이 toScreen에 이미 반영됨 → 눈금/지평선 정렬용으로만 사용
+  const camOff=xShift;
+  // 공간 축 (궤도 모드는 극좌표 장면이라 직선 눈금자를 쓰지 않는다)
+  if(motionType!=='orbit'){
+    ctxS.strokeStyle='rgba(148,163,184,0.35)';ctxS.lineWidth=1;
+    ctxS.beginPath();ctxS.moveTo(0,cy+66);ctxS.lineTo(W,cy+66);ctxS.stroke();
+    // 눈금 (다이어그램 x 좌표 기준, 카메라 오프셋 반영)
+    ctxS.fillStyle='rgba(148,163,184,0.6)';ctxS.font='8px DM Mono';
+    const nLo=Math.floor((0-OX+camOff)/scale)-1, nHi=Math.ceil((W-OX+camOff)/scale)+1;
+    for(let n=nLo;n<=nHi;n++){
+      const tx=OX+n*scale-camOff;
+      if(tx<0||tx>W)continue;
+      ctxS.strokeStyle='rgba(148,163,184,0.4)';
+      ctxS.beginPath();ctxS.moveTo(tx,cy+62);ctxS.lineTo(tx,cy+70);ctxS.stroke();
+      ctxS.fillStyle=n===0?'rgba(148,163,184,0.85)':'rgba(148,163,184,0.6)';
+      ctxS.fillText(n,tx-3,cy+82);
+    }
+  }
+
+  // ── 벨의 우주선 전용 장면: 두 로켓 + 실 (변형률 색, 파단)
+  if(motionType==='bell'){
+    const p=bellParams();
+    const st2=blShared;
+    if(!st2){return;}
+    const pxA=beS(st2.EA[0],st2.EA[1])[0];
+    const pxB=beS(st2.EB[0],st2.EB[1])[0];
+    const ignited=st2.tNow>0;
+    // 실 (로켓보다 먼저 그려 로켓이 위에)
+    if(!st2.broken){
+      ctxS.strokeStyle=bellStrainColor(st2.g,p.gB);
+      ctxS.lineWidth=4;ctxS.lineCap='round';
+      ctxS.beginPath();ctxS.moveTo(pxA+16,cy);ctxS.lineTo(pxB-16,cy);ctxS.stroke();
+    } else {
+      const vRel=(st2.vN-blU)/(1-blU*st2.vN);
+      const gRel=1/Math.sqrt(1-vRel*vRel);
+      const Ls=(p.d/2)/gRel*scale;
+      ctxS.strokeStyle='#22c55e';ctxS.lineWidth=4;ctxS.lineCap='round';
+      ctxS.beginPath();ctxS.moveTo(pxA+16,cy);ctxS.lineTo(pxA+16+Ls,cy);ctxS.stroke();
+      ctxS.beginPath();ctxS.moveTo(pxB-16,cy);ctxS.lineTo(pxB-16-Ls,cy);ctxS.stroke();
+      // 파단 직후 플래시
+      const gl=Math.max(0,1-(st2.tNow-p.tBr)/0.5);
+      if(gl>0.02){
+        ctxS.save();ctxS.globalAlpha=0.8*gl;
+        ctxS.shadowColor='#ef4444';ctxS.shadowBlur=18*gl;
+        ctxS.fillStyle='#ef4444';
+        ctxS.beginPath();ctxS.arc((pxA+pxB)/2,cy,4+9*gl,0,Math.PI*2);ctxS.fill();
+        ctxS.restore();
+      }
+    }
+    drawRocket(pxA,cy,C.s,1,ignited,'A',32);
+    drawRocket(pxB,cy,C.sp,1,ignited,'B',32);
+    // HUD: 변형률 게이지 (다이어그램은 텍스트 최소화 정책 → 수치는 여기)
+    ctxS.font='10px DM Mono';ctxS.textAlign='right';
+    ctxS.fillStyle=bellStrainColor(st2.g,p.gB);
+    ctxS.fillText('γ = '+st2.g.toFixed(2)+' / 한계 '+p.gB.toFixed(2),W-10,16);
+    ctxS.fillStyle=st2.broken?'#ef4444':'rgba(148,163,184,0.9)';
+    ctxS.fillText(st2.broken?'실 끊어짐! (t_br='+p.tBr.toFixed(2)+')'
+      :('실 신장 +'+((st2.g-1)*100).toFixed(0)+'% (자연길이 d/γ 대비)'),W-10,30);
+    if(showClock){
+      const pt2=getProperTimes(t,prog);
+      ctxS.fillStyle=C.s;
+      ctxS.fillText('τ_A = τ_B = '+pt2.tauA.toFixed(2),W-10,44);
+    }
+    ctxS.textAlign='left';
+    return;
+  }
+
+  // ── 막대·헛간 전용 장면 (로켓 없음): 카메라 동시면 절단 위치에 구조물 렌더
+  if(motionType==='barn'){
+    const p=barnParams();
+    if(p.deg){
+      ctxS.fillStyle='rgba(148,163,184,0.8)';ctxS.font='10px DM Mono';
+      ctxS.fillText('β를 키워 막대를 발사하세요',10,SPACE_H-12);
+      return;
+    }
+    const u=bnU, bSig=p.sd*p.bm;
+    const st2=bnShared||{tSnow:p.tLo,passed1:false,passed2:false,gl1:0,gl2:0};
+    const tSnow=st2.tSnow, xc=bSig*tSnow;
+    function slicePx(a,v){ // 세계선 x=a+vt ∩ 카메라 동시면(막대 중심 통과) → 화면 x
+      const tt=(tSnow+u*(a-xc))/(1-u*v);
+      const xx=a+v*tt;
+      const q=Math.abs(u)<1e-9?[xx,tt]:lorentz(xx,tt,u);
+      return OX+q[0]*scale;
+    }
+    const dEnt=-p.sd*p.Lb/2, dExit=p.sd*p.Lb/2;
+    const rearA=-p.sd*p.Lc/2, frontA=p.sd*p.Lc/2;
+    const pxEnt=slicePx(dEnt,0), pxExit=slicePx(dExit,0);
+    const pxRear=slicePx(rearA,bSig), pxFront=slicePx(frontA,bSig);
+    // 헛간: 지붕 + 문 두 짝 (입구: E₁ 이후 닫힘 / 출구: E₂ 이후 열림)
+    const topY=cy-52, botY=cy+44;
+    ctxS.strokeStyle=C.s;ctxS.lineWidth=3;
+    ctxS.beginPath();ctxS.moveTo(pxEnt,topY);ctxS.lineTo(pxExit,topY);ctxS.stroke();
+    function door(px,closed,glow){
+      ctxS.save();
+      if(glow>0){ctxS.shadowColor='#fbbf24';ctxS.shadowBlur=16*glow;}
+      ctxS.strokeStyle=C.s;ctxS.lineWidth=4;
+      ctxS.beginPath();
+      if(closed){ctxS.moveTo(px,topY);ctxS.lineTo(px,botY);}
+      else{ctxS.moveTo(px,topY);ctxS.lineTo(px,topY+16);ctxS.moveTo(px,botY-16);ctxS.lineTo(px,botY);}
+      ctxS.stroke();ctxS.restore();
+    }
+    door(pxEnt, st2.passed1, st2.gl1);
+    door(pxExit, !st2.passed2, st2.gl2);
+    // 막대
+    const rx=Math.min(pxRear,pxFront), rw=Math.abs(pxFront-pxRear);
+    ctxS.fillStyle=C.sp;
+    ctxS.fillRect(rx,cy-6,rw,12);
+    ctxS.fillStyle='#7f1d1d';
+    ctxS.fillRect(pxRear-2,cy-8,4,16);ctxS.fillRect(pxFront-2,cy-8,4,16);
+    // 라벨: 현재 관점에서 잰 길이 (동시면 절단 폭 → 수축값과 일치)
+    ctxS.font='9px DM Mono';ctxS.textAlign='center';
+    ctxS.fillStyle=C.s;
+    ctxS.fillText('헛간 '+(Math.abs(pxExit-pxEnt)/scale).toFixed(2),(pxEnt+pxExit)/2,topY-8);
+    ctxS.fillStyle=C.sp;
+    ctxS.fillText('막대 '+(rw/scale).toFixed(2),(pxRear+pxFront)/2,cy+28);
+    ctxS.textAlign='left';
+    if((ballRunning||ballT>0)&&st2.passed1&&!st2.passed2){
+      ctxS.fillStyle='#a78bfa';ctxS.font='bold 11px DM Mono';ctxS.textAlign='center';
+      ctxS.fillText('▨ 양문 폐쇄',W/2,20);ctxS.textAlign='left';
+    }
+    return;
+  }
+
+  // ── 중력 궤도 전용 장면: 궤도면을 위에서 내려다본 그림
+  if(motionType==='orbit'){
+    const p=orbitParams();
+    const ph=orbShared?orbShared.phNow:0;
+    const cxo=W/2, Rs=92, sPX=Rs/p.r;
+    const Rb=Math.min(p.Rbody*sPX,420);
+    // ── 배경 별: 고정된 물리 좌표(km)에 있고 축척만 바뀐다.
+    //    궤도 반지름을 키우면 화면 1px이 담는 거리가 커져 별들이 안쪽으로 빨려든다.
+    const kmPerPx=p.M_km/sPX;
+    const maxR=Math.hypot(W/2,SPACE_H/2)+30;
+    const dLo=Math.floor(Math.log10(3*kmPerPx)), dHi=Math.ceil(Math.log10(maxR*kmPerPx));
+    for(const st of _orbStars){
+      for(let d=dLo;d<=dHi;d++){
+        const rp=Math.pow(10,st.f+d)/kmPerPx;
+        if(rp<3||rp>maxR) continue;
+        const ang=st.a+d*0.7;                    // 껍질마다 회전 → 방사형 줄무늬 방지
+        const x=cxo+rp*Math.cos(ang), y=cy-rp*Math.sin(ang);
+        if(x<-3||x>W+3||y<-3||y>SPACE_H+3) continue;
+        let al=st.o;
+        if(rp<16) al*=(rp-3)/13;                 // 중심 부근에서 페이드인
+        ctxS.globalAlpha=Math.max(0,Math.min(1,al));
+        ctxS.fillStyle='#fff';
+        ctxS.beginPath();ctxS.arc(x,y,st.s,0,Math.PI*2);ctxS.fill();
+      }
+    }
+    ctxS.globalAlpha=1;
+    // 스케일 바: 같은 화면 길이가 담는 실제 거리 (반지름을 바꾸면 이 값이 바뀐다)
+    {
+      const bp=110, by=SPACE_H-16;
+      ctxS.strokeStyle='rgba(148,163,184,0.85)';ctxS.lineWidth=1.4;
+      ctxS.beginPath();
+      ctxS.moveTo(14,by);ctxS.lineTo(14+bp,by);
+      ctxS.moveTo(14,by-4);ctxS.lineTo(14,by+4);
+      ctxS.moveTo(14+bp,by-4);ctxS.lineTo(14+bp,by+4);
+      ctxS.stroke();
+      ctxS.fillStyle='rgba(203,213,225,0.95)';ctxS.font='9px DM Mono';ctxS.textAlign='left';
+      ctxS.fillText(fmtKm(bp*kmPerPx),14,by-8);
+    }
+    // 블랙홀: 그림자(3√3 M) · 광자구(3M) · 지평선(2M)
+    // 그림자(3√3 M) · 광자구(3M) · 지평선(2M)
+    ctxS.strokeStyle='rgba(148,163,184,0.55)';ctxS.lineWidth=1;ctxS.setLineDash([4,4]);
+    ctxS.beginPath();ctxS.arc(cxo,cy,3*Math.sqrt(3)*sPX,0,Math.PI*2);ctxS.stroke();
+    ctxS.strokeStyle='rgba(124,58,237,0.85)';
+    ctxS.beginPath();ctxS.arc(cxo,cy,3*sPX,0,Math.PI*2);ctxS.stroke();
+    ctxS.setLineDash([]);
+    ctxS.fillStyle='#05070f';
+    ctxS.beginPath();ctxS.arc(cxo,cy,Math.max(2,Rb),0,Math.PI*2);ctxS.fill();
+    ctxS.strokeStyle='rgba(226,232,240,0.7)';ctxS.lineWidth=1;ctxS.stroke();
+    // 궤도
+    ctxS.strokeStyle=p.isLight?'rgba(245,158,11,0.7)':'rgba(220,38,38,0.6)';
+    ctxS.lineWidth=1;ctxS.setLineDash([5,5]);
+    ctxS.beginPath();ctxS.arc(cxo,cy,Rs,0,Math.PI*2);ctxS.stroke();
+    ctxS.setLineDash([]);
+    // 궤도체
+    const px=cxo+Rs*Math.cos(ph), py=cy-Rs*Math.sin(ph);
+    if(p.isLight){
+      for(let k=1;k<=8;k++){
+        const f=ph-k*0.07;
+        ctxS.globalAlpha=0.45*(1-k/9);
+        ctxS.fillStyle=C.light;
+        ctxS.beginPath();ctxS.arc(cxo+Rs*Math.cos(f),cy-Rs*Math.sin(f),2.5,0,Math.PI*2);ctxS.fill();
+      }
+      ctxS.globalAlpha=1;
+      ctxS.save();ctxS.shadowColor=C.light;ctxS.shadowBlur=12;
+      ctxS.fillStyle=C.light;ctxS.beginPath();ctxS.arc(px,py,4.5,0,Math.PI*2);ctxS.fill();
+      ctxS.restore();
+    } else {
+      drawRocketOn(ctxS,px,py,C.sp,1,false,'',30,Math.atan2(-Math.cos(ph),-Math.sin(ph)),1);
+    }
+    // HUD
+    const rkm=p.r*p.M_km;
+    ctxS.font='10px DM Mono';ctxS.textAlign='right';
+    ctxS.fillStyle='rgba(148,163,184,0.95)';
+    ctxS.fillText('M = '+(bhMass<1e3?bhMass.toFixed(0):bhMass.toExponential(2))+' M☉'
+      +'   r = '+p.r.toFixed(2)+' GM/c²  ('+fmtKm(rkm)+')',W-10,16);
+    ctxS.fillStyle=p.isLight?C.light:C.sp;
+    ctxS.fillText('국소 속도 v = '+p.vLoc.toFixed(p.vLoc<0.01?6:4)+' c'
+      +(p.isLight?'':'   γ = '+(1/Math.sqrt(Math.max(1e-12,1-p.vLoc*p.vLoc))).toFixed(3)),W-10,30);
+    ctxS.fillStyle='rgba(148,163,184,0.95)';
+    ctxS.fillText('공전 주기 = '+fmtSec(p.cT*p.secPerM),W-10,44);
+    ctxS.fillText('나선 1주기: 세로 = 가로의 '+(p.cT/(2*p.r)).toFixed(p.cT/(2*p.r)<100?1:0)+'배',W-10,58);
+    if(showClock){
+      ctxS.fillStyle=C.s;
+      ctxS.fillText('τ_정지/t = '+p.dtauStat.toFixed(6),W-10,72);
+      ctxS.fillStyle=p.isLight?C.light:C.sp;
+      ctxS.fillText(p.isLight?'τ_광자 = 0 (빛에는 고유시간이 없다)'
+                             :'τ_궤도/t = '+p.dtaudt.toFixed(6),W-10,86);
+    }
+    ctxS.textAlign='left';
+    return;
+  }
+
+  // 로켓 위치 = 다이어그램 공의 x좌표 - 카메라 오프셋
+  const bp=getBallPositions(t,Math.max(prog,0.0001));
+  const posA={px:bp.posA.px}, posB={px:bp.posB.px}; // toScreen에 xShift 반영됨
+  // 방향 고정 (+x, 오른쪽)
+  let dirA=1, dirB=1;
+  // 불꽃 = 고유가속도 (좌표계 무관): 등가속 B 상시 / 쌍둥이 B는 반환 구간만
+  let flameB=(motionType==='accel');
+  if(motionType==='twin'){
+    const pTw=twinParams();
+    flameB=twinBendNow(prog)>0;
+    const v=pTw.sd*twinVm(pTw,Math.max(prog,0.0001)*pTw.T);
+    if(v<-0.01)dirB=-1;
+  }
+  const flameA=false; // A는 항상 관성(무추력)
+
+  // 길이 우주선 모드: 확장체(보른 강체)의 정확한 길이 수축 (공용 계산)
+  const st=getShipState(t,prog);
+  const cxA=posA.px, cxB=posB.px+(st.rearB?st.lenB/2:0)+st.offB;
+  if(showShip){
+    // 수축 계수 + 기준점 순간속도 표시
+    ctxS.font='9px DM Mono';
+    ctxS.fillStyle=C.s; ctxS.textAlign='center';
+    ctxS.fillText('L='+st.fA.toFixed(2)+'L₀  v='+st.vA.toFixed(2)+'c',cxA,cy+56);
+    ctxS.fillStyle=C.sp;
+    ctxS.fillText('L='+st.fB.toFixed(2)+'L₀  v='+st.vB.toFixed(2)+'c',cxB,cy-56);
+    ctxS.textAlign='left';
+  }
+  // 고유시간 모드에서만 확대 (광시계 가시성), 그 외에는 다이어그램의 A/B 크기와 정확히 일치
+  const SP_MAG=showClock?2:1;
+  const spLenA=showShip?st.lenA*SP_MAG:(showClock?112:32);
+  const spLenB=showShip?st.lenB*SP_MAG:(showClock?112:32);
+  drawRocket(cxA,cy,C.s,dirA,flameA,'A',spLenA);
+  drawRocket(cxB,cy,C.sp,dirB,flameB,'B',spLenB);
+
+  // 시간팽창: 각 우주선의 시계 (경과 고유시간) + 내부 광시계
+  if(showClock){
+    const pt=getProperTimes(t,prog);
+    ctxS.font='10px DM Mono';ctxS.textAlign='right';
+    ctxS.fillStyle=C.s;
+    ctxS.fillText('τ_A = '+pt.tauA.toFixed(2),W-10,16);
+    ctxS.fillStyle=C.sp;
+    ctxS.fillText('τ_B = '+pt.tauB.toFixed(2),W-10,30);
+    ctxS.textAlign='left';
+    // 광시계: 광자가 거울 사이 반주기 = Δτ=0.5 (다이어그램 눈금 글로우와 정확히 동기)
+    // A는 관성(자유낙하) → 직선, B는 등가속 모드에서 추력 → 등가원리로 빛이 휨
+    drawLightClock(cxA,cy,pt.tauA,spLenA,0);
+    drawLightClock(cxB,cy,pt.tauB,spLenB,motionType==='accel'?alpha:Math.min(5,twinBendNow(prog)));
+  }
+  // 광신호: 광자 점 + 수신 플래시 + 도플러 인자 HUD
+  if(showSignal){
+    for(const s of sigPhotons){
+      const al=(s.a!==undefined)?s.a:1;
+      if(s.type==='fly'){
+        ctxS.save();ctxS.globalAlpha=al;
+        ctxS.shadowColor='#f59e0b';ctxS.shadowBlur=8;
+        ctxS.fillStyle='#f59e0b';
+        ctxS.beginPath();ctxS.arc(s.px,cy,3,0,Math.PI*2);ctxS.fill();
+        ctxS.restore();
+      } else {
+        ctxS.save();
+        ctxS.globalAlpha=0.4*s.g;ctxS.fillStyle='#f59e0b';
+        ctxS.beginPath();ctxS.arc(s.px,cy,5+11*s.g,0,Math.PI*2);ctxS.fill();
+        ctxS.restore();
+      }
+    }
+    // 순간 도플러 인자 k (발신자 고유시간당 수신자 고유시간)
+    let kTxt='';
+    if(motionType==='inertial'){
+      if(Math.abs(beta)>0.005){
+        const k=Math.sqrt((1+Math.abs(beta))/(1-Math.abs(beta)));
+        kTxt='k = '+k.toFixed(2)+' (적색편이)';
+      }
+    } else if(motionType==='twin'){
+      const p=twinParams();
+      if(!p.deg){
+        const tNow=Math.max(prog,0.0001)*p.T;
+        let vRel; // 수신 중인 신호의 발신-수신 시선 후퇴속도
+        if(sigEmitter==='A'){
+          vRel=twinVm(p,tNow); // B가 지금 받는 편이는 B의 현재(수신 시점) 속도를 따름
+        } else {
+          // "지금 A에 도착하는 신호": 기준 시각은 현재 관점의 동시면이 가리키는
+          // A의 시각 — S 관점은 tNow, B 순간계는 동시선 교점 (τ_A 표시와 동일 규약)
+          const ctAnow=(1-t)*tNow+t*Math.max(0,Math.min(p.T,tNow-twinVm(p,tNow)*twinXm(p,tNow)));
+          // 발신 시점: t_e+|x_B|(t_e)=ctAnow (단조증가 → 이분법)
+          let lo=0,hi=Math.min(ctAnow,p.T);
+          for(let i=0;i<40;i++){const md=(lo+hi)/2;(md+twinXm(p,md)<=ctAnow)?lo=md:hi=md;}
+          vRel=twinVm(p,lo);
+        }
+        if(tNow>0.01&&tNow<p.T-0.01){
+          const k=Math.sqrt((1+vRel)/(1-vRel));
+          kTxt='k = '+k.toFixed(2)+(k>1.001?' (적색편이)':(k<0.999?' (청색편이)':' (편이 없음)'));
+        }
+      }
+    } else {
+      const a_=alpha, r0_=1/a_;
+      const pt2=getProperTimes(t,prog);
+      if(sigEmitter==='A'){
+        const d=r0_-pt2.tauA;
+        if(d<=1e-4) kTxt='k = ∞ (지평선 차단)';
+        else {
+          const ctR=(r0_*r0_-d*d)/(2*d);
+          const tauR=Math.asinh(ctR/r0_)/a_;
+          const k=(r0_*r0_+d*d)/(2*d*d*Math.cosh(a_*tauR));
+          kTxt='k = '+(k<100?k.toFixed(2):k.toExponential(1))+' (적색편이)';
+        }
+      } else {
+        const k=Math.exp(a_*pt2.tauB);
+        kTxt='k = '+(k<100?k.toFixed(2):k.toExponential(1))+' (적색편이)';
+      }
+    }
+    if(kTxt){
+      ctxS.font='10px DM Mono';ctxS.textAlign='right';
+      ctxS.fillStyle='#f59e0b';
+      ctxS.fillText(kTxt,W-10,showClock?44:16);
+      ctxS.textAlign='left';
+    }
+  }
+
+  // 린들러 지평선 표시 (등가속 S'에서)
+  if(motionType==='accel'){
+    const a_=alpha,r0_=1/a_;
+    const s_=t;
+    // 지평선 화면 x: s=0에선 원점(광선이므로 점), s=1에선 x=-r0
+    if(s_>0.5){
+      const hx=OX-r0_*scale-camOff;
+      if(hx>0&&hx<W){
+        ctxS.strokeStyle='rgba(124,58,237,0.7)';ctxS.lineWidth=2;ctxS.setLineDash([5,4]);
+        ctxS.beginPath();ctxS.moveTo(hx,8);ctxS.lineTo(hx,SPACE_H-8);ctxS.stroke();
+        ctxS.setLineDash([]);
+        ctxS.fillStyle='rgba(124,58,237,0.9)';ctxS.font='8px DM Mono';
+        ctxS.fillText('지평선',hx+4,16);
+      }
+    }
+  }
+}
+
+// 각 우주선의 경과 고유시간 (표시 좌표계의 현재 진행 기준)
+function getProperTimes(t,prog){
+  const p_=Math.max(prog,0.0001);
+  if(motionType==='inertial'){
+    const ctEnd=(OY-10)/scale, ct0=p_*ctEnd;
+    const bSP=beta*(1-t), bS=-beta*t;
+    // 좌표시간 ct0 동안 속도 b인 시계의 고유시간 = ct0·√(1-b²)
+    return {tauA:ct0*Math.sqrt(Math.max(0,1-bS*bS)), tauB:ct0*Math.sqrt(Math.max(0,1-bSP*bSP))};
+  } else if(motionType==='twin'){
+    const pTw=twinParams();
+    const tN=p_*pTw.T;
+    // τ_A 표시값 = 현재 관점의 동시면이 가리키는 A의 시각:
+    //   S 관점(t=0)에선 좌표시간 tN, B 순간계(t=1)에선 동시선 교점 tN−v·x_B
+    //   → 왕로에서 A 시계가 느리게 보이다 반환 때 도약 (동시성 해소의 시계 표현)
+    const xB=pTw.sd*twinXm(pTw,tN), vB=pTw.sd*twinVm(pTw,tN);
+    const ctSim=Math.max(0,Math.min(pTw.T,tN-vB*xB));
+    return {tauA:(1-t)*tN+t*ctSim, tauB:twinTau(pTw,tN)};
+  } else if(motionType==='orbit'){
+    // A = 같은 r의 정지 관측자, B = 궤도체 (빛이면 고유시간 0)
+    const po=orbitParams();
+    const ct=p_*po.cT;
+    return {tauA:ct*po.dtauStat, tauB:po.isLight?0:ct*po.dtaudt};
+  } else if(motionType==='bell'){
+    const pB=bellParams();
+    const tN=pB.tLo+p_*(pB.tHi-pB.tLo);
+    // S의 같은 순간에 두 배의 고유시간은 정확히 동일 — 그런데도 실은 끊어진다
+    const tau=bellTau(tN);
+    return {tauA:tau, tauB:tau};
+  } else {
+    const a_=alpha,r0_=1/a_;
+    const ap=getAccelParams();
+    const ct0=ap.ctTop*p_, tau1=ap.tauTop*p_;
+    // S: A는 관성이라 τ_A=ct0, B는 쌍곡선이라 τ_B=asinh(ct0/r0)/α (점점 느리게)
+    // S': B는 τ_B=τ1(자기 시계), A는 동시면 교차 사건의 민코프스키 시각 = r0·tanh(ατ1)
+    //     → τ_A가 r0=1/α에서 포화 (지평선에서 A의 시계가 동결되어 보임)
+    const tauA=(1-t)*ct0 + t*(r0_*Math.tanh(a_*tau1));
+    const tauB=(1-t)*(Math.asinh(ct0/r0_)/a_) + t*tau1;
+    return {tauA,tauB};
+  }
+}
+
+// 세계선 위 고유시간 눈금 (Δτ=0.5 간격 점) — 시간팽창의 기하학
+function drawProperTicks(t,prog){
+  if(!showClock) return;
+  if(motionType==='orbit') return; // 눈금은 drawOrbit이 나선 위에 직접 찍는다
+  const dtau=0.5, r=2.8;
+  // 우주선이 눈금(고유시간 nΔτ)을 지나면 잠시 빛남: 지난 직후 0.35τ 동안 페이드
+  const active=(ballRunning||ballT>0);
+  const pt=active?getProperTimes(t,prog):null;
+  const FADE=0.35;
+  function glowOf(tauCur,tauTick){
+    if(!active) return 0;
+    const d=tauCur-tauTick;
+    return (d>=-1e-6&&d<FADE)?(1-Math.max(0,d)/FADE):0;
+  }
+  function dot(px,py,color,glow){
+    if(glow>0){
+      ctx.save();
+      // 노란 광채 (외곽 후광 + 노란 본체 + 밝은 코어)
+      ctx.globalAlpha=0.35*glow;
+      ctx.fillStyle='#fbbf24';
+      ctx.beginPath();ctx.arc(px,py,r+11*glow,0,Math.PI*2);ctx.fill();
+      ctx.globalAlpha=1;
+      ctx.shadowColor='#fbbf24';ctx.shadowBlur=22*glow;
+      ctx.fillStyle='#fbbf24';
+      ctx.beginPath();ctx.arc(px,py,r+4*glow,0,Math.PI*2);ctx.fill();
+      ctx.shadowBlur=0;ctx.globalAlpha=0.95*glow;ctx.fillStyle='#fff8dc';
+      ctx.beginPath();ctx.arc(px,py,(r+4*glow)*0.5,0,Math.PI*2);ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.fillStyle=color;
+      ctx.beginPath();ctx.arc(px,py,r,0,Math.PI*2);ctx.fill();
+    }
+  }
+  ctx.save();
+  if(motionType==='inertial'){
+    for(const pair of [[-beta*t,C.s,'A'],[beta*(1-t),C.sp,'B']]){
+      const b=pair[0], color=pair[1];
+      const tauCur=pt?(pair[2]==='A'?pt.tauA:pt.tauB):0;
+      const g=1/Math.sqrt(Math.max(1e-6,1-b*b));
+      for(let n=1;n<=80;n++){
+        const tau=n*dtau;
+        const p=toScreen(b*g*tau, g*tau); // 고유시간 τ의 사건 = γτ·(b,1)
+        if(p[1]<-2) break;
+        if(p[0]<-2||p[0]>W+2) continue;
+        dot(p[0],p[1],color,glowOf(tauCur,tau));
+      }
+    }
+  } else if(motionType==='twin'){
+    const p=twinParams();
+    // A: 사건 (0, nΔτ) — 재회까지 눈금 개수 = τ_A/Δτ
+    for(let n=1;n*dtau<=p.T+1e-9;n++){
+      const q=twS(0,n*dtau);
+      if(q[0]>-2&&q[0]<W+2&&q[1]>-2&&q[1]<H+2) dot(q[0],q[1],C.s,glowOf(pt?pt.tauA:0,n*dtau));
+    }
+    // B: 자기 세계선 위 (역함수로 정확한 사건 좌표) — 개수가 A보다 적다 = 역삼각부등식
+    if(!p.deg){
+      for(let n=1;n*dtau<=p.tauTotal+1e-9;n++){
+        const ev=twinEv(p,n*dtau);
+        const q=twS(p.sd*ev[0],ev[1]);
+        if(q[0]>-2&&q[0]<W+2&&q[1]>-2&&q[1]<H+2) dot(q[0],q[1],C.sp,glowOf(pt?pt.tauB:0,n*dtau));
+      }
+    }
+  } else if(motionType==='bell'){
+    const pB=bellParams();
+    // 두 세계선 위 자기 고유시간 눈금: S에선 같은 τ가 수평으로 나란히,
+    // 순간계 절단으로 보면 앞 배의 시계가 앞서 어긋남 (강체가 아닌 이유)
+    const pt2=getProperTimes(t,prog);
+    for(const pair of [[pB.x0A,C.s,pt2?pt2.tauA:0],[pB.x0B,C.sp,pt2?pt2.tauB:0]]){
+      for(let n=1;n<=80;n++){
+        const tau=n*dtau;
+        const ev=bellEvTau(pair[0],tau);
+        if(ev[1]>pB.tHi+1) break;
+        const q=beS(ev[0],ev[1]);
+        if(q[0]>-2&&q[0]<W+2&&q[1]>-2&&q[1]<H+2) dot(q[0],q[1],pair[1],glowOf(pair[2],tau));
+      }
+    }
+  } else {
+    const a_=alpha,r0_=1/a_,s=t;
+    // B: 자기 고유시간 τ=nΔτ 눈금 — 쌍곡선↔수직선 블렌드
+    for(let n=1;n<=80;n++){
+      const tau=n*dtau;
+      const p0=toScreen(r0_*Math.cosh(a_*tau),r0_*Math.sinh(a_*tau));
+      const p1=toScreen(0,tau);
+      const px=(1-s)*p0[0]+s*p1[0],py=(1-s)*p0[1]+s*p1[1];
+      if(py<-2&&s>0.5) break;
+      if(px>-2&&px<W+2&&py>-2&&py<H+2) dot(px,py,C.sp,glowOf(pt?pt.tauB:0,tau));
+      if(p0[1]<-2&&p1[1]<-2) break;
+    }
+    // A: 고유시간 = 민코프스키 t, 사건 (r0, nΔτ)
+    // S'에서는 |t|<r0인 눈금만 웨지 안 → 지평선 접근하며 눈금이 몰림 (동결)
+    for(let n=1;n<=80;n++){
+      const tA=n*dtau;
+      const p0=toScreen(r0_,tA);
+      const gA=glowOf(pt?pt.tauA:0,tA);
+      if(tA<r0_*0.999){
+        const ratio=tA/r0_;
+        const p1=toScreen(r0_*Math.sqrt(1-ratio*ratio)-r0_, Math.atanh(ratio)/a_);
+        const px=(1-s)*p0[0]+s*p1[0],py=(1-s)*p0[1]+s*p1[1];
+        if(px>-2&&px<W+2&&py>-2&&py<H+2) dot(px,py,C.s,gA);
+      } else if(s<0.999){
+        // 지평선 밖 눈금: S'에서 표현 불가 → 페이드
+        ctx.globalAlpha=1-s;
+        if(p0[0]>-2&&p0[0]<W+2&&p0[1]>-2&&p0[1]<H+2) dot(p0[0],p0[1],C.s,gA);
+        ctx.globalAlpha=1;
+      }
+      if(p0[1]<-2) break;
+    }
+  }
+  ctx.restore();
+}
+
+// 길이 우주선 모드: 우주선 앞/뒤 끝의 세계선 (점선, 좌표축과 별개)
+function drawShipWorldlines(t){
+  if(!showShip) return;
+  if(motionType==='orbit') return;
+  if(motionType==='twin') return; // 길이수축 모드는 쌍둥이 시나리오에서 비활성
+  const L0u=L0PX/scale;
+  ctx.save();
+  ctx.setLineDash([7,5]);
+  ctx.lineWidth=1.8;
+  if(motionType==='inertial'){
+    const bSP=beta*(1-t), bS=-beta*t;
+    const R=Math.max(W,H)/scale+2;
+    // A: ct축과 평행한 두 점선 (표시 좌표계 수축 길이 ±절반)
+    const LA=L0u*Math.sqrt(Math.max(1e-6,1-bS*bS));
+    ctx.strokeStyle=C.s;
+    for(const off of [-LA/2, LA/2]){
+      ctx.beginPath();
+      ctx.moveTo(...toScreen(-R*bS+off,-R));
+      ctx.lineTo(...toScreen(R*bS+off,R));
+      ctx.stroke();
+    }
+    // B: ct'축과 평행한 두 점선
+    const LB=L0u*Math.sqrt(Math.max(1e-6,1-bSP*bSP));
+    ctx.strokeStyle=C.sp;
+    for(const off of [-LB/2, LB/2]){
+      ctx.beginPath();
+      ctx.moveTo(...toScreen(-R*bSP+off,-R));
+      ctx.lineTo(...toScreen(R*bSP+off,R));
+      ctx.stroke();
+    }
+  } else {
+    const a_=alpha, r0_=1/a_, s=t;
+    const RCT=Math.ceil(H/(2*scale))+3, tauMax_rind=RCT+2;
+    // B(보른 강체): 중심=실선(ρ=0), 양 끝 점선 R=r0±L0/2
+    // (α≥4/3이면 뒤끝이 지평선 밖 → 지평선 직전에 클램프 + 반투명)
+    ctx.strokeStyle=C.sp;
+    const Rm_=r0_-L0u/2, Rp_=r0_+L0u/2;
+    for(const RR of [Math.max(0.02,Rm_), Rp_]){
+      const clamped=(RR!==Rp_&&Rm_<0.02);
+      if(clamped) ctx.globalAlpha=0.45;
+      const rho1=RR-r0_;
+      const tauX=Math.acosh(Math.max(1.0001,((W-OX)/scale+r0_)/RR))/a_;
+      const tauUp_m=Math.min(tauX,(OY+50)/scale), tauDn_m=Math.min(tauX,(H-OY+50)/scale);
+      const tauUp=tauUp_m+(tauMax_rind-tauUp_m)*s, tauDn=tauDn_m+(tauMax_rind-tauDn_m)*s;
+      ctx.beginPath(); let f=true;
+      for(let k=0;k<=300;k++){
+        const tau=-tauDn+k/300*(tauUp+tauDn);
+        const[p0x,p0y]=toScreen(RR*Math.cosh(a_*tau),RR*Math.sinh(a_*tau));
+        const[p1x,p1y]=toScreen(rho1,tau);
+        const px=(1-s)*p0x+s*p1x, py=(1-s)*p0y+s*p1y;
+        if(px<-2||px>W+2||py<-2||py>H+2){f=true;continue;}
+        if(f){ctx.moveTo(px,py);f=false;}else ctx.lineTo(px,py);
+      }
+      ctx.stroke();
+      if(clamped) ctx.globalAlpha=1;
+    }
+    // A(관성, 중심 x=r0): 앞/뒤 x0=r0±L0/2 — 수직선↔린들러 종모양 블렌드
+    ctx.strokeStyle=C.s;
+    for(const x0 of [r0_-L0u/2, r0_+L0u/2]){
+      if(x0<=0.01){
+        // 지평선 밖(웨지 밖): S'에서 표현 불가 → s가 커질수록 페이드아웃, 수직선만
+        if(s<0.999){
+          ctx.globalAlpha=1-s;
+          ctx.beginPath();
+          ctx.moveTo(...toScreen(x0,-(H-OY+50)/scale));
+          ctx.lineTo(...toScreen(x0,(OY+50)/scale));
+          ctx.stroke();
+          ctx.globalAlpha=1;
+        }
+        continue;
+      }
+      const ctMax=H/scale+2, tauSL=tauMax_rind;
+      ctx.beginPath(); let f=true;
+      for(let k=0;k<=300;k++){
+        const ct0=-ctMax+k/300*ctMax*2;
+        const tau1=-tauSL+k/300*tauSL*2;
+        const ct=(1-s)*ct0+s*x0*Math.sinh(a_*tau1);
+        const[p0x,p0y]=toScreen(x0,ct);
+        const tau_=Math.asinh(ct/x0)/a_;
+        const rho_=x0/Math.cosh(a_*tau_)-r0_;
+        const[p1x,p1y]=toScreen(rho_,tau_);
+        const px=(1-s)*p0x+s*p1x, py=(1-s)*p0y+s*p1y;
+        if(px<-2||px>W+2||py<-2||py>H+2){f=true;continue;}
+        if(f){ctx.moveTo(px,py);f=false;}else ctx.lineTo(px,py);
+      }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+// 동시성의 차이 시각화: 움직이는 우주선의 "자기 동시" 절단(성긴 점선 + ●)과
+// 표시 좌표계의 "지금" 절단(로켓, 기수=○)이 앞 세계선 위 서로 다른 사건을 가리킴
+// → 두 절단의 길이 차이(L0 vs L0/γ)가 곧 길이 수축 = 동시성의 상대성
+function drawSimulDiff(t,prog){
+  const L0u=L0PX/scale;
+  ctx.save();
+  ctx.setLineDash([2,4]);ctx.lineWidth=1.5;
+  if(motionType==='inertial'){
+    const ctEnd=(OY-10)/scale, ct0=Math.max(prog,0.0001)*ctEnd;
+    for(const pair of [[-beta*t,C.s],[beta*(1-t),C.sp]]){
+      const b=pair[0], color=pair[1];
+      if(Math.abs(b)<0.02) continue; // 정지: 두 동시면 일치 → 생략
+      const g=1/Math.sqrt(1-b*b), Lc=L0u/g;
+      const T=[b*ct0-Lc/2, ct0];            // 꼬리 사건 (뒤 세계선 위)
+      const F=[T[0]+g*L0u, T[1]+g*L0u*b];   // 자기 동시면 ∩ 앞 세계선 (간격=L0)
+      const N=[b*ct0+Lc/2, ct0];            // 표시계 동시면 ∩ 앞 세계선 (로켓 기수)
+      const pT=toScreen(T[0],T[1]), pF=toScreen(F[0],F[1]), pN=toScreen(N[0],N[1]);
+      ctx.strokeStyle=color;ctx.globalAlpha=0.65;
+      ctx.beginPath();ctx.moveTo(pT[0],pT[1]);ctx.lineTo(pF[0],pF[1]);ctx.stroke();
+      ctx.globalAlpha=1;
+      ctx.fillStyle=color;
+      ctx.beginPath();ctx.arc(pF[0],pF[1],3.5,0,Math.PI*2);ctx.fill();
+      ctx.setLineDash([]);
+      ctx.beginPath();ctx.arc(pN[0],pN[1],3.5,0,Math.PI*2);ctx.stroke();
+      ctx.setLineDash([2,4]);
+    }
+  } else {
+    const a_=alpha, r0_=1/a_;
+    const ap=getAccelParams();
+    const p_=Math.max(prog,0.0001);
+    const ct0=ap.ctTop*p_, tau1=ap.tauTop*p_;
+    // B: S 쪽 관점에서만 운동 (S'에선 정지 → 두 동시면 일치)
+    if(1-t>0.02 && ct0>1e-4){
+      const sh0=ct0/r0_, ch0=Math.sqrt(1+sh0*sh0);
+      const T0=toScreen(r0_*ch0, r0_*sh0);
+      const F0=toScreen((r0_+L0u)*ch0,(r0_+L0u)*sh0);   // τ=const 방사선 ∩ 앞 쌍곡선
+      const T1=toScreen(0,tau1), F1=toScreen(L0u,tau1);
+      const pT=[(1-t)*T0[0]+t*T1[0],(1-t)*T0[1]+t*T1[1]];
+      const pF=[(1-t)*F0[0]+t*F1[0],(1-t)*F0[1]+t*F1[1]];
+      const N0=toScreen(Math.sqrt((r0_+L0u)*(r0_+L0u)+ct0*ct0), ct0);
+      const pN=[(1-t)*N0[0]+t*F1[0],(1-t)*N0[1]+t*F1[1]];
+      ctx.strokeStyle=C.sp;ctx.globalAlpha=0.65;
+      ctx.beginPath();ctx.moveTo(pT[0],pT[1]);ctx.lineTo(pF[0],pF[1]);ctx.stroke();
+      ctx.globalAlpha=1;ctx.fillStyle=C.sp;
+      ctx.beginPath();ctx.arc(pF[0],pF[1],3.5,0,Math.PI*2);ctx.fill();
+      ctx.setLineDash([]);
+      ctx.beginPath();ctx.arc(pN[0],pN[1],3.5,0,Math.PI*2);ctx.stroke();
+      ctx.setLineDash([2,4]);
+    }
+    // A: S' 쪽 관점에서만 운동
+    if(t>0.02){
+      const xm=r0_-L0u/2, xp=r0_+L0u/2;
+      function mapEv(x0,ct){
+        const q0=toScreen(x0,ct);
+        const xs=Math.max(0.02,x0);
+        const ratio=Math.max(-0.995,Math.min(0.995,ct/xs));
+        const R=xs*Math.sqrt(1-ratio*ratio);
+        const q1=toScreen(R-r0_,Math.atanh(ratio)/a_);
+        return[(1-t)*q0[0]+t*q1[0],(1-t)*q0[1]+t*q1[1]];
+      }
+      if(xm>0.02){
+        const ctT=xm*Math.tanh(a_*tau1); // 꼬리 사건(S'절단의 꼬리)의 민코프스키 시각
+        ctx.strokeStyle=C.s;ctx.globalAlpha=0.65;
+        ctx.beginPath();
+        for(let k=0;k<=24;k++){
+          const x0=xm+(xp-xm)*k/24;
+          const P=mapEv(x0,ctT); // A의 동시면: ct=ctT (차트에서 곡선)
+          if(k===0)ctx.moveTo(P[0],P[1]);else ctx.lineTo(P[0],P[1]);
+        }
+        ctx.stroke();ctx.globalAlpha=1;
+        const pF=mapEv(xp,ctT);
+        ctx.fillStyle=C.s;
+        ctx.beginPath();ctx.arc(pF[0],pF[1],3.5,0,Math.PI*2);ctx.fill();
+        const pN=mapEv(xp, xp*Math.tanh(a_*tau1)); // S' 동시 절단의 기수 사건
+        ctx.setLineDash([]);
+        ctx.beginPath();ctx.arc(pN[0],pN[1],3.5,0,Math.PI*2);ctx.stroke();
+        ctx.setLineDash([2,4]);
+      }
+    }
+  }
+  ctx.restore();
+}
+
+// ═══════════════ 광신호 (도플러) ═══════════════
+// 선택된 발신자(A/B)가 자기 고유시간 Δτ=0.5 간격으로 상대에게 빛 발사.
+// 매 프레임 해석적으로 계산 (상태 없음). 등가속은 두 관점 차트를 안정 lerp.
+function chartScr(x,ct){ // 등가속: 민코프스키 사건 → 린들러 차트 화면 (클램프 사상)
+  const a_=alpha, r0_=1/a_;
+  const xs=Math.max(0.02,x);
+  const ratio=Math.max(-0.995,Math.min(0.995,ct/xs));
+  const R=xs*Math.sqrt(1-ratio*ratio);
+  return toScreen(R-r0_,Math.atanh(ratio)/a_);
+}
+
+function drawSignals(t,prog){
+  sigPhotons=[];
+  if(!showSignal) return;
+  if(motionType==='orbit') return;
+  const p_=Math.max(prog,0.0001);
+  ctx.save();
+  const YEL='#f59e0b';
+
+  function photonDot(px,py,alpha){
+    ctx.save();ctx.globalAlpha=alpha;
+    ctx.shadowColor=YEL;ctx.shadowBlur=10;
+    ctx.fillStyle=YEL;ctx.beginPath();ctx.arc(px,py,3.5,0,Math.PI*2);ctx.fill();
+    ctx.shadowBlur=0;ctx.fillStyle='#fff8dc';
+    ctx.beginPath();ctx.arc(px,py,1.6,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+  function recvFlash(px,py,g){
+    if(g<=0.01) return;
+    ctx.save();
+    ctx.globalAlpha=0.35*g;ctx.fillStyle=YEL;
+    ctx.beginPath();ctx.arc(px,py,4+12*g,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=1;ctx.shadowColor=YEL;ctx.shadowBlur=20*g;
+    ctx.fillStyle=YEL;ctx.beginPath();ctx.arc(px,py,3+4*g,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+
+  if(motionType==='inertial'){
+    const ctEnd=(OY-10)/scale, ctNow=p_*ctEnd;
+    const bSP=beta*(1-t), bS=-beta*t;
+    const be=(sigEmitter==='A')?bS:bSP, br=(sigEmitter==='A')?bSP:bS;
+    if(Math.abs(beta)<0.01){ctx.restore();return;}
+    const ge=1/Math.sqrt(1-be*be), gr=1/Math.sqrt(1-br*br);
+    const dir=Math.sign(br-be)||1;
+    for(let m=1;m<=40;m++){
+      const te=m*SIG_DTAU;
+      const xE=be*ge*te, ctE=ge*te;
+      if(ctE>ctEnd) break;
+      if(ctNow<ctE) break; // 아직 발사 전
+      const ctR=(dir>0)?(ctE-xE)/(1-br):(xE+ctE)/(1+br);
+      const ctP=Math.min(ctNow,ctR);
+      const pE=toScreen(xE,ctE), pP=toScreen(xE+dir*(ctP-ctE),ctP);
+      // 이동 궤적 (45° 광선)
+      ctx.strokeStyle=YEL;ctx.globalAlpha=0.5;ctx.lineWidth=1.5;ctx.setLineDash([5,4]);
+      ctx.beginPath();ctx.moveTo(pE[0],pE[1]);ctx.lineTo(pP[0],pP[1]);ctx.stroke();
+      ctx.setLineDash([]);ctx.globalAlpha=1;
+      // 발신 마커 (작은 링)
+      ctx.strokeStyle=YEL;ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.arc(pE[0],pE[1],3,0,Math.PI*2);ctx.stroke();
+      if(ctNow<ctR){
+        photonDot(pP[0],pP[1],1);
+        sigPhotons.push({px:pP[0],type:'fly'});
+      } else {
+        const g=Math.max(0,1-(ctNow-ctR)/0.5);
+        recvFlash(pP[0],pP[1],g);
+        if(g>0.01) sigPhotons.push({px:pP[0],type:'recv',g:g,to:(sigEmitter==='A')?'B':'A'});
+      }
+    }
+  } else if(motionType==='accel'){
+    const a_=alpha, r0_=1/a_;
+    const ap=getAccelParams();
+    const ctNow=ap.ctTop*p_, tauNow=ap.tauTop*p_;
+    const tauCap=(OY+60)/scale; // 화면 위 여유까지만 그림 (차트 궤적 상한)
+    for(let m=1;m<=40;m++){
+      const te=m*SIG_DTAU;
+      let xE,ctE,dir,ctR,reach,tauE1,tauR1,rhoE1,lapseE;
+      if(sigEmitter==='A'){
+        if(te>ap.ctTop) break;
+        xE=r0_; ctE=te; dir=1;
+        const d=r0_-te;
+        reach=d>1e-6;
+        ctR=reach?(r0_*r0_-d*d)/(2*d):Infinity;
+        // 발신 사건의 린들러 좌표 (웨지 안일 때만): A 세계선 위 (정확식)
+        if(te<r0_*0.9995){
+          tauE1=Math.atanh(te/r0_)/a_;
+          rhoE1=Math.sqrt(r0_*r0_-te*te)-r0_;   // = r0/cosh(aτE)-r0
+        } else {tauE1=Infinity; rhoE1=0;}
+        tauR1=reach?Math.asinh(ctR/r0_)/a_:Infinity;
+      } else {
+        if(te>Math.max(ap.tauTop, Math.asinh(ap.ctTop/r0_)/a_)) break;
+        xE=r0_*Math.cosh(a_*te); ctE=r0_*Math.sinh(a_*te); dir=-1;
+        reach=true;
+        ctR=r0_*(Math.exp(a_*te)-1);
+        tauE1=te; rhoE1=0;                       // B의 발신: 정확히 (ρ=0, τ=te)
+        tauR1=(ctR<r0_*0.9995)?Math.atanh(ctR/r0_)/a_:Infinity;
+      }
+      lapseE=1+a_*rhoE1; // 발신점의 1+αρ
+      // 가시성: 각 관점 시계로 발사 여부 판정 후 블렌드
+      const vis0=(ctNow>=ctE)?1:0;
+      const vis1=(isFinite(tauE1)&&tauNow>=tauE1)?1:0;
+      const vis=(1-t)*vis0+t*vis1;
+      if(vis<0.02) continue;
+      // 광자 현재 위치의 시간 파라미터
+      const ctP0=Math.min(ctNow, isFinite(ctR)?ctR:ctNow);          // s=0: 좌표시간
+      const tauP1=isFinite(tauE1)?Math.min(tauNow, isFinite(tauR1)?tauR1:tauNow, tauCap):null; // s=1: 린들러 시간
+      // S' 널 곡선 (정확해): 1+αρ(τ) = lapseE · e^{dir·α(τ-τE)}
+      function rho1Of(tau){ return (lapseE*Math.exp(dir*a_*(tau-tauE1))-1)/a_; }
+      // 궤적 폴리라인: u∈[0,1] — s=0은 민코프스키 광선, s=1은 널 곡선을 병렬 샘플
+      ctx.strokeStyle=YEL;ctx.globalAlpha=0.5*vis;ctx.lineWidth=1.5;ctx.setLineDash([5,4]);
+      ctx.beginPath();
+      let pP=null;
+      for(let i=0;i<=24;i++){
+        const u=i/24;
+        const c0=ctE+u*(Math.max(ctE,ctP0)-ctE);
+        const s0=toScreen(xE+dir*(c0-ctE),c0);
+        let px,py;
+        if(tauP1!==null){
+          const tu=tauE1+u*(tauP1-tauE1);
+          const s1=toScreen(rho1Of(tu),tu);
+          px=(1-t)*s0[0]+t*s1[0];py=(1-t)*s0[1]+t*s1[1];
+        } else {
+          px=s0[0];py=s0[1]; // 발신 자체가 웨지 밖: S측만 (vis1=0이라 t>0에서 사라짐)
+        }
+        if(i===0)ctx.moveTo(px,py);else ctx.lineTo(px,py);
+        if(i===24)pP=[px,py];
+      }
+      ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;
+      // 발신 마커 (정확 좌표 블렌드)
+      const sE0=toScreen(xE,ctE);
+      const sE1=isFinite(tauE1)?toScreen(rhoE1,tauE1):null;
+      const pEx=sE1?((1-t)*sE0[0]+t*sE1[0]):sE0[0];
+      const pEy=sE1?((1-t)*sE0[1]+t*sE1[1]):sE0[1];
+      ctx.save();ctx.globalAlpha=(sE1?1:(1-t))*vis;
+      ctx.strokeStyle=YEL;ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.arc(pEx,pEy,3,0,Math.PI*2);ctx.stroke();
+      ctx.restore();
+      // 광자 / 수신 플래시
+      const arrived0=reach&&ctNow>=ctR;
+      const arrived1=isFinite(tauR1)&&tauNow>=tauR1;
+      const arrived=(1-t)*(arrived0?1:0)+t*(arrived1?1:0);
+      if(arrived<0.5){
+        if(pP){photonDot(pP[0],pP[1],vis);sigPhotons.push({px:pP[0],type:'fly',a:vis});}
+      } else {
+        const g0=arrived0?Math.max(0,1-(ctNow-ctR)/0.6):0;
+        const g1=arrived1?Math.max(0,1-(tauNow-tauR1)/0.6):0;
+        const g=((1-t)*g0+t*g1)*vis;
+        if(g>0.01&&isFinite(ctR)){
+          // 수신 사건: A발사→B수신 (0,τR) / B발사→A수신 (r0/cosh-r0, τR) — 정확 좌표
+          const eR=[xE+dir*(ctR-ctE),ctR];
+          const r0s=toScreen(eR[0],eR[1]);
+          let r1s=null;
+          if(isFinite(tauR1)){
+            r1s=(sigEmitter==='A')?toScreen(0,tauR1)
+                                  :toScreen(r0_/Math.cosh(a_*tauR1)-r0_,tauR1);
+          }
+          const rx=r1s?((1-t)*r0s[0]+t*r1s[0]):r0s[0];
+          const ry=r1s?((1-t)*r0s[1]+t*r1s[1]):r0s[1];
+          recvFlash(rx,ry,g*(r1s?1:(1-t)));
+          sigPhotons.push({px:rx,type:'recv',g:g,to:(sigEmitter==='A')?'B':'A'});
+        }
+      }
+    }
+  } else if(motionType==='twin'){
+    const p=twinParams();
+    if(p.deg){ctx.restore();return;}
+    const tNow=p_*p.T;
+    // 카메라 동시면: t − tNow = u(x − x_B). 광자의 "현재 위치"와 발신·도착 여부를
+    // 이 절단으로 판정 — s=0이면 S 절단(t=tNow)으로 정확히 환원.
+    // (S 절단을 쓰면 B 순간계에서 광자가 발신자 밖에 그려지거나, 반환 후
+    //  동시면 도약으로 이미 과거가 된 발신들의 광자가 누락되는 결함이 있었음)
+    const uw=twCamU*p.sd;          // 크기 좌표계의 카메라 부스트 (drawTwin이 이번 프레임 갱신)
+    const XmN=twinXm(p,tNow);      // |x_B|(tNow)
+    function drawOne(pE,pC,arrived,g,toWho){
+      // 궤적: 포앵카레 사상은 직선·45° 보존 → 양 끝점만 연결
+      ctx.strokeStyle=YEL;ctx.globalAlpha=0.5;ctx.lineWidth=1.5;ctx.setLineDash([5,4]);
+      ctx.beginPath();ctx.moveTo(pE[0],pE[1]);ctx.lineTo(pC[0],pC[1]);ctx.stroke();
+      ctx.setLineDash([]);ctx.globalAlpha=1;
+      ctx.strokeStyle=YEL;ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.arc(pE[0],pE[1],3,0,Math.PI*2);ctx.stroke();
+      if(!arrived){
+        photonDot(pC[0],pC[1],1);
+        sigPhotons.push({px:pC[0],type:'fly'});
+      } else if(g>0.01){
+        recvFlash(pC[0],pC[1],g);
+        sigPhotons.push({px:pC[0],type:'recv',g:g,to:toWho});
+      }
+    }
+    if(sigEmitter==='A'){
+      // A(정지)가 Δτ=0.5마다 발신 → B 수신. 광자 세계선: x̂=t−te (크기 좌표)
+      // 동시면 교점: tPu = (tNow − uw(te+x̂_B))/(1−uw)
+      for(let m=1;m<=60;m++){
+        const te=m*SIG_DTAU;
+        if(te>=p.T) break;
+        const tPu=(tNow-uw*(te+XmN))/(1-uw);
+        if(tPu<te) break; // 이 관점의 동시면이 발신 사건에 아직 도달 전 (te 단조 → break 가능)
+        const tr=twinRecvA(p,te);
+        const tP=Math.min(tPu,tr);
+        const pE=twS(0,te);
+        const pC=twS(p.sd*(tP-te),tP);
+        const g=Math.max(0,1-(tPu-tr)/0.5);
+        drawOne(pE,pC,tPu>=tr,g,'B');
+      }
+    } else {
+      // B가 자기 고유시간 Δτ=0.5마다 발신 → A 수신: t_r = t_e + |x_e| (해석적)
+      // 발신 사건은 B 세계선 위 → τ 순서는 관점 무관 (시간꼴 곡선의 인과 순서 불변)
+      // 광자 세계선: x̂ = x_e − (t−t_e) → 동시면 교점 tPu = (tNow + uw(x_e+t_e−x̂_B))/(1+uw)
+      const tauNowB=twinTau(p,tNow);
+      for(let m=1;m<=60;m++){
+        const taue=m*SIG_DTAU;
+        if(taue>=p.tauTotal||tauNowB<taue) break;
+        const ev=twinEv(p,taue);
+        const xe=ev[0], te=ev[1];
+        const tr=te+xe;
+        const tPu=(tNow+uw*(xe+te-XmN))/(1+uw);
+        const tP=Math.max(te,Math.min(tPu,tr));
+        const pE=twS(p.sd*xe,te);
+        const pC=twS(p.sd*Math.max(0,xe-(tP-te)),tP);
+        const g=Math.max(0,1-(tPu-tr)/0.5);
+        drawOne(pE,pC,tPu>=tr,g,'A');
+      }
+    }
+  }
+  ctx.restore();
+}
+
+// 우주선에 붙어 함께 이동하는 4속도 벡터
+// |u·u|=c²은 불변량이므로 화살표 길이를 고정(=c에 해당, 48px)하고
+// 방향만 세계선 접선(시간축)을 따라 회전 — "크기는 항상 c, 방향만 변한다"
+// (주의: 민코프스키 다이어그램의 유클리드 길이는 물리량이 아니므로,
+//  고정 길이는 norm 불변을 나타내는 시각화 규약. 성분 (γ,γβ)은 자라지만 norm은 -c²)
+function drawBall4V(t,prog,posA,posB,axes){
+  if(!show4V) return;
+  const L=48; // |u|=c 고정 길이
+  const norm=v=>{const l=Math.hypot(v[0],v[1])||1;return[v[0]/l,v[1]/l];};
+  function arrow(pos,dir,color){
+    const d=norm(dir);
+    const x2=pos.px+d[0]*L, y2=pos.py+d[1]*L;
+    ctx.save();
+    ctx.strokeStyle=color;ctx.lineWidth=2.5;ctx.setLineDash([]);
+    ctx.beginPath();ctx.moveTo(pos.px,pos.py);ctx.lineTo(x2,y2);ctx.stroke();
+    arrowHead(pos.px,pos.py,x2,y2,color);
+    ctx.fillStyle=color;ctx.font='italic bold 12px DM Sans';
+    ctx.fillText('u',x2+5,y2-3);
+    ctx.restore();
+  }
+  arrow(posA,axes.A.time,C.s);
+  arrow(posB,axes.B.time,C.sp);
+}
+
+function drawBalls(t, prog){
+  if(prog<=0) return;
+  if(motionType==='barn'||motionType==='bell'||motionType==='orbit') return; // 전용 절단·그래픽 사용 모드
+  const {posA, posB} = getBallPositions(t, prog);
+  // 독립 시간/공간 축 (우주선보다 먼저 그려 우주선이 위에 오도록)
+  const axes=getBallAxes(t, prog);
+  drawBallAxes(posA, axes.A, C.s);
+  drawBallAxes(posB, axes.B, C.sp);
+  let flameB=(motionType==='accel'), dirB2=1;
+  if(motionType==='twin'){
+    const pTw=twinParams();
+    flameB=twinBendNow(prog)>0;
+    const v=pTw.sd*twinVm(pTw,Math.max(prog,0.0001)*pTw.T);
+    if(v<-0.01)dirB2=-1;
+  }
+  if(!showShip){
+    // 점 모드: 기존 소형 로켓
+    drawRocketOn(ctx,posA.px,posA.py,C.s,1,false,'A',32);
+    drawRocketOn(ctx,posB.px,posB.py,C.sp,dirB2,flameB,'B',32);
+    drawBall4V(t,prog,posA,posB,axes);
+    return;
+  }
+  // 길이 모드: 두 절단을 동시에 표시
+  //  (1) 반투명: 표시 좌표계의 동시면 절단 — 수평, 수축된 길이 (A가 측정하는 B)
+  //  (2) 진하게: 자기 동시면 절단 — 세계선(ct'축)에 나란히 놓인 고유길이 우주선
+  const st=getShipState(t,prog);
+  const L0u=L0PX/scale;
+  // ── (1) 반투명 수평 우주선 (표시계 "지금" 절단)
+  ctx.globalAlpha=0.35;
+  const cxA=posA.px, cxB=posB.px+(st.rearB?st.lenB/2:0)+st.offB;
+  drawRocketOn(ctx,cxA,posA.py,C.s,1,false,'',st.lenA);
+  drawRocketOn(ctx,cxB,posB.py,C.sp,1,false,'',st.lenB);
+  ctx.globalAlpha=1;
+  // ── (2) 진한 기울어진 우주선 (자기 동시면 절단, 고유길이 L0)
+  let A1,A2,B1,B2;
+  if(motionType==='inertial'){
+    const bSP=beta*(1-t), bS=-beta*t;
+    const gS=1/Math.sqrt(Math.max(1e-6,1-bS*bS)), gP=1/Math.sqrt(Math.max(1e-6,1-bSP*bSP));
+    const vA=[gS*L0PX/2, -gS*bS*L0PX/2];
+    const vB=[gP*L0PX/2, -gP*bSP*L0PX/2];
+    A1=[posA.px-vA[0],posA.py-vA[1]]; A2=[posA.px+vA[0],posA.py+vA[1]];
+    B1=[posB.px-vB[0],posB.py-vB[1]]; B2=[posB.px+vB[0],posB.py+vB[1]];
+  } else {
+    const a_=alpha, r0_=1/a_;
+    const ap=getAccelParams();
+    const p_=Math.max(prog,0.0001);
+    const ct0=ap.ctTop*p_, tau1=ap.tauTop*p_;
+    const sh0=ct0/r0_, ch0=Math.sqrt(1+sh0*sh0);
+    // 중심 기준: 꼬리/기수가 R=r0∓L0/2 세계선의 같은-τ 사건 (뒤는 지평선 클램프)
+    const Rm=Math.max(0.02, r0_-L0u/2), Rp=r0_+L0u/2;
+    const b1_0=toScreen(Rm*ch0,Rm*sh0), b2_0=toScreen(Rp*ch0,Rp*sh0);
+    const b1_1=toScreen(Rm-r0_,tau1),   b2_1=toScreen(Rp-r0_,tau1);
+    B1=[(1-t)*b1_0[0]+t*b1_1[0],(1-t)*b1_0[1]+t*b1_1[1]];
+    B2=[(1-t)*b2_0[0]+t*b2_1[0],(1-t)*b2_0[1]+t*b2_1[1]];
+    const ctE=(1-t)*ct0+t*(r0_*Math.tanh(a_*tau1));
+    function mapA(x0){
+      const[q0x,q0y]=toScreen(x0,ctE);
+      const xs=Math.max(0.02,x0);
+      const ratio=Math.max(-0.995,Math.min(0.995,ctE/xs));
+      const R=xs*Math.sqrt(1-ratio*ratio);
+      const tau_=Math.atanh(ratio)/a_;
+      const[q1x,q1y]=toScreen(R-r0_,tau_);
+      return[(1-t)*q0x+t*q1x,(1-t)*q0y+t*q1y];
+    }
+    A1=mapA(r0_-L0u/2); A2=mapA(r0_+L0u/2);
+  }
+  function shipDraw(P1,P2,color,flame,label){
+    const mx=(P1[0]+P2[0])/2,my=(P1[1]+P2[1])/2;
+    const ang=Math.atan2(P2[1]-P1[1],P2[0]-P1[0]);
+    const len=Math.hypot(P2[0]-P1[0],P2[1]-P1[1]);
+    drawRocketOn(ctx,mx,my,color,1,flame,'',len,ang);
+    ctx.fillStyle=color;ctx.font='bold 11px DM Mono';ctx.textAlign='center';
+    ctx.fillText(label,P1[0],P1[1]-16);
+    ctx.textAlign='left';
+  }
+  shipDraw(A1,A2,C.s,false,'A');
+  shipDraw(B1,B2,C.sp,flameB,'B');
+  drawBall4V(t,prog,posA,posB,axes);
+}
+
+// 하단 뷰 라벨: 표시 중인 "공간"이 어느 관측자의 동시면/좌표 공간인지 명시
+// (린들러 ρ는 가속 관측자의 좌표 공간이지 유클리드 "실제 공간"이 아님)
+function updateSpaceLabel(t){
+  const el=document.getElementById('spaceLabel');
+  let txt;
+  if(motionType==='orbit'){
+    txt='ORBITAL PLANE — 궤도면을 위에서 본 그림 (먼 관측자의 슈바르츠실트 좌표)';
+  } else if(motionType==='barn'){
+    txt=t<0.5?'SPACE VIEW — 헛간계 S의 공간 (t=const 동시면 절단)'
+             :"SPACE VIEW — 막대계 S'의 공간 (t'=const 동시면 절단)";
+  } else if(t<0.5){
+    txt='SPACE VIEW — 관성계 S의 공간 (t=const 동시면 절단)';
+  } else {
+    if(motionType==='inertial') txt="SPACE VIEW — 관성계 S'의 공간 (t'=const 동시면 절단)";
+    else if(motionType==='twin') txt='SPACE VIEW — B의 순간 공동운동 관성계 (단일 관성계 아님)';
+    else if(motionType==='bell') txt='SPACE VIEW — 우주선들의 순간 공동운동 관성계 (단일 관성계 아님)';
+    else txt='RINDLER FRAME — 가속 관측자의 좌표 공간 ρ (유클리드 공간 아님)';
+  }
+  if(el.textContent!==txt) el.textContent=txt;
+}
+
+function draw(){
+  updateAnim(); // 관점 전환 애니메이션 진행 (별도 rAF 루프 대신 여기서 갱신)
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
+  const t=animating?animT:(viewMode==='SP'?1:0);
+  ctShift=0; // 배율 80 고정, 세로 팬은 drawBarn이 재생 중에만 설정
+  updateSpaceLabel(t);
+  // 공 진행도 계산 — 쌍둥이 카메라(B의 현재 속도)와 눈금 글로우가 쓰므로 장면보다 먼저
+  let prog=0;
+  if(ballRunning||ballT>0){
+    const now=performance.now();
+    if(ballRunning&&!ballPaused){
+      prog=Math.min(1,(now-ballAnimStart)*timeSpeed/ballDur());
+      if(prog>=1){
+        ballRunning=false;ballT=1;ballPaused=false;
+        const btn=document.getElementById('btnBall');
+        if(btn){btn.textContent='▶ 다시 진행';}
+      } else ballT=prog;
+    } else {
+      prog=ballT;
+    }
+  }
+  if(motionType==='inertial') drawInertial(t);
+  else if(motionType==='accel') drawAccel(t);
+  else if(motionType==='orbit') drawOrbit(t,prog);
+  else if(motionType==='twin') drawTwin(t,prog);
+  else if(motionType==='barn') drawBarn(t,prog);
+  else drawBell(t,prog);
+  drawShipWorldlines(t);
+  drawProperTicks(t,prog);
+  if(mouseOnCanvas&&showLightCone&&motionType!=='orbit') drawLightCone(t);
+  else if(motionType==='orbit') tip.style.display='none';
+  if(ballRunning||ballT>0) drawBalls(t, prog);
+  drawSignals(t, prog);
+  drawSpace(t, prog);
+}
+
+// ═══════════════ 등속 ═══════════════
+function drawInertial(t){
+  xShift=0; // 등속은 이동 없음
+  const bSP=beta*(1-t), bS=-beta*t;
+  drawSkewGrid(bS,C.grid);
+  drawSkewGrid(bSP,C.grid);
+  drawLightRays45();
+  drawAxes(bS,C.s,'x','ct',true);
+  drawAxes(bSP,C.sp,"x'","ct'",false);
+  // 빨간 세계선은 drawAxes(bSP)의 ct'축과 동일 → 별도로 그리지 않음
+  if(show4V){
+    const g=1/Math.sqrt(1-Math.max(1e-6,beta*beta));
+    // 빨간(S') 4속도: bSP 방향
+    const[vx,vy]=toScreen(0,0);
+    const[ex,ey]=toScreen(bSP*g*0.6,g*0.6);
+    const dx=ex-vx,dy=ey-vy,len=Math.sqrt(dx*dx+dy*dy)||1,L=48;
+    ctx.strokeStyle=C.sp;ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.moveTo(vx,vy);ctx.lineTo(vx+dx/len*L,vy+dy/len*L);ctx.stroke();
+    arrowHead(vx,vy,vx+dx/len*L,vy+dy/len*L,C.sp);
+    ctx.fillStyle=C.sp;ctx.font='bold 11px DM Mono';
+    ctx.fillText('u^μ',vx+dx/len*L+4,vy+dy/len*L);
+    // 파란(S) 4속도: bS 방향 (S 관찰자의 4속도)
+    const gS=1/Math.sqrt(1-Math.max(1e-6,bS*bS));
+    const[esX,esY]=toScreen(bS*gS*0.6,gS*0.6);
+    const dsx=esX-vx,dsy=esY-vy,lensS=Math.sqrt(dsx*dsx+dsy*dsy)||1;
+    ctx.strokeStyle=C.s;ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.moveTo(vx,vy);ctx.lineTo(vx+dsx/lensS*L,vy+dsy/lensS*L);ctx.stroke();
+    arrowHead(vx,vy,vx+dsx/lensS*L,vy+dsy/lensS*L,C.s);
+    ctx.fillStyle=C.s;ctx.font='bold 11px DM Mono';
+    ctx.fillText('u^μ',vx+dsx/lensS*L+4,vy+dsy/lensS*L);
+  }
+  if(showInterval&&eventPt) drawIntervalInertial(beta*t);
+}
+
+
+function drawSkewGrid(b,color,Rext){
+  const R=Rext||(Math.ceil(Math.max(W,H)/scale)+4);
+  const isOrtho=Math.abs(b)<0.001;
+  ctx.strokeStyle=color;ctx.lineWidth=0.8;
+  ctx.beginPath();
+  for(let n=-R;n<=R;n++){
+    if(isOrtho){
+      ctx.moveTo(...toScreen(n,-R));ctx.lineTo(...toScreen(n,R));
+      ctx.moveTo(...toScreen(-R,n));ctx.lineTo(...toScreen(R,n));
+    } else {
+      const g=1/Math.sqrt(1-b*b);
+      ctx.moveTo(...toScreen(-R,(-R-n/g)/b));ctx.lineTo(...toScreen(R,(R-n/g)/b));
+      ctx.moveTo(...toScreen(-R,-R*b+n/g));ctx.lineTo(...toScreen(R,R*b+n/g));
+    }
+  }
+  ctx.stroke();
+}
+
+function drawLightRays45(Rext){
+  const R=Rext||(Math.max(W,H)/scale+2);
+  ctx.strokeStyle=C.light;ctx.lineWidth=1.5;ctx.setLineDash([6,4]);
+  ctx.beginPath();
+  ctx.moveTo(...toScreen(-R,-R));ctx.lineTo(...toScreen(R,R));
+  ctx.moveTo(...toScreen(R,-R));ctx.lineTo(...toScreen(-R,R));
+  ctx.stroke();ctx.setLineDash([]);
+}
+
+function drawAxes(b,color,lx,lct,ticks,Rext){
+  const R=Rext||(Math.max(W,H)/scale+2);
+  ctx.setLineDash([]);
+  ctx.strokeStyle=color;ctx.lineWidth=2.5;
+  ctx.beginPath();
+  ctx.moveTo(...toScreen(0,0));ctx.lineTo(...toScreen(R,R*b));
+  ctx.moveTo(...toScreen(0,0));ctx.lineTo(...toScreen(R*b,R));
+  ctx.stroke();
+  arrowHead(...toScreen(R-0.3,(R-0.3)*b),...toScreen(R,R*b),color);
+  arrowHead(...toScreen((R-0.3)*b,R-0.3),...toScreen(R*b,R),color);
+  ctx.strokeStyle=color;ctx.lineWidth=2.5;
+  ctx.beginPath();
+  ctx.moveTo(...toScreen(0,0));ctx.lineTo(...toScreen(-R,-R*b));
+  ctx.moveTo(...toScreen(0,0));ctx.lineTo(...toScreen(-R*b,-R));
+  ctx.stroke();
+  ctx.fillStyle=color;ctx.font='bold 13px DM Sans';
+  ctx.fillText(lx,...toScreen(R-0.4,R*b-0.35));
+  ctx.fillText(lct,...toScreen(R*b+0.1,R-0.3));
+  if(ticks&&Math.abs(b)<0.05){
+    ctx.strokeStyle=color;ctx.lineWidth=1;ctx.font='9px DM Mono';
+    const NT=Math.min(60,Math.max(8,Math.ceil(R)));
+    for(let n=-NT;n<=NT;n++){
+      if(n===0)continue;
+      const[sx,sy]=toScreen(n,0);
+      ctx.beginPath();ctx.moveTo(sx,sy-4);ctx.lineTo(sx,sy+4);ctx.stroke();
+      if(n%2===0){ctx.fillStyle=color;ctx.fillText(n,sx-4,sy+14);}
+      const[cx,cy]=toScreen(0,n);
+      ctx.beginPath();ctx.moveTo(cx-4,cy);ctx.lineTo(cx+4,cy);ctx.stroke();
+      if(n%2===0)ctx.fillText(n,cx+6,cy+4);
+    }
+  }
+}
+
+// ═══════════════ 쌍둥이 역설 ═══════════════
+// A: x=0에 머무는 쌍둥이(관성). B: +β 출발 → 반환 → −β 귀환.
+// S' 관점 = "B의 순간 공동운동 관성계": 부스트 u=s·v_B(t_now) + 평행이동으로
+// B의 현재 사건을 (x'=0, ct'=τ_B)에 고정 — 매 프레임의 화면이 정확한 포앵카레
+// 변환의 결과이며, B에게 단일 관성계가 없다는 사실(=역설의 답)이 반환 구간의
+// 연속 전단과 A 시계의 도약으로 그대로 드러남.
+function drawTwin(s,prog){
+  xShift=0;
+  const p=twinParams();
+  const tNow=Math.max(0,Math.min(1,prog))*p.T;
+  const vNow=p.deg?0:p.sd*twinVm(p,tNow);
+  twCamU=Math.max(-0.985,Math.min(0.985,s*vNow));
+  const u=twCamU;
+  // ── 카메라 평행이동: s=1에서 B의 현재 사건이 (x'=0, ct'=τ_B)에 고정되도록.
+  //    왕로 세계선은 원점을 지나 이동=0 (기존과 동일)이지만, 귀로에선 부스트만으로
+  //    B가 x'=γ(x1+βt2)로 밀려나 고속에서 화면 밖으로 사라짐 → 이동 성분이 교정.
+  //    각 s의 화면 = 부스트 Λ(u) + 평행이동 = 정확한 포앵카레 변환 (근사 아님).
+  {
+    const EB=[p.sd*twinXm(p,tNow), tNow];
+    let bx=EB[0],bct=EB[1];
+    if(Math.abs(u)>=1e-9){const r=lorentz(EB[0],EB[1],u);bx=r[0];bct=r[1];}
+    twOffX=s*(0-bx);
+    twOffCt=s*(twinTau(p,tNow)-bct);
+  }
+  // ── 배경 (S 격자·광선·S축): 이동 성분까지 반영해야 하므로 twS로 직접 사상
+  if(Math.abs(u)<1e-9&&Math.abs(twOffX)<1e-9&&Math.abs(twOffCt)<1e-9){
+    drawSkewGrid(0,C.grid);
+    drawLightRays45();
+    drawAxes(0,C.s,'x','ct',true);
+  } else {
+    // 화면 네 모서리를 S 좌표로 역사상 → 화면을 덮는 격자 범위 산출
+    let mnX=1e9,mxX=-1e9,mnC=1e9,mxC=-1e9;
+    for(const c of [[0,0],[W,0],[0,H],[W,H]]){
+      const wq=toWorld(c[0],c[1]);
+      const q=twInvW(wq[0],wq[1]);
+      mnX=Math.min(mnX,q[0]);mxX=Math.max(mxX,q[0]);
+      mnC=Math.min(mnC,q[1]);mxC=Math.max(mxC,q[1]);
+    }
+    const lo=Math.max(-400,Math.floor(mnX)-1), hi=Math.min(400,Math.ceil(mxX)+1);
+    const lc=Math.max(-400,Math.floor(mnC)-1), hc=Math.min(400,Math.ceil(mxC)+1);
+    const twLine=(x1,c1,x2,c2)=>{const a=twS(x1,c1),b=twS(x2,c2);ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);};
+    ctx.strokeStyle=C.grid;ctx.lineWidth=0.8;ctx.beginPath();
+    for(let n=lo;n<=hi;n++) twLine(n,lc,n,hc);
+    for(let m2=lc;m2<=hc;m2++) twLine(lo,m2,hi,m2);
+    ctx.stroke();
+    // 광선: 출발 사건 (0,0)의 광원뿔 — 포앵카레 사상은 직선·45° 보존 → 끝점만 사상
+    const Rr=Math.max(Math.abs(mnX),Math.abs(mxX),Math.abs(mnC),Math.abs(mxC))+2;
+    ctx.strokeStyle=C.light;ctx.lineWidth=1.5;ctx.setLineDash([6,4]);ctx.beginPath();
+    twLine(-Rr,-Rr,Rr,Rr); twLine(Rr,-Rr,-Rr,Rr);
+    ctx.stroke();ctx.setLineDash([]);
+    // S축 (x축: ct=0 / ct축: x=0)
+    ctx.strokeStyle=C.s;ctx.lineWidth=2;ctx.beginPath();
+    twLine(lo,0,hi,0); twLine(0,lc,0,hc);
+    ctx.stroke();
+    const lxp=twS(mxX-0.4,0), lcp=twS(0,mxC-0.4);
+    ctx.fillStyle=C.s;ctx.font='bold 13px DM Sans';
+    if(lxp[0]>4&&lxp[0]<W-10&&lxp[1]>10&&lxp[1]<H-4) ctx.fillText('x',lxp[0],lxp[1]-6);
+    if(lcp[0]>4&&lcp[0]<W-14&&lcp[1]>10&&lcp[1]<H-4) ctx.fillText('ct',lcp[0]+6,lcp[1]);
+  }
+  if(p.deg){
+    if(showInterval&&eventPt) drawIntervalInertial(u,twS);
+    return;
+  }
+  // ── 동시선 스윕 밴드: 반환 동안 B의 동시선이 지나가는 A(x=0)의 구간
+  //    경계: 반환 시작·끝 사건의 동시선 ∩ x=0 → [t1−βx1, t2+βx1] = [t1/γ², t2+β²t1]
+  //    순간 반전이면 B의 "지금"이 통째로 건너뛰는 구간(동시성 점프)
+  const tA1=p.t1-p.bm*p.x1, tA2=p.t2+p.bm*p.x1;
+  {
+    const q1=twS(0,tA1), q2=twS(0,tA2);
+    ctx.save();
+    ctx.strokeStyle='rgba(124,58,237,0.28)';ctx.lineWidth=9;ctx.lineCap='butt';
+    ctx.beginPath();ctx.moveTo(q1[0],q1[1]);ctx.lineTo(q2[0],q2[1]);ctx.stroke();
+    const e1=twS(p.sd*p.x1,p.t1), e2=twS(p.sd*p.x1,p.t2);
+    ctx.strokeStyle='rgba(124,58,237,0.45)';ctx.lineWidth=1;ctx.setLineDash([3,3]);
+    ctx.beginPath();ctx.moveTo(e1[0],e1[1]);ctx.lineTo(q1[0],q1[1]);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(e2[0],e2[1]);ctx.lineTo(q2[0],q2[1]);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+  // ── A 세계선 (x=0)
+  {
+    const a0=twS(0,-0.5), a1=twS(0,p.T+0.6);
+    ctx.strokeStyle=C.s;ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.moveTo(a0[0],a0[1]);ctx.lineTo(a1[0],a1[1]);ctx.stroke();
+    ctx.fillStyle=C.s;ctx.font='bold 11px DM Mono';
+    ctx.fillText('A',a1[0]-16,a1[1]+14);
+  }
+  // ── B 세계선 (V자 / 모서리 둥근 V — 반환 구간은 쌍곡선 호)
+  {
+    ctx.strokeStyle=C.sp;ctx.lineWidth=2.5;
+    ctx.beginPath();let f=true;
+    const N=260;
+    for(let i=0;i<=N;i++){
+      const tt=p.T*i/N;
+      const q=twS(p.sd*twinXm(p,tt),tt);
+      if(q[0]<-40||q[0]>W+40||q[1]<-40||q[1]>H+40){f=true;continue;}
+      if(f){ctx.moveTo(q[0],q[1]);f=false;}else ctx.lineTo(q[0],q[1]);
+    }
+    ctx.stroke();
+    const apx=twS(p.sd*p.xApex,p.T/2);
+    ctx.fillStyle=C.sp;ctx.font='bold 11px DM Mono';
+    ctx.fillText('B',apx[0]+(p.sd>0?10:-20),apx[1]+4);
+    ctx.font='8px DM Mono';
+    ctx.fillText('반환',apx[0]+(p.sd>0?10:-26),apx[1]+16);
+  }
+  // ── 출발·재회 사건
+  {
+    const d0=twS(0,0), d1=twS(0,p.T);
+    ctx.fillStyle='#1a1a2e';
+    ctx.beginPath();ctx.arc(d0[0],d0[1],4,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(d1[0],d1[1],4,0,Math.PI*2);ctx.fill();
+    ctx.font='8px DM Mono';
+    ctx.fillText('출발',d0[0]+7,d0[1]+3);
+    ctx.fillText('재회',d1[0]+7,d1[1]+3);
+  }
+  // ── B의 현재 동시선 + A와의 교점: "B가 생각하는 A의 지금"
+  //    반환 구간에서 이 교점이 밴드를 질주해 올라감 = 동시성 해소의 시각화
+  if(prog>0.001&&prog<0.999){
+    const xB=p.sd*twinXm(p,tNow);
+    const ctSim=tNow-vNow*xB; // 동시선 ∩ x=0 (S 좌표)
+    const simPt=xx=>twS(xx, tNow+vNow*(xx-xB));
+    const LR=Math.max(W,H)/scale*4+6; // 고속 부스트로 압축돼도 화면을 가로지르도록
+    const eL=simPt(xB-LR), eR=simPt(xB+LR);
+    ctx.save();
+    ctx.strokeStyle=C.prop;ctx.lineWidth=1.5;ctx.setLineDash([6,4]);
+    ctx.beginPath();ctx.moveTo(eL[0],eL[1]);ctx.lineTo(eR[0],eR[1]);ctx.stroke();
+    ctx.setLineDash([]);
+    const q=twS(0,ctSim);
+    ctx.fillStyle=C.prop;
+    ctx.beginPath();ctx.arc(q[0],q[1],4,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+  }
+  if(showInterval&&eventPt) drawIntervalInertial(u,twS);
+}
+
+// ═══════════════ 막대와 헛간 ═══════════════
+// 카메라 = 원점(정렬 사건) 기준 순수 부스트 u=s·β — 모든 중간 화면이 정확한
+// 로런츠 변환. 같은 두 사건 E₁·E₂가 헛간계에선 E₁→E₂(밀폐 존재), 막대계에선
+// E₂→E₁(밀폐 없음)로 순서가 뒤집히는 것이 동시성의 상대성에 의한 해소.
+function drawBarn(s,prog){
+  xShift=0;
+  const p=barnParams();
+  const bSig=p.deg?0:p.sd*p.bm;
+  bnU=Math.max(-0.985,Math.min(0.985,s*bSig));
+  const u=bnU;
+  const gcam=1/Math.sqrt(1-u*u);
+  const ctCam=(x,ct)=>gcam*(ct-u*x); // 카메라 시간좌표 (사건 통과 판정·팬 기준)
+  // ── 재생 상태 (배경보다 먼저: 세로 팬이 배경 격자·축에도 적용되어야 함)
+  const active=(ballRunning||ballT>0);
+  let tSnow=0, xc=0, CTn=0;
+  if(!p.deg){
+    tSnow=p.tLo+Math.max(0,Math.min(1,prog))*(p.tHi-p.tLo);
+    xc=bSig*tSnow;
+    CTn=ctCam(xc,tSnow);
+  }
+  // 스크롤·줌 없음: 축소된 길이 덕에 이야기 창(tLo..tHi)이 고정 화면 안에서 완결
+  const REx=Math.max(W,H)/scale+2;
+  // 배경: 헛간계 격자·축 + 막대계 축 (단일 카메라 부스트로 일관)
+  const bS=-u;
+  const bP=p.deg?0:(bSig-u)/(1-bSig*u); // 막대계의 카메라 기준 속도 (정확한 속도 합성)
+  drawSkewGrid(bS,C.grid,REx);
+  if(!p.deg) drawSkewGrid(bP,C.grid,REx);
+  drawLightRays45(REx);
+  drawAxes(bS,C.s,'x','ct',Math.abs(u)<0.05,REx);
+  if(!p.deg) drawAxes(bP,C.sp,"x'","ct'",false,REx);
+  if(p.deg){
+    bnShared=null;
+    // 카메라와 동일한 부스트를 써야 마커가 실제 사건 위에 놓인다 (p.deg면 bnU=0)
+    if(showInterval&&eventPt) drawIntervalInertial(bnU);
+    return;
+  }
+  const M=(x,ct)=>{if(Math.abs(u)<1e-9)return toScreen(x,ct);const q=lorentz(x,ct,u);return toScreen(q[0],q[1]);};
+  const BIG=Math.max(W,H)/scale*3+8;
+  const dEnt=-p.sd*p.Lb/2, dExit=p.sd*p.Lb/2;      // 입구·출구 문 (부호 좌표)
+  const rearA=-p.sd*p.Lc/2, frontA=p.sd*p.Lc/2;     // t=0의 막대 끝 위치, 속도 bSig
+  // ── 세계면 채우기 (경계는 직선 → 끝점만 사상)
+  function band(x1a,v1,x2a,v2,fill){
+    const A1=M(x1a-v1*BIG,-BIG),A2=M(x1a+v1*BIG,BIG);
+    const B2=M(x2a+v2*BIG,BIG),B1=M(x2a-v2*BIG,-BIG);
+    ctx.fillStyle=fill;ctx.beginPath();
+    ctx.moveTo(A1[0],A1[1]);ctx.lineTo(A2[0],A2[1]);ctx.lineTo(B2[0],B2[1]);ctx.lineTo(B1[0],B1[1]);
+    ctx.closePath();ctx.fill();
+  }
+  band(dEnt,0,dExit,0,'rgba(37,99,235,0.06)');
+  band(rearA,bSig,frontA,bSig,'rgba(220,38,38,0.07)');
+  // ── 밀폐 시간 슬랩 (헛간계 t∈[−t*,t*], t*>0일 때만): 두 문 사이 × 두 사건 시각
+  if(p.tS>0){
+    const q=[M(dEnt,-p.tS),M(dExit,-p.tS),M(dExit,p.tS),M(dEnt,p.tS)];
+    ctx.fillStyle='rgba(124,58,237,0.16)';
+    ctx.beginPath();ctx.moveTo(q[0][0],q[0][1]);
+    ctx.lineTo(q[1][0],q[1][1]);ctx.lineTo(q[2][0],q[2][1]);ctx.lineTo(q[3][0],q[3][1]);
+    ctx.closePath();ctx.fill();
+  }
+  // ── 경계 세계선 (문 2 + 막대 끝 2)
+  ctx.strokeStyle=C.s;ctx.lineWidth=2.2;ctx.beginPath();
+  for(const dx of [dEnt,dExit]){
+    const a=M(dx,-BIG),b=M(dx,BIG);ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);
+  }
+  ctx.stroke();
+  ctx.strokeStyle=C.sp;ctx.lineWidth=2.2;ctx.beginPath();
+  for(const xa of [rearA,frontA]){
+    const a=M(xa-bSig*BIG,-BIG),b=M(xa+bSig*BIG,BIG);ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);
+  }
+  ctx.stroke();
+  // ── 재생: 막대 중심을 지나는 카메라 동시면 절단 (tSnow·CTn은 상단에서 계산)
+  const kSl=gcam*(1-u*bSig);          // 중심 세계선의 CT 진행률: CT(Ec)=kSl·tS
+  const c1=ctCam(dEnt,-p.tS), c2=ctCam(dExit,p.tS);
+  const t1x=c1/kSl, t2x=c2/kSl;       // 각 사건이 절단에 걸리는 tS값
+  const WIN=0.10*(p.tHi-p.tLo);
+  const gl1=(tSnow>=t1x)?Math.max(0,1-(tSnow-t1x)/WIN):0;
+  const gl2=(tSnow>=t2x)?Math.max(0,1-(tSnow-t2x)/WIN):0;
+  const passed1=CTn>=c1, passed2=CTn>=c2;
+  if(active){
+    ctx.save();
+    ctx.strokeStyle='rgba(26,26,46,0.45)';ctx.lineWidth=1.2;ctx.setLineDash([7,5]);
+    const Ec=M(xc,tSnow);
+    ctx.beginPath();ctx.moveTo(0,Ec[1]);ctx.lineTo(W,Ec[1]);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+  // ── 사건 마커 E₁·E₂ (+통과 글로우)
+  function evDot(x,ct,glow,lbl){
+    const q=M(x,ct);
+    if(glow>0){
+      ctx.save();
+      ctx.globalAlpha=0.35*glow;ctx.fillStyle='#fbbf24';
+      ctx.beginPath();ctx.arc(q[0],q[1],4+12*glow,0,Math.PI*2);ctx.fill();
+      ctx.globalAlpha=1;ctx.shadowColor='#fbbf24';ctx.shadowBlur=18*glow;
+      ctx.fillStyle='#fbbf24';
+      ctx.beginPath();ctx.arc(q[0],q[1],4+3*glow,0,Math.PI*2);ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.fillStyle='#1a1a2e';
+      ctx.beginPath();ctx.arc(q[0],q[1],4,0,Math.PI*2);ctx.fill();
+    }
+    ctx.fillStyle='#1a1a2e';ctx.font='bold 9px DM Mono';
+    ctx.fillText(lbl,q[0]+8,q[1]+3);
+  }
+  evDot(dEnt,-p.tS,gl1,'E₁');
+  evDot(dExit,p.tS,gl2,'E₂');
+  // ── 다이어그램 위 물체 그래픽: 현재 동시면 ∩ 세계면 = "지금"의 막대·헛간
+  //    (물체 = 자기 세계면의 동시면 절단. 재생 전에는 창 시작점 = 출발 위치를 표시:
+  //     막대는 왼쪽 아래 접근 전, 앞문 열림·뒷문 닫힘의 초기 상태)
+  {
+    const dispTS=tSnow; // prog=0이면 tSnow=tLo(출발), 재생 중엔 현재 절단
+    const xcd=bSig*dispTS;
+    const CTd=ctCam(xcd,dispTS);
+    const p1d=CTd>=c1, p2d=CTd>=c2;
+    const sliceEv=(a,v)=>{ // 세계선 x=a+vt ∩ 카메라 동시면(막대 중심 통과)
+      const tt=(dispTS+u*(a-xcd))/(1-u*v);
+      return M(a+v*tt,tt);
+    };
+    const qEnt=sliceEv(dEnt,0), qExit=sliceEv(dExit,0);
+    const qR=sliceEv(rearA,bSig), qF=sliceEv(frontA,bSig);
+    ctx.save();
+    // 헛간 절단: 반투명 파란 두꺼운 선 + 문 표식 (닫힘=채움, 열림=빈 사각)
+    ctx.strokeStyle=C.s;ctx.globalAlpha=0.45;ctx.lineWidth=6;ctx.lineCap='butt';
+    ctx.beginPath();ctx.moveTo(qEnt[0],qEnt[1]);ctx.lineTo(qExit[0],qExit[1]);ctx.stroke();
+    ctx.globalAlpha=1;
+    const doorMark=(q,closed)=>{
+      ctx.lineWidth=2;ctx.strokeStyle=C.s;ctx.fillStyle=C.s;
+      if(closed) ctx.fillRect(q[0]-4,q[1]-8,8,16);
+      else ctx.strokeRect(q[0]-4,q[1]-8,8,16);
+    };
+    doorMark(qEnt,p1d);
+    doorMark(qExit,!p2d);
+    // 막대 절단: 빨간 굵은 막대
+    ctx.strokeStyle=C.sp;ctx.lineWidth=8;ctx.lineCap='round';
+    ctx.beginPath();ctx.moveTo(qR[0],qR[1]);ctx.lineTo(qF[0],qF[1]);ctx.stroke();
+    ctx.restore();
+  }
+  bnShared={passed1,passed2,gl1,gl2,tSnow,dEnt,dExit,rearA,frontA,bSig,xc};
+  // 카메라 부스트는 bnU (|β|>0.949에서 클램프됨) — beta*s를 쓰면 마커가 어긋난다
+  if(showInterval&&eventPt) drawIntervalInertial(bnU);
+}
+
+// ═══════════════ 벨의 우주선 ═══════════════
+// S' 관점 = 두 우주선이 공유하는 순간 공동운동 관성계 (같은 S-시각에 같은 속도).
+// 카메라 = 부스트 u=s·v(t) + 평행이동(A를 (0,τ_A)에 고정) — 정확한 포앵카레 변환.
+// S에선 간격이 d로 불변인데도 실이 끊어지고, 순간계에선 간격이 γd로 벌어짐이 보임.
+function drawBell(s,prog){
+  xShift=0;
+  const p=bellParams();
+  const tNow=p.tLo+Math.max(0,Math.min(1,prog))*(p.tHi-p.tLo);
+  const vN=bellV(tNow);
+  blU=Math.max(-0.985,Math.min(0.985,s*vN));
+  const u=blU;
+  const gcam=1/Math.sqrt(1-u*u);
+  const ctCam=(x,ct)=>gcam*(ct-u*x);
+  const EA=[bellX(p.x0A,tNow),tNow];
+  {
+    let bx=EA[0],bct=EA[1];
+    if(Math.abs(u)>=1e-9){const r=lorentz(EA[0],EA[1],u);bx=r[0];bct=r[1];}
+    blOX=s*(0-bx);
+    blOC=s*(bellTau(tNow)-bct);
+  }
+  // ── 배경: 이동 성분까지 반영해야 하므로 beS로 직접 사상 (쌍둥이와 동일 패턴)
+  if(Math.abs(u)<1e-9&&Math.abs(blOX)<1e-9&&Math.abs(blOC)<1e-9){
+    drawSkewGrid(0,C.grid);
+    drawLightRays45();
+    drawAxes(0,C.s,'x','ct',true);
+  } else {
+    let mnX=1e9,mxX=-1e9,mnC=1e9,mxC=-1e9;
+    for(const c of [[0,0],[W,0],[0,H],[W,H]]){
+      const wq=toWorld(c[0],c[1]);
+      const q=beInvW(wq[0],wq[1]);
+      mnX=Math.min(mnX,q[0]);mxX=Math.max(mxX,q[0]);
+      mnC=Math.min(mnC,q[1]);mxC=Math.max(mxC,q[1]);
+    }
+    const lo=Math.max(-400,Math.floor(mnX)-1), hi=Math.min(400,Math.ceil(mxX)+1);
+    const lc=Math.max(-400,Math.floor(mnC)-1), hc=Math.min(400,Math.ceil(mxC)+1);
+    const beLine=(x1,c1,x2,c2)=>{const a=beS(x1,c1),b=beS(x2,c2);ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);};
+    ctx.strokeStyle=C.grid;ctx.lineWidth=0.8;ctx.beginPath();
+    for(let n=lo;n<=hi;n++) beLine(n,lc,n,hc);
+    for(let m2=lc;m2<=hc;m2++) beLine(lo,m2,hi,m2);
+    ctx.stroke();
+    const Rr=Math.max(Math.abs(mnX),Math.abs(mxX),Math.abs(mnC),Math.abs(mxC))+2;
+    ctx.strokeStyle=C.light;ctx.lineWidth=1.5;ctx.setLineDash([6,4]);ctx.beginPath();
+    beLine(-Rr,-Rr,Rr,Rr); beLine(Rr,-Rr,-Rr,Rr);
+    ctx.stroke();ctx.setLineDash([]);
+    ctx.strokeStyle=C.s;ctx.lineWidth=2;ctx.beginPath();
+    beLine(lo,0,hi,0); beLine(0,lc,0,hc);
+    ctx.stroke();
+  }
+  // ── 보른 강체 유령선: A와 강체를 이룰 때 B가 그렸어야 할 동심 쌍곡선 (점선)
+  {
+    const cA=p.x0A-1/p.a, R=1/p.a+p.d;
+    ctx.strokeStyle=C.rind;ctx.lineWidth=1.8;ctx.setLineDash([7,5]);
+    ctx.beginPath();let f=true;
+    const N=140;
+    for(let i=0;i<=N;i++){
+      const tt=(p.tHi+1)*i/N;
+      const q=beS(cA+Math.sqrt(R*R+tt*tt),tt);
+      if(q[0]<-40||q[0]>W+40||q[1]<-40||q[1]>H+40){f=true;continue;}
+      if(f){ctx.moveTo(q[0],q[1]);f=false;}else ctx.lineTo(q[0],q[1]);
+    }
+    ctx.stroke();ctx.setLineDash([]);
+  }
+  // ── 두 우주선 세계선 (점화 전 수직 + 쌍곡선)
+  function worldline(x0,color,lbl){
+    ctx.strokeStyle=color;ctx.lineWidth=2.5;
+    ctx.beginPath();let f=true;
+    const N=220;
+    for(let i=0;i<=N;i++){
+      const tt=(p.tLo-0.5)+((p.tHi+1)-(p.tLo-0.5))*i/N;
+      const q=beS(bellX(x0,tt),tt);
+      if(q[0]<-40||q[0]>W+40||q[1]<-40||q[1]>H+40){f=true;continue;}
+      if(f){ctx.moveTo(q[0],q[1]);f=false;}else ctx.lineTo(q[0],q[1]);
+    }
+    ctx.stroke();
+    const qe=beS(bellX(x0,p.tHi-0.25),p.tHi-0.25);
+    ctx.fillStyle=color;ctx.font='bold 11px DM Mono';
+    if(qe[0]>4&&qe[0]<W-14&&qe[1]>12&&qe[1]<H-4) ctx.fillText(lbl,qe[0]+7,qe[1]);
+  }
+  worldline(p.x0A,C.s,'A');
+  worldline(p.x0B,C.sp,'B');
+  // ── 점화 사건 (t=0, 두 척 동시 점화 — S 동시)
+  for(const x0 of [p.x0A,p.x0B]){
+    const q=beS(x0,0);
+    ctx.fillStyle='#1a1a2e';
+    ctx.beginPath();ctx.arc(q[0],q[1],3.5,0,Math.PI*2);ctx.fill();
+  }
+  // ── 파단 사건 마커 (+통과 글로우)
+  const CTn=ctCam(EA[0],EA[1]);
+  const broken=(tNow>=p.tBr);
+  if(p.tBr<=p.tHi+0.5){
+    const xbr=(bellX(p.x0A,p.tBr)+bellX(p.x0B,p.tBr))/2;
+    const cBr=ctCam(xbr,p.tBr);
+    const crossed=CTn>=cBr;
+    const gl=crossed?Math.max(0,1-(CTn-cBr)/(0.5*gcam)):0;
+    const q=beS(xbr,p.tBr);
+    if(gl>0){
+      ctx.save();
+      ctx.globalAlpha=0.35*gl;ctx.fillStyle='#ef4444';
+      ctx.beginPath();ctx.arc(q[0],q[1],5+13*gl,0,Math.PI*2);ctx.fill();
+      ctx.globalAlpha=1;ctx.shadowColor='#ef4444';ctx.shadowBlur=18*gl;
+      ctx.fillStyle='#ef4444';
+      ctx.beginPath();ctx.arc(q[0],q[1],4+3*gl,0,Math.PI*2);ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.fillStyle=crossed?'#ef4444':'#1a1a2e';
+      ctx.beginPath();ctx.arc(q[0],q[1],4,0,Math.PI*2);ctx.fill();
+    }
+    ctx.fillStyle='#1a1a2e';ctx.font='bold 9px DM Mono';
+    ctx.fillText('파단',q[0]+8,q[1]+3);
+  }
+  // ── 지금-절단 물체: 실(변형률 색) + 두 우주선 절단점
+  {
+    const tB=bellSliceT(p.x0B,tNow,EA[0],u);
+    const EB=[bellX(p.x0B,tB),tB];
+    const qA=beS(EA[0],EA[1]), qB=beS(EB[0],EB[1]);
+    const g=bellG(tNow);
+    ctx.save();
+    if(!broken){
+      ctx.strokeStyle=bellStrainColor(g,p.gB);
+      ctx.lineWidth=5;ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(qA[0],qA[1]);ctx.lineTo(qB[0],qB[1]);ctx.stroke();
+    } else {
+      // 파단 후: 각 배에 붙은 이완된 반쪽 (고유길이 d/2, 절단면 위 측정 길이 = d/(2γ_rel))
+      const vRel=(vN-u)/(1-u*vN);
+      const gRel=1/Math.sqrt(1-vRel*vRel);
+      const Ls=(p.d/2)/gRel;
+      const den=Math.sqrt(1-u*u);
+      const tipA=beS(EA[0]+Ls/den, EA[1]+u*Ls/den);
+      const tipB=beS(EB[0]-Ls/den, EB[1]-u*Ls/den);
+      ctx.strokeStyle='#22c55e';ctx.lineWidth=5;ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(qA[0],qA[1]);ctx.lineTo(tipA[0],tipA[1]);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(qB[0],qB[1]);ctx.lineTo(tipB[0],tipB[1]);ctx.stroke();
+    }
+    // 우주선 절단점
+    ctx.fillStyle=C.s;ctx.beginPath();ctx.arc(qA[0],qA[1],5,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle=C.sp;ctx.beginPath();ctx.arc(qB[0],qB[1],5,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+    blShared={tNow,tB,broken,g,vN,EA,EB};
+  }
+  if(showInterval&&eventPt) drawIntervalInertial(u,beS);
+}
+
+// ═══════════════ 중력 원궤도 ═══════════════
+// 다이어그램은 (x, y, ct) 3차원을 축측투영한 것: 가로=x, 세로=ct, 궤도면의 y는
+// 기울기 TILT로 눌러 그린다. 원궤도의 세계선은 나선이고, 세로 축척은 "1주기가
+// 화면 높이에 딱 맞도록" 잡되 x와 ct의 px/단위를 같게 유지한다(=투영이 물리적).
+//   → 화면상 궤도 반지름 = (세로여백)/(2π√r) 이 자동으로 v/c를 인코딩한다.
+//     r=60M: 가늘고 길게 늘어난 나선 (v/c가 작을수록 직선에 가까워진다)
+//     ISCO r=6M: 눈에 보이는 코일. 광자구 r=3M: 가능한 가장 굵은 코일.
+// 곡선 시공간에는 전역 관성계가 없으므로 이 모드에서는 관점(S/S') 전환을 두지 않고
+// 먼 관측자의 슈바르츠실트 좌표로 고정한다.
+const ORB_TILT=0.42; // 궤도면을 보는 고도각의 sin
+
+// ═══ 광원뿔: 슈바르츠실트 적도면 널 측지선의 정확한 적분 ═══
+// f=1−2/r 로 두고 아핀 매개변수 λ, E=1 로 규격화하면 (M=1 단위)
+//   dt/dλ = 1/f,   dr/dλ = p,   dφ/dλ = b/r²,   dp/dλ = (b²/r³)(1−3/r)
+// 마지막 식은 (dr/dλ)² = 1 − b²f/r² 를 미분해 얻은 것이라 회귀점(p=0)에서도
+// 부호 전환 없이 매끄럽다.
+// 방출 조건: 정지 관측자의 국소 정규직교 틀에서 방출각 ψ (0=반경 바깥, π/2=+φ 접선)
+//   p₀ = cos ψ,   b = r₀ sin ψ / √f₀
+//   (검산: 1 − b²f₀/r₀² = 1 − sin²ψ = cos²ψ = p₀²  → 널 조건 정확히 만족)
+// 직선 원뿔은 이 해의 1차 근사일 뿐이고, 광자구에서 30% 넘게 어긋난다.
+// r→2M 에서 dt/dλ→∞ 이므로 안쪽으로 간 빛도 유한한 좌표시간 안에는 지평선에
+// 닿지 못한다 → 파면은 (좌표시간 절단면 위에서) 닫힌 곡선으로 남는다.
+let _coneCache={r:null,dct:null,rays:null};
+function orbitConeRays(r0,dctTarget){
+  if(_coneCache.r===r0&&_coneCache.dct===dctTarget) return _coneCache.rays;
+  const NR=28, f0=1-2/r0, rays=[];
+  const deriv=(y)=>{
+    const rr=Math.max(2.0008,y[1]), ff=1-2/rr, b=y[4];
+    return [1/ff, y[3], b/(rr*rr), (b*b/(rr*rr*rr))*(1-3/rr), 0];
+  };
+  for(let k=0;k<NR;k++){
+    const psi=2*Math.PI*k/NR;
+    const b=r0*Math.sin(psi)/Math.sqrt(f0);
+    let y=[0,r0,0,Math.cos(psi),b];
+    const pts=[[r0,0,0]];
+    const N=360, dl=dctTarget*f0/N;
+    for(let i=0;i<N*8;i++){
+      const prev=y.slice();
+      const k1=deriv(y);
+      const k2=deriv(y.map((v,j)=>v+dl/2*k1[j]));
+      const k3=deriv(y.map((v,j)=>v+dl/2*k2[j]));
+      const k4=deriv(y.map((v,j)=>v+dl*k3[j]));
+      y=y.map((v,j)=>v+dl/6*(k1[j]+2*k2[j]+2*k3[j]+k4[j]));
+      if(!isFinite(y[1])||y[1]<=2.001){
+        pts.push([2.001,prev[2],Math.min(prev[0],dctTarget)]);break;
+      }
+      if(y[0]>=dctTarget){   // 절단면 t=Δct 에 정확히 맞춰 선형 보간
+        const u=(dctTarget-prev[0])/(y[0]-prev[0]);
+        pts.push([prev[1]+u*(y[1]-prev[1]), prev[2]+u*(y[2]-prev[2]), dctTarget]);
+        break;
+      }
+      if(i%6===0) pts.push([y[1],y[2],y[0]]);
+    }
+    rays.push(pts);
+  }
+  _coneCache={r:r0,dct:dctTarget,rays};
+  return rays;
+}
+function drawOrbit(s,prog){
+  xShift=0;
+  const p=orbitParams();
+  const oy0=H-64;                 // ct=0 평면의 화면 y
+  const oPX=(H-124)/p.cT;         // px per 기하 길이 (x와 ct 공통)
+  const R=p.r, Rpx=R*oPX;
+  const P=(x,y,ct)=>[OX+x*oPX, oy0-ct*oPX-y*oPX*ORB_TILT];
+  const ctNow=Math.max(0,Math.min(1,prog))*p.cT;
+  const phNow=p.Om*ctNow;
+  const objCol=p.isLight?C.light:C.sp;
+  orbShared={p,oPX,oy0,ctNow,phNow,Rpx};
+
+  // ══ 좌표계 (r, φ, ct) ══
+  // 궤도면의 극좌표 (r, φ)를 밑면(ct=0)에 깔고 그 위로 ct축을 세운 3차원 축측투영.
+  // 좌표 프레임의 화면 크기(Rf)는 고정이고 궤도는 자기 실제 크기(Rpx)로 그려진다
+  //  → 축은 항상 읽히면서, 궤도가 프레임 안에서 얼마나 작은지가 그대로 드러난다.
+  //    (r=60M은 프레임 안쪽의 작은 코일, 광자구는 프레임을 꽉 채우는 코일)
+  const pol=(rr,f,ct)=>P(rr*Math.cos(f),rr*Math.sin(f),ct);
+  const ell=(cx0,cy0,rx)=>{ctx.beginPath();ctx.ellipse(cx0,cy0,Math.max(0.5,rx),Math.max(0.3,rx*ORB_TILT),0,0,Math.PI*2);};
+  const Rf=128, RfU=Rf/oPX;   // 좌표 프레임 반지름: 화면 px 고정 → 단위 환산
+
+  // ── 은면 판정: 중심체는 반지름 R_b의 수직 원기둥(월드튜브)이다.
+  //    투영은 (x, y·TILT+ct) → 화면이므로, 두 사건이 겹쳐 보일 조건은
+  //    같은 x이고 ct + y·TILT 가 같은 것. 관측자는 −y 쪽에 있으므로
+  //    (x₀,y₀,ct₀)이 가려지려면 x₀가 기둥 폭 안이고, 같은 화면점에 더 앞쪽(y<y₀)의
+  //    기둥 물질이 있어야 한다 → |x₀|<R_b 이고 y₀>√(R_b²−x₀²).
+  //    그 기둥 물질의 ct = ct₀+(y₀−√(R_b²−x₀²))·TILT 가 그려진 범위 안이어야 한다.
+  const RbU=p.Rbody, ctTopDraw=p.cT+22/oPX;
+  const occl=(x0,y0,ct0)=>{
+    if(Math.abs(x0)>=RbU) return false;
+    const ys=Math.sqrt(Math.max(0,RbU*RbU-x0*x0));
+    if(y0<=ys) return false;                       // 기둥 안이거나 앞쪽 → 보임
+    return ct0+(y0-ys)*ORB_TILT<=ctTopDraw;        // 가려줄 기둥이 그려진 구간인가
+  };
+  // 궤도 원 (ct=const)을 은면 판정하며 잇는 폴리라인
+  const ellOcc=(ct)=>{
+    ctx.beginPath();let pen=false;
+    for(let i=0;i<=160;i++){
+      const f=2*Math.PI*i/160, X=R*Math.cos(f), Y=R*Math.sin(f);
+      if(occl(X,Y,ct)){pen=false;continue;}
+      const q=P(X,Y,ct);
+      if(!pen){ctx.moveTo(q[0],q[1]);pen=true;}else ctx.lineTo(q[0],q[1]);
+    }
+    ctx.stroke();
+  };
+
+  // ── ct = const 슬라이스 (좌표시간 격자)
+  ctx.strokeStyle=C.grid;ctx.lineWidth=0.8;ctx.setLineDash([]);
+  ctx.beginPath();
+  for(let k=1;k<=8;k++){const y=oy0-p.cT*k/8*oPX;ctx.moveTo(70,y);ctx.lineTo(W-16,y);}
+  ctx.stroke();
+  ctx.fillStyle='#94a3b8';ctx.font='9px DM Mono';ctx.textAlign='right';
+  for(const k of [2,4,6,8]){
+    const y=oy0-p.cT*k/8*oPX;
+    ctx.fillText(k===8?'T':(k===4?'T/2':(k===2?'T/4':'3T/4')),64,y+3);
+  }
+  ctx.textAlign='left';
+
+  // ── 밑면(ct=0)의 극좌표 격자: φ = const 방사선 + r = const 타원
+  ctx.strokeStyle='rgba(148,163,184,0.26)';ctx.lineWidth=0.8;
+  for(let k=0;k<12;k++){
+    const q=pol(RfU,Math.PI*k/6,0);
+    ctx.beginPath();ctx.moveTo(OX,oy0);ctx.lineTo(q[0],q[1]);ctx.stroke();
+  }
+  for(const fr of [0.34,0.67,1.0]){ell(OX,oy0,Rf*fr);ctx.stroke();}
+
+  // ── r 축 (φ=0 방향, 밑면 위)
+  {
+    const e=pol(RfU*1.16,0,0);
+    ctx.strokeStyle='#64748b';ctx.lineWidth=1.6;
+    ctx.beginPath();ctx.moveTo(OX,oy0);ctx.lineTo(e[0],e[1]);ctx.stroke();
+    arrowHead(OX,oy0,e[0],e[1],'#64748b');
+    ctx.fillStyle='#334155';ctx.font='italic bold 14px DM Sans';
+    ctx.fillText('r',e[0]+7,e[1]+5);
+  }
+
+  // ── φ 축 (밑면 바깥 타원의 눈금 + 증가 방향 호)
+  {
+    ctx.font='9px DM Mono';ctx.textAlign='center';
+    const lab=['φ=0','π/2','π','3π/2'];
+    for(let k=0;k<4;k++){
+      const a=pol(RfU,Math.PI/2*k,0), b=pol(RfU*1.07,Math.PI/2*k,0);
+      ctx.strokeStyle='#64748b';ctx.lineWidth=1.2;
+      ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();
+      if(k>0){ctx.fillStyle='#64748b';ctx.fillText(lab[k],b[0],b[1]-6);}
+    }
+    ctx.strokeStyle='#64748b';ctx.lineWidth=1.4;
+    ctx.beginPath();
+    for(let i=0;i<=14;i++){const q=pol(RfU*1.24,Math.PI*(0.16+0.20*i/14),0);i===0?ctx.moveTo(q[0],q[1]):ctx.lineTo(q[0],q[1]);}
+    ctx.stroke();
+    const h1=pol(RfU*1.24,Math.PI*0.32,0), h2=pol(RfU*1.24,Math.PI*0.36,0);
+    arrowHead(h1[0],h1[1],h2[0],h2[1],'#64748b');
+    const lc=pol(RfU*1.40,Math.PI*0.26,0);
+    ctx.fillStyle='#334155';ctx.font='italic bold 14px DM Sans';
+    ctx.fillText('φ',lc[0],lc[1]);
+    ctx.textAlign='left';
+  }
+
+  // ── 중심체 월드튜브 (수직 기둥) + 밑면·윗면 타원
+  const RbRaw=p.Rbody*oPX, Rb=Math.min(RbRaw,W*1.6);
+  const bodyFill='rgba(17,24,39,0.92)', bodyEdge='#111827';
+  const tubeTop=oy0-ctTopDraw*oPX;
+  if(Rb>1.2){
+    ctx.fillStyle=bodyFill;
+    ctx.fillRect(OX-Rb,tubeTop,2*Rb,oy0-tubeTop);
+    ctx.strokeStyle=bodyEdge;ctx.lineWidth=1.2;
+    ctx.beginPath();ctx.moveTo(OX-Rb,oy0);ctx.lineTo(OX-Rb,tubeTop);
+    ctx.moveTo(OX+Rb,oy0);ctx.lineTo(OX+Rb,tubeTop);ctx.stroke();
+    ell(OX,oy0,Rb);ctx.fillStyle=bodyFill;ctx.fill();ctx.stroke();
+  } else {
+    // 실제 투영 크기가 1px 미만 — 월드튜브를 가느다란 색 기둥으로만 남긴다
+    ctx.strokeStyle=bodyEdge;ctx.lineWidth=3;ctx.globalAlpha=0.55;
+    ctx.beginPath();ctx.moveTo(OX,oy0);ctx.lineTo(OX,tubeTop);ctx.stroke();
+    ctx.globalAlpha=1;
+  }
+  // ── ct 축 (원점에서 수직) — 중심체 기둥 위에 얹는다
+  {
+    const top=oy0-p.cT*oPX-16;
+    ctx.strokeStyle='rgba(203,213,225,0.95)';ctx.lineWidth=1.6;ctx.setLineDash([6,4]);
+    ctx.beginPath();ctx.moveTo(OX,oy0);ctx.lineTo(OX,top);ctx.stroke();
+    ctx.setLineDash([]);
+    arrowHead(OX,top+10,OX,top,'rgba(203,213,225,0.95)');
+    ctx.fillStyle='#334155';ctx.font='italic bold 14px DM Sans';
+    ctx.fillText('ct',OX+8,top+6);
+    ctx.strokeStyle='rgba(203,213,225,0.8)';ctx.lineWidth=1;
+    ctx.beginPath();
+    for(let k=1;k<=8;k++){const y=oy0-p.cT*k/8*oPX;ctx.moveTo(OX-4,y);ctx.lineTo(OX+4,y);}
+    ctx.stroke();
+  }
+
+  // ── 중심체가 1px 미만이면 위치 표식을 따로 찍는다 (표식만 확대, 축척 아님)
+  //    ct 축척이 "1주기 = 화면 높이"라 R_b/cT ∝ r^{-3/2} 로 줄어든다.
+  //    바깥 궤도(r≳40M)에서 지평선이 1px 아래로 내려가는 건 버그가 아니라,
+  //    한 주기 동안 빛이 가는 거리에 비해 블랙홀이 그만큼 작다는 뜻이다.
+  if(Rb<=1.2){
+    ctx.fillStyle='#111827';
+    ctx.beginPath();ctx.arc(OX,oy0,4.5,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#475569';ctx.lineWidth=1;ctx.stroke();
+    ctx.fillStyle='#64748b';ctx.font='9px DM Mono';ctx.textAlign='center';
+    ctx.fillText('지평선 — 실제 지름 '
+      +(2*Rb<0.02?(2*Rb).toExponential(1):(2*Rb).toFixed(2))+' px (표식만 확대)',OX,oy0+32);
+    ctx.textAlign='left';
+  }
+
+  // 광자구 (궤도 자체가 광자구가 아닐 때)
+  if(!p.isLight&&3*oPX>1.5){
+    ctx.strokeStyle=C.rind;ctx.lineWidth=1;ctx.setLineDash([5,4]);
+    ell(OX,oy0,3*oPX);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(OX-3*oPX,oy0);ctx.lineTo(OX-3*oPX,oy0-p.cT*oPX);
+    ctx.moveTo(OX+3*oPX,oy0);ctx.lineTo(OX+3*oPX,oy0-p.cT*oPX);ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // ── r 축 위의 r₀ 눈금 (궤도가 좌표 프레임 안에서 차지하는 크기)
+  {
+    ctx.strokeStyle=objCol;ctx.lineWidth=1.4;
+    ctx.beginPath();ctx.moveTo(OX+Rpx,oy0-5);ctx.lineTo(OX+Rpx,oy0+5);ctx.stroke();
+    ctx.font='9px DM Mono';ctx.textAlign='center';ctx.fillStyle=objCol;
+    if(Rpx>=13) ctx.fillText('r₀',OX+Rpx,oy0+16);
+    else {
+      ctx.textAlign='left';ctx.fillStyle='#64748b';
+      ctx.fillText('r₀ — 화면상 궤도 지름 '+(2*Rpx<0.05?(2*Rpx).toExponential(1):(2*Rpx).toFixed(2))+' px',OX+8,oy0+16);
+    }
+    ctx.textAlign='left';
+  }
+
+  // ── 궤도 (ct=0 밑면 / ct=T 윗면)
+  ctx.strokeStyle=objCol;ctx.lineWidth=1;ctx.setLineDash([4,4]);ctx.globalAlpha=0.55;
+  ellOcc(0);ellOcc(p.cT);
+  ctx.globalAlpha=1;ctx.setLineDash([]);
+
+  // ── 같은 r의 정지 관측자 세계선 (수직) — 궤도 시계와 비교 대상
+  {
+    const a=P(R,0,0), b=P(R,0,p.cT);
+    ctx.strokeStyle=C.s;ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();
+    ctx.fillStyle=C.s;ctx.font='bold 10px DM Mono';
+    ctx.fillText('정지',b[0]+6,b[1]+10);
+  }
+
+  // ── 세계선 나선 (뒤쪽 반은 흐리게 → 깊이감)
+  const N=300;
+  function helix(farWanted){
+    ctx.beginPath();let pen=false;
+    for(let i=0;i<=N;i++){
+      const c=p.cT*i/N, f=p.Om*c;
+      const X=R*Math.cos(f), Y=R*Math.sin(f);
+      // 뒤쪽 반이면서 기둥에 가려지면 선을 끊는다 → 중심체 뒤로 사라졌다 나온다
+      if((Math.sin(f)>0)!==farWanted||occl(X,Y,c)){pen=false;continue;}
+      const q=P(X,Y,c);
+      if(!pen){ctx.moveTo(q[0],q[1]);pen=true;}else ctx.lineTo(q[0],q[1]);
+    }
+    ctx.stroke();
+  }
+  ctx.strokeStyle=objCol;
+  ctx.globalAlpha=0.32;ctx.lineWidth=1.6;helix(true);
+  ctx.globalAlpha=1;   ctx.lineWidth=2.6;helix(false);
+
+  // ── 고유시간 눈금: 같은 좌표시간 구간에 대해 시계마다 눈금 개수가 다르다
+  //    좌표 8개(격자) > 정지 관측자 8·√(1−2M/r) > 궤도체 8·√(1−3M/r)
+  if(showClock){
+    const dTau=p.cT/8;
+    ctx.fillStyle=C.s;
+    for(let k=1;;k++){
+      const ct=k*dTau/p.dtauStat; if(ct>p.cT+1e-9) break;
+      const q=P(R,0,ct);
+      ctx.beginPath();ctx.arc(q[0],q[1],3,0,Math.PI*2);ctx.fill();
+    }
+    if(!p.isLight&&p.dtaudt>1e-6){
+      ctx.fillStyle=C.sp;
+      for(let k=1;;k++){
+        const ct=k*dTau/p.dtaudt; if(ct>p.cT+1e-9) break;
+        const f=p.Om*ct, X=R*Math.cos(f), Y=R*Math.sin(f);
+        if(occl(X,Y,ct)) continue;
+        const q=P(X,Y,ct);
+        ctx.globalAlpha=(Math.sin(f)>0)?0.45:1;
+        ctx.beginPath();ctx.arc(q[0],q[1],3.2,0,Math.PI*2);ctx.fill();
+      }
+      ctx.globalAlpha=1;
+    }
+  }
+
+  // ── 현재 사건의 국소 광원뿔 (좌표계에서 찌그러진 원뿔)
+  //    원뿔은 사건의 성질이지 물체의 성질이 아니다. 여기 그려지는 것은 "지금 이
+  //    사건에서 출발한 빛이 Δct 뒤에 어디에 있는가"이고, 옆면은 실제 널 측지선이라
+  //    휘어 있다. 세계선이 원뿔 안이면 물체, 파면 위에 놓이면 빛이다.
+  //    r=3M의 광자는 ψ=π/2 널 측지선 자체를 타므로 끝점이 파면에 정확히 얹힌다.
+  const cf=Math.cos(phNow), sf=Math.sin(phNow);
+  const ox=R*cf, oy=R*sf;
+  const apex=P(ox,oy,ctNow);
+  const hidden=occl(ox,oy,ctNow);   // 지금 중심체 뒤인가
+  const dc=p.cT*0.09;
+  const rays=orbitConeRays(R,dc);
+  // 널 측지선 표본 → 현재 사건 기준으로 회전(φ₀)·평행이동(ct₀)
+  const rayPt=(pt)=>{
+    const f=phNow+pt[1];
+    return {x:R*0+pt[0]*Math.cos(f), y:pt[0]*Math.sin(f), ct:ctNow+pt[2]};
+  };
+  ctx.save();
+  if(hidden) ctx.globalAlpha=0.18;   // 기둥 뒤 — 흐릿한 잔상만
+  // 파면 (t = ct₀+Δct 절단면에서 도달 가능한 경계)
+  ctx.beginPath();
+  for(let k=0;k<rays.length;k++){
+    const e=rayPt(rays[k][rays[k].length-1]);
+    const q=P(e.x,e.y,e.ct);
+    k===0?ctx.moveTo(q[0],q[1]):ctx.lineTo(q[0],q[1]);
+  }
+  ctx.closePath();
+  ctx.fillStyle='rgba(245,158,11,0.11)';ctx.fill();
+  ctx.strokeStyle=C.light;ctx.lineWidth=1.4;ctx.setLineDash([5,4]);ctx.stroke();
+  ctx.setLineDash([]);
+  // 개별 널 측지선 (원뿔의 옆면 — 직선이 아니라 휜다)
+  ctx.strokeStyle='rgba(245,158,11,0.5)';ctx.lineWidth=1;
+  for(const pts of rays){
+    ctx.beginPath();let pen=false;
+    for(const pt of pts){
+      const e=rayPt(pt);
+      if(occl(e.x,e.y,e.ct)){pen=false;continue;}
+      const q=P(e.x,e.y,e.ct);
+      if(!pen){ctx.moveTo(q[0],q[1]);pen=true;}else ctx.lineTo(q[0],q[1]);
+    }
+    ctx.stroke();
+  }
+  // 궤도체가 Δct 뒤에 도달하는 지점: 우주선은 파면 안, 빛은 파면 위
+  {
+    const fe=p.Om*(ctNow+dc);
+    const q=P(R*Math.cos(fe),R*Math.sin(fe),ctNow+dc);
+    ctx.fillStyle=objCol;
+    ctx.beginPath();ctx.arc(q[0],q[1],3.6,0,Math.PI*2);ctx.fill();
+    if(!hidden){
+      ctx.fillStyle='#a16207';ctx.font='9px DM Mono';
+      ctx.fillText(p.isLight?'파면 위 (널)':'파면 안 (시간꼴)  v/c = '
+        +p.vLoc.toFixed(p.vLoc<0.01?5:3), q[0]+8, q[1]-5);
+    }
+  }
+  ctx.restore();
+
+  // ── 궤도체 (우주선 = 세계선 접선 방향으로 회전 / 빛 = 발광점)
+  ctx.save();
+  if(hidden){
+    ctx.globalAlpha=0.16;
+    ctx.fillStyle='#64748b';ctx.font='9px DM Mono';ctx.textAlign='center';
+    ctx.globalAlpha=0.85;
+    ctx.fillText('⌾ 중심체 뒤',apex[0],apex[1]-16);
+    ctx.textAlign='left';ctx.globalAlpha=0.16;
+  }
+  if(p.isLight){
+    ctx.save();
+    ctx.shadowColor=C.light;ctx.shadowBlur=14;
+    ctx.fillStyle=C.light;
+    ctx.beginPath();ctx.arc(apex[0],apex[1],5,0,Math.PI*2);ctx.fill();
+    ctx.shadowBlur=0;ctx.fillStyle='#fff8dc';
+    ctx.beginPath();ctx.arc(apex[0],apex[1],2.2,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+    ctx.fillStyle=C.light;ctx.font='bold 10px DM Mono';
+    ctx.fillText('광자',apex[0]+9,apex[1]-6);
+  } else {
+    const sdx=(-R*sf*p.Om)*oPX;
+    const sdy=-oPX-(R*cf*p.Om)*oPX*ORB_TILT;
+    drawRocketOn(ctx,apex[0],apex[1],C.sp,1,false,'',30,Math.atan2(sdy,sdx));
+    ctx.fillStyle=C.sp;ctx.font='bold 10px DM Mono';
+    ctx.fillText('우주선',apex[0]+12,apex[1]+4);
+  }
+  ctx.restore();
+
+  // ── 경고 배지
+  ctx.font='bold 11px DM Mono';ctx.textAlign='center';
+  if(p.isLight){
+    ctx.fillStyle='#a16207';
+    ctx.fillText('광자구 r = 3GM/c² — 빛의 유일한 원궤도, 그리고 항상 불안정',W/2,22);
+  } else if(!p.stable){
+    ctx.fillStyle='#dc2626';
+    ctx.fillText('⚠ r < 6GM/c² (ISCO 안쪽) — 원궤도는 존재하지만 불안정',W/2,22);
+  }
+  ctx.textAlign='left';
+}
+
+// ═══════════════ 등가속 ═══════════════
+// s=0: 민코프스키 S 관점, s=1: 린들러 S' 관점
+// 크로스페이드 방식 — 좌표 보간 없음
+function drawAccel(s){
+  const a=alpha, r0=1/a;
+  // 좌표평면 이동: 출발점 (r0,0)이 항상 화면 중앙 (s=1이면 원점이 이미 중앙)
+  xShift=(1-s)*r0*scale;
+  const RX =Math.ceil(W/(2*scale))+3;
+  const RCT=Math.ceil(H/(2*scale))+3;
+  const tauMax_mink=Math.atanh(0.995)/a;
+  const tauMax_rind=RCT+2;
+  const N_TAU=12;
+  const axR=RX*1.2, Rv=Math.max(RX,RCT)+2;
+
+  // ── 핵심 보간 방식: y_screen 기반
+  // x=xi 수직선:
+  //   s=0: x_screen = OX + xi*scale (수직선)
+  //   s=1: tau=(OY-y)/scale, rho=xi/cosh(a*tau)-r0, x_screen=OX+rho*scale (쌍곡선)
+  //   중간: x_screen 선형 보간
+  //   → y가 연속이므로 꺾임 없음 (수학적으로 보장)
+  function drawGridLineX(xi){
+    // tau 파라미터로 순회
+    // s=0: toScreen(xi, xi*tanh(a*tau)) — 민코프스키 수직선
+    // s=1: toScreen(xi/cosh(a*tau)-r0, tau) — 린들러 쌍곡선
+    // tau 범위: 민코프스키 ct=xi*tanh(a*tau)가 화면 안이고
+    //           린들러 화면도 안인 구간
+    const tauLim = Math.max((OY+50)/scale, (H-OY+50)/scale);
+    ctx.beginPath(); let f=true;
+    // y픽셀 단위로 순회: s=1에서 y=OY-tau*scale이므로 y균등=tau균등=부드러운 쌍곡선
+    for(let y=0;y<=H;y++){
+      const tau = (OY-y)/scale;
+      if(Math.abs(tau)>tauLim){f=true;continue;}
+      const[p0x,p0y] = toScreen(xi, xi*Math.tanh(a*tau));
+      const rho = xi/Math.cosh(a*tau)-r0;
+      if(rho<0&&s>0.001){f=true;continue;} // 린들러 지평선 안쪽 제외
+      const[p1x,p1y] = toScreen(rho, tau);
+      const px=p0x+(p1x-p0x)*s, py=p0y+(p1y-p0y)*s;
+      if(px<-2||px>W+2||py<-2||py>H+2){f=true;continue;}
+      if(f){ctx.moveTo(px,py);f=false;}else ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+  }
+
+  // ct=ci 수평선:
+  //   s=0: y_screen = OY - ci*scale (수평선)
+  //   s=1: tau=atanh(ci/x)/a, y_screen = OY - tau*scale (원점 사선)
+  //   → x를 파라미터로 순회하면서 s=0 y와 s=1 y를 보간
+  function drawGridLineY(ci){
+    if(ci===0) return;
+    const absCi=Math.abs(ci);
+    const tauLim=Math.max((OY+50)/scale, (H-OY+50)/scale);
+    if(tauLim<0.001) return;
+    for(const sgn of[+1,-1]){
+      ctx.beginPath();let f=true;
+      for(let k=1;k<=120;k++){
+        const tau=tauLim*k/120;
+        const x=absCi/Math.tanh(a*tau);
+        const rhoMax=(W+50)/scale+r0;
+        if(x>Math.sqrt(rhoMax*rhoMax+ci*ci)){f=true;continue;}
+        const R2=x*x-ci*ci;if(R2<=0){f=true;continue;}
+        const rho=Math.sqrt(R2)-r0;
+        const[p0x,p0y]=toScreen(x,Math.sign(ci)*absCi);
+        const[p1x,p1y]=toScreen(rho,sgn*Math.sign(ci)*tau);
+        const px=p0x+(p1x-p0x)*s,py=p0y+(p1y-p0y)*s;
+        if(px<-2||px>W+2||py<-2||py>H+2){f=true;continue;}
+        if(f){ctx.moveTo(px,py);f=false;}else ctx.lineTo(px,py);
+      }
+      ctx.stroke();
+    }
+  }
+
+  function drawRindLineRho(rho){
+    const R=r0+rho;if(R<0.01)return;
+
+    if(s<0.001){
+      // s=0(민코프스키): 쌍곡선 전체 (화면 끝까지)
+      // x²-ct²=R² → 각 y픽셀에서 x=sqrt(R²+ct²)
+      ctx.beginPath();let f=true;
+      for(let y=0;y<=H;y++){
+        const ct=(OY-y)/scale;
+        const xm=Math.sqrt(R*R+ct*ct);
+        const[px,py]=toScreen(xm,ct);
+        if(px<-2||px>W+2){f=true;continue;}
+        if(f){ctx.moveTo(px,py);f=false;}else ctx.lineTo(px,py);
+      }
+      ctx.stroke();
+
+    } else if(s>0.999){
+      // s=1(린들러): 수직선 x=rho, 화면 전체
+      const[rx]=toScreen(rho,0);
+      if(rx<-2||rx>W+2) return;
+      // S'에서는 gridR을 진하게 (grid와 동일한 불투명도)
+      ctx.beginPath();
+      ctx.moveTo(...toScreen(rho,-RCT*1.5));
+      ctx.lineTo(...toScreen(rho, RCT*1.5));
+      ctx.stroke();
+
+    } else {
+      // 중간: lerp
+      const tauLimX=Math.acosh(Math.max(1.0001,(W/scale)/R))/a;
+      ctx.beginPath();let f=true;
+      for(let k=0;k<=120;k++){
+        const tau=-tauLimX+k/120*tauLimX*2;
+        const[p0x,p0y]=toScreen(R*Math.cosh(a*tau),R*Math.sinh(a*tau));
+        const[p1x,p1y]=toScreen(rho,tau);
+        const px=p0x+(p1x-p0x)*s,py=p0y+(p1y-p0y)*s;
+        if(px<-2||px>W+2||py<-2||py>H+2){f=true;continue;}
+        if(f){ctx.moveTo(px,py);f=false;}else ctx.lineTo(px,py);
+      }
+      ctx.stroke();
+    }
+  }
+  function drawRindLineTau(tau){
+    const slope=Math.tanh(a*tau);
+    const slopeSq=slope*slope;
+    // s=1에서 화면 밖 tau 조기 종료
+    const tauScreenMax=(OY-2)/scale, tauScreenMin=-(H-OY-2)/scale;
+    if(s>0.999&&(tau>tauScreenMax||tau<tauScreenMin)) return;
+    // slope≈1이면 xm 파라미터 방식이 수렴 → s=1에서 직접 수평선 그리기
+    if(1-slopeSq<1e-6){
+      if(s>0.001){
+        // s=1: 수평선 y=OY-tau*scale, rho=0~화면 오른쪽 끝
+        const py=OY-tau*scale;
+        if(py<-2||py>H+2) return;
+        ctx.beginPath();
+        ctx.moveTo(...toScreen(0,tau));
+        ctx.lineTo(...toScreen((W-OX+50)/scale,tau));
+        ctx.stroke();
+      }
+      return;
+    }
+    const rhoMax=(W+50)/scale;
+    const xmMax=Math.abs(slope)>0.0001 ? Math.max(RX*1.5, (rhoMax+r0)/Math.sqrt(1-slopeSq+1e-9)) : RX*1.5;
+    ctx.beginPath();let f=true;
+    for(let k=0;k<=200;k++){
+      const xm=0.01+k/200*xmMax;
+      if(Math.abs(xm*slope)>=xm){f=true;continue;}
+      const R2=xm*xm*(1-slopeSq);if(R2<=0){f=true;continue;}
+      const rho=Math.sqrt(R2)-r0;if(rho>RX*1.5){f=true;continue;}
+      if(rho<0&&s>0.001){f=true;continue;} // 린들러 지평선 안쪽 제외
+      const[p0x,p0y]=toScreen(xm,xm*slope);
+      const[p1x,p1y]=toScreen(rho,tau);
+      const px=p0x+(p1x-p0x)*s,py=p0y+(p1y-p0y)*s;
+      if(px<-2||px>W+2||py<-2||py>H+2){f=true;continue;}
+      if(f){ctx.moveTo(px,py);f=false;}else ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+  }
+
+
+  // ── S 격자 커버 밖 (크로스페이드)
+  ctx.strokeStyle=C.grid; ctx.lineWidth=0.8;
+  ctx.globalAlpha=1-s;
+  ctx.beginPath();
+  for(let xi=-RX;xi<=RX;xi++){
+    if(Math.abs(xi*scale - r0*scale) < 1) continue; // x=r0은 ct축(파란 세계선)이므로 제외
+    if(xi<=0){ctx.moveTo(...toScreen(xi,-RCT*1.5));ctx.lineTo(...toScreen(xi,RCT*1.5));}
+    else{ctx.moveTo(...toScreen(xi,xi));ctx.lineTo(...toScreen(xi,RCT*1.5));
+         ctx.moveTo(...toScreen(xi,-xi));ctx.lineTo(...toScreen(xi,-RCT*1.5));}
+  }
+  for(let ci=-RCT;ci<=RCT;ci++){
+    ctx.moveTo(...toScreen(-RX*1.5,ci));ctx.lineTo(...toScreen(Math.abs(ci),ci));
+  }
+  ctx.stroke();
+  ctx.globalAlpha=1;
+
+  // ── S 격자 커버 안 (y_screen 보간)
+  ctx.strokeStyle=C.grid; ctx.lineWidth=0.8;
+  // xi 범위: r0이 클 때(alpha 작을 때) S'에서 보이는 xi가 더 크므로 r0+RX까지
+  // 단 tau=0에서 rho=xi-r0이 화면 오른쪽 밖이면 끊김 발생 → 제외
+  for(let xi=1;xi<=Math.ceil(r0+RX)+1;xi++){
+    const rho0=xi-r0; // tau=0에서 rho
+    if(toScreen(rho0,0)[0]>W+2) continue; // 화면 밖이면 끊김 → 제외
+    drawGridLineX(xi);
+  }
+  for(let ci=-RCT;ci<=RCT;ci++) drawGridLineY(ci);
+
+  // ── 린들러 격자 (y_screen 보간)
+  ctx.strokeStyle=C.gridR; ctx.lineWidth=0.8;
+  // rho=1단위 간격: alpha에 무관하게 S'에서 항상 80px 균일 간격
+  for(let n=-Math.ceil(RX);n<=Math.ceil(RX)+1;n++){
+    const rho=n;
+    if(Math.abs(rho)<0.001) continue;
+    const R=r0+rho; if(R<0.01) continue;
+    drawRindLineRho(rho);
+  }
+  // tau=const 선
+  // s=0(민코프스키): 기존 촘촘한 간격 (tauMax_mink/N_TAU)
+  // s=1(린들러): 1단위 간격 (S와 동일한 80px)
+  // 중간: 두 집합의 합집합을 s에 따라 보간
+  {
+    const dtau_mink=tauMax_mink/N_TAU; // 0.25
+    const tauSet=new Set();
+    // s=0 기여: 기존 촘촘한 tau값들
+    for(let i=0;i<=N_TAU*2;i++){
+      const tau=-tauMax_mink+i*dtau_mink;
+      if(Math.abs(tau)>0.001) tauSet.add(Math.round(tau*1000)/1000);
+    }
+    // s=1 기여: 1단위 tau값들 (화면 안)
+    const tauLoopMax=Math.round(tauMax_rind);
+    for(let tau=-tauLoopMax;tau<=tauLoopMax;tau++){
+      if(tau!==0) tauSet.add(tau);
+    }
+    // 각 tau를 s에 따라 opacity 조절해서 그리기
+    for(const tau of [...tauSet].sort((a,b)=>a-b)){
+      // 이 tau가 s=0 집합에 있는지 (tauMax_mink 이내 & dtau_mink 배수)
+      const inMink=Math.abs(tau)<=tauMax_mink+0.001;
+      // 이 tau가 s=1 집합에 있는지 (정수)
+      const inRind=Math.abs(tau-Math.round(tau))<0.001;
+      if(!inMink&&!inRind) continue;
+      // opacity: inMink면 s=0에서 불투명, inRind면 s=1에서 불투명
+      let opacity=1;
+      if(inMink&&!inRind) opacity=1-s;       // 민코프스키 전용: 페이드아웃
+      else if(!inMink&&inRind) opacity=s;    // 린들러 전용: 페이드인
+      // 둘 다이면 항상 1
+      if(opacity<0.02) continue;
+      ctx.globalAlpha=opacity;
+      drawRindLineTau(tau);
+    }
+    ctx.globalAlpha=1;
+  }
+
+  // ── 광선
+  ctx.strokeStyle=C.light;ctx.lineWidth=1.5;ctx.setLineDash([6,4]);ctx.beginPath();
+  for(const sg of[+1,-1]){
+    let f=true;
+    for(let k=0;k<=80;k++){
+      const dt=Rv*k/80,rhoL=r0*Math.exp(a*sg*dt)-r0;
+      const[p0x,p0y]=toScreen(sg*dt,dt);
+      const[p1x,p1y]=toScreen(rhoL,dt);
+      const px=p0x+(p1x-p0x)*s,py=p0y+(p1y-p0y)*s;
+      if(px<-50||px>W+50||py<-50||py>H+50){f=true;continue;}
+      if(f){ctx.moveTo(px,py);f=false;}else ctx.lineTo(px,py);
+    }
+  }
+  ctx.stroke();
+  ctx.strokeStyle='rgba(245,158,11,0.35)';ctx.lineWidth=1;ctx.beginPath();
+  for(const sg of[+1,-1]){
+    let f=true;
+    for(let k=0;k<=80;k++){
+      const dt=Rv*k/80,rhoL=r0*Math.exp(a*sg*dt)-r0;
+      const[p0x,p0y]=toScreen(sg*dt,-dt);
+      const[p1x,p1y]=toScreen(rhoL,-dt);
+      const px=p0x+(p1x-p0x)*s,py=p0y+(p1y-p0y)*s;
+      if(px<-50||px>W+50||py<-50||py>H+50){f=true;continue;}
+      if(f){ctx.moveTo(px,py);f=false;}else ctx.lineTo(px,py);
+    }
+  }
+  ctx.stroke();ctx.setLineDash([]);
+
+  // ── 린들러 지평선
+  if(showRindler){
+    const[ox,oy]=toScreen(0,0);const[lx1]=toScreen(-r0,0);const lxS=ox+(lx1-ox)*s;
+    const[tx0,ty0]=toScreen(-Rv,Rv);const[bx0,by0]=toScreen(-Rv,-Rv);
+    const topX=tx0+(lxS-tx0)*s,topY=ty0+(0-ty0)*s;
+    const botX=bx0+(lxS-bx0)*s,botY=by0+(H-by0)*s;const tipX=ox+(lxS-ox)*s;
+    ctx.fillStyle='rgba(124,58,237,0.08)';ctx.beginPath();
+    ctx.moveTo(tipX,oy);ctx.lineTo(topX,topY);
+    if(s>0.02){ctx.lineTo(0,topY);ctx.lineTo(0,botY);}
+    ctx.lineTo(botX,botY);ctx.closePath();ctx.fill();
+    ctx.strokeStyle=C.rind;ctx.lineWidth=1.8;ctx.setLineDash([8,4]);
+    ctx.beginPath();ctx.moveTo(tipX,oy);ctx.lineTo(topX,topY);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(tipX,oy);ctx.lineTo(botX,botY);ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // ── S 축 (페이드아웃)
+  {
+    const av=Math.max(0,1-s*2); if(av<=0) {} else {
+    ctx.globalAlpha=av;
+    // 원점(x=0) ct축 — 회색, 파란 세계선(x=r0)과 구분
+    ctx.strokeStyle='rgba(120,120,120,0.7)';ctx.lineWidth=1.5;ctx.setLineDash([]);
+    ctx.beginPath();ctx.moveTo(...toScreen(0,-axR));ctx.lineTo(...toScreen(0,axR));ctx.stroke();
+    arrowHead(...toScreen(0,axR*0.9),...toScreen(0,axR),'rgba(120,120,120,0.7)');
+    ctx.fillStyle='rgba(120,120,120,0.9)';ctx.font='bold 13px DM Sans';
+    ctx.fillText('ct₀',...toScreen(0.1,axR-0.3));
+    // 회색 ct축 눈금
+    ctx.strokeStyle='rgba(120,120,120,0.7)';ctx.lineWidth=1;ctx.font='9px DM Mono';
+    for(let n=-Math.ceil(axR);n<=Math.ceil(axR);n++){
+      if(n===0) continue;
+      const[tx,ty]=toScreen(0,n);
+      if(ty<0||ty>H) continue;
+      ctx.beginPath();ctx.moveTo(tx-4,ty);ctx.lineTo(tx+4,ty);ctx.stroke();
+      ctx.fillStyle='rgba(120,120,120,0.9)';ctx.fillText(n,tx+6,ty+4);
+    }
+    ctx.setLineDash([]);
+    ctx.strokeStyle=C.s;ctx.lineWidth=2;
+    // x축 (출발점 r0 중심으로 좌우 axR 커버 — 좌표평면 이동에 대응)
+    ctx.beginPath();ctx.moveTo(...toScreen(r0-axR,0));ctx.lineTo(...toScreen(r0+axR,0));ctx.stroke();
+    arrowHead(...toScreen(r0+axR*0.9,0),...toScreen(r0+axR,0),C.s);
+    // ct축 선은 파란 세계선(린들러계 관성 세계선)과 동일하므로 별도로 그리지 않음
+    // 화살표와 레이블만 표시
+    arrowHead(...toScreen(r0,axR*0.9),...toScreen(r0,axR),C.s);
+    // 레이블
+    ctx.fillStyle=C.s;ctx.font='bold 13px DM Sans';
+    ctx.fillText('x',...toScreen(r0+axR-0.4,-0.4));
+    ctx.fillText('ct',...toScreen(r0+0.1,axR-0.3));
+    // x축 눈금 (r0 원점 기준)
+    ctx.font='9px DM Mono';ctx.lineWidth=1;
+    for(let n=-Math.ceil(axR);n<=Math.ceil(axR);n++){
+      if(n===0) continue;
+      const[tx,ty]=toScreen(r0+n,0);
+      if(tx<0||tx>W) continue;
+      ctx.beginPath();ctx.moveTo(tx,ty-4);ctx.lineTo(tx,ty+4);ctx.stroke();
+      ctx.fillText(n,tx-4,ty+14);
+    }
+    // ct축 눈금 (r0,0 원점 기준)
+    for(let n=-Math.ceil(axR);n<=Math.ceil(axR);n++){
+      if(n===0) continue;
+      const[tx,ty]=toScreen(r0,n);
+      if(ty<0||ty>H) continue;
+      ctx.beginPath();ctx.moveTo(tx-4,ty);ctx.lineTo(tx+4,ty);ctx.stroke();
+      ctx.fillText(n,tx+6,ty+4);
+    }
+    ctx.globalAlpha=1;
+    }
+  }
+
+  // ── 린들러 축 (페이드인)
+  if(s>0.02){
+    ctx.globalAlpha=Math.min(1,s*2);ctx.strokeStyle=C.sp;ctx.lineWidth=2;ctx.setLineDash([]);
+    // ρ축 양수 방향 (rho=0 ~ axR)
+    ctx.beginPath();let fr=true;
+    for(let k=0;k<=60;k++){
+      const rho=k/60*axR;
+      const x0s=OX+(r0+rho)*scale, x1s=OX+rho*scale;
+      const x=x0s+(x1s-x0s)*s;
+      if(x<-2||x>W+2){fr=true;continue;}
+      if(fr){ctx.moveTo(x,OY);fr=false;}else ctx.lineTo(x,OY);
+    }
+    ctx.stroke();
+    // ρ축 음수 방향 (rho=0 ~ -axR, 린들러 지평선 방향)
+    // rho_min = -r0 (지평선), 화면 안인 범위까지
+    ctx.beginPath();fr=true;
+    for(let k=0;k<=60;k++){
+      const rho=-k/60*axR;
+      const R=r0+rho; if(R<0.01) break; // 지평선 근처에서 중단
+      const x0s=OX+(r0+rho)*scale, x1s=OX+rho*scale;
+      const x=x0s+(x1s-x0s)*s;
+      if(x<-2||x>W+2){fr=true;continue;}
+      if(fr){ctx.moveTo(x,OY);fr=false;}else ctx.lineTo(x,OY);
+    }
+    ctx.stroke();
+    const pax0=OX+(r0+axR*0.85)*scale, pax1=OX+axR*0.85*scale;
+    const pbx0=OX+(r0+axR)*scale, pbx1=OX+axR*scale;
+    arrowHead(pax0+(pax1-pax0)*s,OY, pbx0+(pbx1-pbx0)*s,OY, C.sp);
+    // τ축은 가속 세계선(rho=0)과 동일하므로 별도로 그리지 않음
+    // 화살표: tau=tauMax_rind 근처 (s>0일 때만, s=0에서 cosh overflow 방지)
+    if(s>0.001){
+      const tauE=tauMax_rind-0.3,tauF=tauMax_rind;
+      const yeE=OY-tauE*scale, yeF=OY-tauF*scale;
+      const xeE=(OX+r0*Math.cosh(a*tauE)*scale)*(1-s)+OX*s;
+      const xeF=(OX+r0*Math.cosh(a*tauF)*scale)*(1-s)+OX*s;
+      if(isFinite(xeE)&&xeE>-2&&xeE<W+2&&yeE>-2&&yeE<H+2&&
+         isFinite(xeF)&&xeF>-2&&xeF<W+2&&yeF>-2&&yeF<H+2){
+        arrowHead(xeE,yeE,xeF,yeF,C.sp);
+        ctx.fillStyle=C.sp;ctx.font='bold 13px DM Sans';
+        ctx.fillText("ct'",xeF+4,yeF);
+      }
+    }
+    ctx.fillStyle=C.sp;ctx.font='bold 13px DM Sans';
+    ctx.fillText("x'",pbx0+(pbx1-pbx0)*s+4,OY-4);
+    // x'(ρ)축 눈금
+    ctx.strokeStyle=C.sp;ctx.lineWidth=1;ctx.font='9px DM Mono';
+    for(let n=1;n<=Math.ceil(axR/r0);n++){
+      const rho=n*r0;
+      const rx0=OX+(r0+rho)*scale, rx1=OX+rho*scale;
+      const rx=rx0+(rx1-rx0)*s;
+      if(rx<0||rx>W) continue;
+      ctx.beginPath();ctx.moveTo(rx,OY-4);ctx.lineTo(rx,OY+4);ctx.stroke();
+      ctx.fillStyle=C.sp;ctx.fillText(n,rx-4,OY+14);
+    }
+    // ct'(τ)축 눈금
+    for(let n=-8;n<=8;n++){
+      if(n===0) continue;
+      const ty=OY-n*scale;
+      if(ty<0||ty>H) continue;
+      // τ축 위 점: rho=0 → 민코프스키 (r0*cosh, r0*sinh), 린들러 (0, n)
+      const tx0=OX+r0*Math.cosh(a*n)*scale, tx1=OX;
+      const tx=tx0+(tx1-tx0)*s;
+      if(tx<0||tx>W) continue;
+      ctx.beginPath();ctx.moveTo(tx-4,ty);ctx.lineTo(tx+4,ty);ctx.stroke();
+      ctx.fillStyle=C.sp;ctx.fillText(n,tx+6,ty+4);
+    }
+    ctx.globalAlpha=1;
+  }
+
+  // ── 관성계 S 세계선 (페이드아웃)
+  // 관성계 S 세계선은 린들러계 관성 세계선(b)으로 대체됨
+
+  // ── 가속 세계선 (rho=0)
+  ctx.strokeStyle=C.sp;ctx.lineWidth=2.5;ctx.setLineDash([]);
+  {
+    // 위/아래 비대칭 한계: 각 방향의 세로·가로 경계까지 (위쪽 가지가 조기 절단되지 않도록)
+    const tauX=Math.acosh(Math.max(1.0001,((W-OX)/scale+r0)/r0))/a;
+    const tauUp_mink=Math.min(tauX,(OY+50)/scale);
+    const tauDn_mink=Math.min(tauX,(H-OY+50)/scale);
+    const tauUp=tauUp_mink+(tauMax_rind-tauUp_mink)*s;
+    const tauDn=tauDn_mink+(tauMax_rind-tauDn_mink)*s;
+    ctx.beginPath();let fW=true;
+    for(let k=0;k<=300;k++){
+      const tau=-tauDn+k/300*(tauUp+tauDn);
+      const[p0x,p0y]=toScreen(r0*Math.cosh(a*tau),r0*Math.sinh(a*tau));
+      const[p1x,p1y]=toScreen(0,tau);
+      const px=(1-s)*p0x+s*p1x,py=(1-s)*p0y+s*p1y;
+      if(px<-2||px>W+2||py<-2||py>H+2){fW=true;continue;}
+      if(fW){ctx.moveTo(px,py);fW=false;}else ctx.lineTo(px,py);
+    }
+    // s=0에서 커버 밖(|ct|>r0) 구간은 파란 세계선(ct축)이 담당하므로 별도로 그리지 않음
+    ctx.stroke();
+  }
+
+  // ── 린들러계 관성 세계선
+  // s=0: toScreen(r0, r0*tanh(a*tau)) — 민코프스키 수직선 x=r0
+  // s=1: toScreen(r0/cosh(a*tau)-r0, tau) — 린들러 종모양 곡선
+  // ── 린들러계 관성 세계선 (항상 표시)
+  // s=0: x=r0 수직선 (민코프스키에서 가속 관찰자 출발점 통과)
+  // s=1: 종모양 곡선 (린들러계에서)
+  {
+    ctx.globalAlpha=1;
+    ctx.strokeStyle=C.s;ctx.lineWidth=2;ctx.setLineDash([]);ctx.beginPath();let fS=true;
+    // s=0: x=r0 수직선 (화면 끝까지), ct 파라미터
+    // s=1: 린들러 종모양 곡선, tau 파라미터
+    // 파라미터: ct=(1-s)*ct_mink + s*r0*sinh(a*tau_rind)
+    // 단순하게: ct를 화면 범위로, tau=asinh(ct/r0)/a로 변환
+    const ctMax=H/scale+2;
+    const tauSL=tauMax_rind;
+    for(let k=0;k<=300;k++){
+      // s=0이면 ct 균등, s=1이면 tau 균등으로 보간
+      const ct0=-ctMax+k/300*ctMax*2;          // 민코프스키 ct
+      const tau1=-tauSL+k/300*tauSL*2;          // 린들러 tau
+      const ct=(1-s)*ct0+s*r0*Math.sinh(a*tau1); // 혼합 파라미터
+      // s=0: (r0, ct) 수직선
+      const[p0x,p0y]=toScreen(r0,ct);
+      // s=1: 린들러. tau=asinh(ct/r0)/a, rho=r0/cosh-r0
+      const tau_=Math.asinh(ct/r0)/a;
+      const rho_=r0/Math.cosh(a*tau_)-r0;
+      const[p1x,p1y]=toScreen(rho_,tau_);
+      // 수치 안정 lerp: s=1에서 거대한 p0가 정확히 소거되도록 (1-s)*p0+s*p1 형태
+      const px=(1-s)*p0x+s*p1x,py=(1-s)*p0y+s*p1y;
+      if(px<-2||px>W+2||py<-2||py>H+2){fS=true;continue;}
+      if(fS){ctx.moveTo(px,py);fS=false;}else ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+  }
+
+  // ── 4속도 (출발 사건 기준 초기 4벡터 — 좌표평면 이동을 toScreen으로 반영)
+  if(show4V){
+    const eps=0.05;
+    const p0s=toScreen(r0,0), p1s=toScreen(0,0);
+    const xv=(1-s)*p0s[0]+s*p1s[0], yv=(1-s)*p0s[1]+s*p1s[1];
+    const p0e=toScreen(r0*Math.cosh(a*eps), r0*Math.sinh(a*eps));
+    const p1e=toScreen(0, eps);
+    const xe=(1-s)*p0e[0]+s*p1e[0], ye=(1-s)*p0e[1]+s*p1e[1];
+    const dx=xe-xv,dy=ye-yv,len=Math.hypot(dx,dy)||1,L=48;
+    ctx.strokeStyle=C.sp;ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(xv,yv);ctx.lineTo(xv+dx/len*L,yv+dy/len*L);ctx.stroke();
+    arrowHead(xv,yv,xv+dx/len*L,yv+dy/len*L,C.sp);
+    ctx.fillStyle=C.sp;ctx.font='bold 11px DM Mono';ctx.fillText('u^μ',xv+dx/len*L+4,yv+dy/len*L);
+  }
+  if(show4A){
+    const p0s=toScreen(r0,0), p1s=toScreen(0,0);
+    const xv=(1-s)*p0s[0]+s*p1s[0], yv=(1-s)*p0s[1]+s*p1s[1];
+    const p0e=toScreen(r0+0.4,0), p1e=toScreen(0.4,0);
+    const xe=(1-s)*p0e[0]+s*p1e[0];
+    const dx=xe-xv,len=Math.abs(dx)||1,L=40;
+    ctx.strokeStyle=C.rind;ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(xv,yv);ctx.lineTo(xv+dx/len*L,yv);ctx.stroke();
+    arrowHead(xv,yv,xv+dx/len*L,yv,C.rind);
+    ctx.fillStyle=C.rind;ctx.font='bold 11px DM Mono';ctx.fillText('a^μ',xv+dx/len*L+4,yv-4);
+  }
+
+  if(showInterval&&eventPt) drawIntervalAccel(s,a,r0);
+}
+
+// ═══════════════ 시공간 간격 ═══════════════
+// eventPt는 항상 민코프스키(S) 좌표 {x, ct}로 저장 — 관점이 바뀌어도 같은 물리적 사건.
+// ds²는 로런츠 불변량이므로 어느 좌표로 계산해도 동일 (S 좌표로 계산).
+// 시간꼴(ds²<0)은 Δτ=√(−ds²), 공간꼴(ds²>0)은 고유거리 Δσ=√(ds²)로 구분 표기.
+function intervalLabels(ex,ey,ds2){
+  ctx.font='bold 10px DM Mono';ctx.fillStyle=C.prop;
+  ctx.fillText('ds²='+ds2.toFixed(2),ex+8,ey);
+  if(ds2<-1e-9)      ctx.fillText('Δτ='+Math.sqrt(-ds2).toFixed(2)+' (시간꼴)',ex+8,ey+14);
+  else if(ds2>1e-9)  ctx.fillText('Δσ='+Math.sqrt(ds2).toFixed(2)+' (공간꼴)',ex+8,ey+14);
+  else               ctx.fillText('널 (광적 간격)',ex+8,ey+14);
+}
+
+function drawIntervalInertial(u,map){
+  // 사건은 S 좌표에 고정 → 현재 카메라 사상으로 화면에 표시
+  // (등속: 부스트 Λ(u), 쌍둥이: 포앵카레 사상 twS를 map으로 전달)
+  const M=map||function(x,ct){
+    if(Math.abs(u)<1e-9)return toScreen(x,ct);
+    const r=lorentz(x,ct,u);return toScreen(r[0],r[1]);
+  };
+  const[sx,sy]=M(0,0),[ex,ey]=M(eventPt.x,eventPt.ct);
+  ctx.strokeStyle=C.prop;ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex,ey);ctx.stroke();
+  arrowHead(sx,sy,ex,ey,C.prop);
+  ctx.fillStyle=C.prop;ctx.beginPath();ctx.arc(ex,ey,4,0,Math.PI*2);ctx.fill();
+  ctx.setLineDash([4,3]);ctx.strokeStyle=C.prop+'88';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(ex,ey);ctx.lineTo(ex,sy);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(ex,sy);ctx.stroke();
+  ctx.setLineDash([]);
+  // 불변량: S 좌표로 계산 (카메라 좌표로 계산해도 동일한 값)
+  const ds2=-eventPt.ct*eventPt.ct+eventPt.x*eventPt.x;
+  intervalLabels(ex,ey,ds2);
+}
+
+function drawIntervalAccel(s,a,r0){
+  const xe=eventPt.x, cte=eventPt.ct; // 민코프스키 좌표 (고정)
+  // 기준점: 출발 사건 — 민코프스키 (r0,0) = 린들러 (0,0). 두 관점에서 같은 물리적 사건.
+  const q0=toScreen(r0,0), q1=toScreen(0,0);
+  const ox=(1-s)*q0[0]+s*q1[0], oy=(1-s)*q0[1]+s*q1[1];
+  // 사건의 화면 좌표: s=0 민코프스키, s=1 린들러 (다른 요소와 동일한 블렌드)
+  const p0=toScreen(xe,cte);
+  const inWedge=(xe>0.01&&Math.abs(cte)<xe*0.9999);
+  let ex,ey,fade=1;
+  if(inWedge){
+    const R=Math.sqrt(xe*xe-cte*cte), tau=Math.atanh(cte/xe)/a;
+    const p1=toScreen(R-r0,tau);
+    ex=(1-s)*p0[0]+s*p1[0]; ey=(1-s)*p0[1]+s*p1[1];
+  } else {
+    // 웨지 밖 사건: S'(린들러 차트)에서 표현 불가 → S' 관점으로 갈수록 페이드
+    ex=p0[0]; ey=p0[1]; fade=Math.max(0,1-s);
+    if(fade<0.02) return;
+  }
+  ctx.save();
+  ctx.globalAlpha=fade;
+  ctx.strokeStyle=C.prop;ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(ox,oy);ctx.lineTo(ex,ey);ctx.stroke();
+  arrowHead(ox,oy,ex,ey,C.prop);
+  ctx.fillStyle=C.prop;ctx.beginPath();ctx.arc(ex,ey,4,0,Math.PI*2);ctx.fill();
+  // 간격: 출발 사건 (r0,0) 기준 — 불변량이므로 민코프스키 좌표로 계산
+  const dx=xe-r0, dct=cte;
+  const ds2=-dct*dct+dx*dx;
+  intervalLabels(ex,ey,ds2);
+  ctx.font='8px DM Mono';
+  ctx.fillText('(출발 사건 기준)',ex+8,ey+26);
+  ctx.restore();
+}
+
+// ═══════════════ 광원뿔 ═══════════════
+function drawLightCone(t){
+  const[wx,wct]=toWorld(mouseX,mouseY);
+  if(motionType==='accel'&&t>0.99){
+    const a=alpha,r0=1/a,rho0=wx,tau0=wct,R=rho0+r0,sz=1.5,steps=80;
+    function rayL(sr,st,op,lw){
+      ctx.strokeStyle='rgba(245,158,11,'+op+')';ctx.lineWidth=lw;
+      ctx.beginPath();ctx.moveTo(...toScreen(rho0,tau0));
+      for(let k=1;k<=steps;k++){
+        const dt=sz*k/steps;
+        const rho=R*Math.exp(a*sr*dt)-r0;
+        if(!isFinite(rho))break;
+        ctx.lineTo(...toScreen(rho,tau0+st*dt));
+      }ctx.stroke();
+    }
+    if(Math.abs(R)<0.01){
+      ctx.strokeStyle='rgba(245,158,11,0.8)';ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.moveTo(...toScreen(rho0,tau0));ctx.lineTo(...toScreen(rho0,tau0+sz));ctx.stroke();
+    }else if(R>0){rayL(+1,+1,0.8,1.5);rayL(-1,+1,0.8,1.5);rayL(+1,-1,0.3,1);rayL(-1,-1,0.3,1);}
+    tip.style.display='block';tip.style.left=(mouseX+12)+'px';tip.style.top=(mouseY-8)+'px';
+    tip.textContent='ρ='+rho0.toFixed(2)+' τ='+tau0.toFixed(2)+' g_tt='+(-Math.pow(1+a*rho0,2)).toFixed(3);
+  }else{
+    const sz=0.9;
+    ctx.strokeStyle='rgba(245,158,11,0.7)';ctx.lineWidth=1.5;
+    ctx.beginPath();
+    ctx.moveTo(...toScreen(wx,wct));ctx.lineTo(...toScreen(wx+sz,wct+sz));
+    ctx.moveTo(...toScreen(wx,wct));ctx.lineTo(...toScreen(wx-sz,wct+sz));
+    ctx.stroke();
+    ctx.strokeStyle='rgba(245,158,11,0.25)';ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.moveTo(...toScreen(wx,wct));ctx.lineTo(...toScreen(wx+sz,wct-sz));
+    ctx.moveTo(...toScreen(wx,wct));ctx.lineTo(...toScreen(wx-sz,wct-sz));
+    ctx.stroke();
+    tip.style.display='block';tip.style.left=(mouseX+12)+'px';tip.style.top=(mouseY-8)+'px';
+    if(motionType==='accel'){
+      // 등가속 S 관점: 화면좌표 = 민코프스키 (x,ct). 웨지 안이면 린들러 (ρ,τ)도 병기
+      // (기존의 lorentz(…,beta) 표기는 등가속과 무관한 슬라이더 β로 이중 부스트하던 오류)
+      let ex='';
+      if(wx>0.01&&Math.abs(wct)<wx*0.9999){
+        const a2=alpha,r02=1/a2;
+        const R2=Math.sqrt(wx*wx-wct*wct);
+        const tau2=Math.atanh(wct/wx)/a2;
+        ex=' | ρ='+(R2-r02).toFixed(2)+' τ='+tau2.toFixed(2);
+      }
+      tip.textContent='x='+wx.toFixed(2)+' ct='+wct.toFixed(2)+ex;
+    } else if(motionType==='twin'){
+      // 쌍둥이: 화면좌표는 카메라(포앵카레 사상) 좌표 → 역사상으로 S 좌표 표시
+      const inv=twInvW(wx,wct);
+      tip.textContent='x='+inv[0].toFixed(2)+' ct='+inv[1].toFixed(2)+((Math.abs(twCamU)>1e-9||Math.abs(twOffX)>1e-9)?' (S 좌표)':'');
+    } else if(motionType==='bell'){
+      const inv=beInvW(wx,wct);
+      tip.textContent='x='+inv[0].toFixed(2)+' ct='+inv[1].toFixed(2)+((Math.abs(blU)>1e-9||Math.abs(blOX)>1e-9)?' (S 좌표)':'');
+    } else if(motionType==='barn'){
+      // 막대·헛간: 카메라 부스트는 bnU (클램프 반영) — beta로 역변환하면 어긋난다
+      let xS,ctS,xP,ctP;
+      if(t>0.5){
+        xP=wx; ctP=wct;
+        const inv=lorentz(wx,wct,-bnU); xS=inv[0]; ctS=inv[1];
+      } else {
+        xS=wx; ctS=wct;
+        const fwd=lorentz(wx,wct,bnU); xP=fwd[0]; ctP=fwd[1];
+      }
+      tip.textContent='(x='+xS.toFixed(2)+',ct='+ctS.toFixed(2)+") | (x'="+xP.toFixed(2)+",ct'="+ctP.toFixed(2)+')';
+    } else {
+      // 등속: 화면좌표의 의미가 관점에 따라 다름 — S 관점=(x,ct), S' 관점=(x',ct')
+      // 이중 부스트 방지: S' 관점에서는 역변환(-β)으로 (x,ct)를 복원해서 병기
+      let xS,ctS,xP,ctP;
+      if(t>0.5){
+        xP=wx; ctP=wct;
+        const inv=lorentz(wx,wct,-beta); xS=inv[0]; ctS=inv[1];
+      } else {
+        xS=wx; ctS=wct;
+        const fwd=lorentz(wx,wct,beta); xP=fwd[0]; ctP=fwd[1];
+      }
+      tip.textContent='(x='+xS.toFixed(2)+',ct='+ctS.toFixed(2)+") | (x'="+xP.toFixed(2)+",ct'="+ctP.toFixed(2)+')';
+    }
+  }
+}
+
+// ═══════════════ UI ═══════════════
+// 렌더링 정책: rAF 루프는 mainLoop 하나뿐이다. 이벤트 핸들러는 상태만 바꾸고
+// draw()를 직접 호출하지 않는다 (예전에는 핸들러·ballLoop·startAnim이 각각
+// draw를 불러 한 프레임에 최대 4번 중복 렌더링됐다).
+function setSeg(ids,act){ids.forEach(id=>document.getElementById(id).classList.toggle('act',id===act));}
+function fillSlider(el){const p=(el.value-el.min)/(el.max-el.min)*100;el.style.background=`linear-gradient(to right,#2563eb ${p}%,#e2e8f0 ${p}%)`;}
+
+document.getElementById('sBeta').addEventListener('input',function(){
+  beta=parseFloat(this.value);
+  document.getElementById('vBeta').textContent=(beta>=0?'+':'')+beta.toFixed(2);
+  // 막대·헛간: β가 바뀌면 창 크기(=재생 시간)가 바뀌므로 진행도 보존 리베이스
+  if(motionType==='barn'){
+    const now=performance.now();
+    if(ballRunning&&!ballPaused) ballAnimStart=now-ballT*ballDur()/timeSpeed;
+    else if(ballPaused) ballPausedAt=ballT*ballDur()/timeSpeed;
+  }
+  fillSlider(this);
+});
+document.getElementById('sAlpha').addEventListener('input',function(){
+  alpha=parseFloat(this.value);
+  document.getElementById('vAlpha').textContent=alpha.toFixed(1);
+  fillSlider(this);
+});
+document.getElementById('sSpeed').addEventListener('input',function(){
+  const ns=parseFloat(this.value);
+  const now=performance.now();
+  // 진행도(ballT) 보존 리베이스: 속도를 바꿔도 애니메이션이 튀지 않음
+  if(ballRunning&&!ballPaused){
+    ballAnimStart=now - ballT*ballDur()/ns;
+  } else if(ballPaused){
+    ballPausedAt=ballT*ballDur()/ns;
+  }
+  timeSpeed=ns;
+  document.getElementById('vSpeed').textContent=ns.toFixed(2)+'×';
+  fillSlider(this);
+});
+document.getElementById('btnBall').onclick=function(){
+  const btn=this;
+  if(ballRunning&&!ballPaused){
+    // 일시정지 (경과 실시간 저장 — 현재 배율 기준)
+    ballPaused=true;
+    ballPausedAt=ballT*ballDur()/timeSpeed;
+    btn.textContent='▶ 계속';
+  } else if(ballPaused){
+    // 재개
+    ballPaused=false;
+    ballAnimStart=performance.now()-ballPausedAt;
+    btn.textContent='⏸ 일시정지';
+  } else {
+    // 새로 시작
+    ballT=0; ballRunning=true; ballPaused=false;
+    ballAnimStart=performance.now();
+    btn.textContent='⏸ 일시정지';
+  }
+};
+
+document.getElementById('btnReset').onclick=function(){
+  ballT=0; ballRunning=false; ballPaused=false;
+  const btn=document.getElementById('btnBall');
+  if(btn) btn.textContent='▶ 진행';
+};
+
+// 모드에 따라 사이드바 UI 정리: 해당 모드와 무관한 요소는 숨김 (혼동 방지)
+function applyModeUI(){
+  const m=motionType, orb=(m==='orbit');
+  document.getElementById('rowBeta').style.display=(m==='accel'||m==='bell'||orb)?'none':'flex';
+  document.getElementById('rowAlpha').style.display=(m==='accel'||m==='bell')?'flex':'none';
+  document.getElementById('rowTurn').style.display=(m==='twin')?'flex':'none';
+  document.getElementById('rowBreak').style.display=(m==='bell')?'flex':'none';
+  document.getElementById('rowMass').style.display=orb?'flex':'none';
+  document.getElementById('rowOrbiter').style.display=orb?'flex':'none';
+  document.getElementById('rowOrbR').style.display=orb?'flex':'none';
+  // 곡선 시공간에는 전역 관성계가 없다 → 관점 전환·Δs² 클릭은 궤도 모드에서 감춘다
+  document.getElementById('grpView').style.display=orb?'none':'';
+  document.getElementById('grpInterval').style.display=orb?'none':'';
+  document.getElementById('legendRay').style.display=orb?'none':'';
+  document.getElementById('legendHz').style.display=(m==='accel')?'':'none';
+  document.getElementById('legendPh').style.display=orb?'':'none';
+  document.getElementById('eqAccel').style.display=(m==='accel')?'':'none';
+  document.getElementById('eqOrbit').style.display=orb?'':'none';
+  document.getElementById('eqMink').style.display=orb?'none':'';
+  document.getElementById('legendS').textContent=
+    (m==='barn')?'헛간 (정지계 S)':(m==='bell'?'우주선 A (뒤)':(orb?'정지 관측자 (같은 r)':'정지계 S'));
+  document.getElementById('legendSP').textContent=
+    (m==='accel')?"가속계 S' (린들러)":(m==='twin'?'여행자 B':(m==='barn'?"막대 (운동계 S')":(m==='bell'?'우주선 B (앞)':(orb?'궤도체 세계선 (나선)':"운동계 S'"))));
+  document.getElementById('bViewS').textContent=(m==='barn')?'헛간계 S':'정지계 S';
+  document.getElementById('bViewSP').textContent=
+    (m==='accel')?"가속계 S'":(m==='twin'?'B 순간계':(m==='barn'?'막대계 S\u2032':(m==='bell'?'우주선 순간계':"운동계 S'")));
+  // 학습 모드 가시성: 쌍둥이=길이수축 숨김 / 막대·헛간=3종 숨김 / 벨=시간팽창만
+  const shipBtn=document.getElementById('btnShip');
+  const clockBtn=document.getElementById('btnClock');
+  const sigBtn=document.getElementById('btnSignal');
+  shipBtn.style.display=(m==='twin'||m==='barn'||m==='bell'||orb)?'none':'';
+  clockBtn.style.display=(m==='barn')?'none':'';
+  sigBtn.style.display=(m==='barn'||m==='bell'||orb)?'none':'';
+  if((m==='twin'||m==='barn'||m==='bell'||orb)&&showShip){showShip=false;shipBtn.classList.remove('on');}
+  if(m==='barn'&&showClock){showClock=false;clockBtn.classList.remove('on');}
+  if((m==='barn'||m==='bell'||orb)&&showSignal){showSignal=false;sigBtn.classList.remove('on');document.getElementById('segSignal').style.display='none';}
+  if(orb) updateOrbLabel();
+}
+
+// 궤도 슬라이더 라벨/활성 상태 (빛이면 r=3M 고정이라 비활성)
+function updateOrbLabel(){
+  const p=orbitParams();
+  const sl=document.getElementById('sOrbR');
+  sl.disabled=p.isLight;
+  sl.style.opacity=p.isLight?0.35:1;
+  document.getElementById('vOrbR').textContent=
+    p.isLight?'3 GM/c² 고정':p.r.toFixed(2)+' GM/c²';
+  const n=document.getElementById('orbNote');
+  n.textContent=(p.isLight?'빛의 원궤도는 광자구 하나뿐 (불안정)'
+    :(p.r>=6?'안정 (ISCO 바깥)':'불안정 (ISCO 안쪽)'))
+    +' · r_s = '+fmtKm(2*p.M_km)+' · 주기 '+fmtSec(p.cT*p.secPerM);
+}
+const SEG_MODES=['bInertial','bAccel','bOrbit','bTwin','bBarn','bBell'];
+document.getElementById('bInertial').onclick=function(){
+  motionType='inertial';setSeg(SEG_MODES,'bInertial');
+  applyModeUI();
+  eventPt=null; // 모드 전환: 사건 좌표 의미가 달라지므로 초기화
+};
+document.getElementById('bAccel').onclick=function(){
+  motionType='accel';setSeg(SEG_MODES,'bAccel');
+  applyModeUI();
+  eventPt=null; // 모드 전환: 사건 좌표 의미가 달라지므로 초기화
+};
+document.getElementById('bOrbit').onclick=function(){
+  motionType='orbit';setSeg(SEG_MODES,'bOrbit');
+  // 곡선 시공간에는 전역 관성계가 없다 → 먼 관측자 좌표로 고정
+  viewMode='S';setSeg(['bViewS','bViewSP'],'bViewS');animating=false;animT=0;
+  applyModeUI();
+  eventPt=null;
+};
+const MASS_BTN=['bM10','bM21','bMSgr','bM87'];
+function setMass(m,id){bhMass=m;setSeg(MASS_BTN,id);applyModeUI();}
+document.getElementById('bM10').onclick=()=>setMass(10,'bM10');          // 항성질량
+document.getElementById('bM21').onclick=()=>setMass(21,'bM21');          // Cygnus X-1
+document.getElementById('bMSgr').onclick=()=>setMass(4.297e6,'bMSgr');   // 우리 은하 중심
+document.getElementById('bM87').onclick=()=>setMass(6.5e9,'bM87');       // M87* (EHT)
+document.getElementById('bShip').onclick=function(){
+  orbiter='ship';setSeg(['bShip','bLight'],'bShip');applyModeUI();
+};
+document.getElementById('bLight').onclick=function(){
+  orbiter='light';setSeg(['bShip','bLight'],'bLight');applyModeUI();
+};
+document.getElementById('sOrbR').addEventListener('input',function(){
+  orbSlider=parseFloat(this.value);
+  fillSlider(this);updateOrbLabel();
+});
+document.getElementById('bTwin').onclick=function(){
+  motionType='twin';setSeg(SEG_MODES,'bTwin');
+  applyModeUI();
+  eventPt=null; // 모드 전환: 사건 좌표 의미가 달라지므로 초기화
+};
+document.getElementById('bBarn').onclick=function(){
+  motionType='barn';setSeg(SEG_MODES,'bBarn');
+  // β≈0이면 시나리오가 성립하지 않아 빈 격자로 보임 → 시연 기본값(임계속도 초과)
+  if(Math.abs(beta)<0.05){
+    beta=0.85;
+    const sl=document.getElementById('sBeta');
+    sl.value='0.85';
+    document.getElementById('vBeta').textContent='+0.85';
+    fillSlider(sl);
+  }
+  applyModeUI();
+  eventPt=null; // 모드 전환: 사건 좌표 의미가 달라지므로 초기화
+};
+document.getElementById('bBell').onclick=function(){
+  motionType='bell';setSeg(SEG_MODES,'bBell');
+  applyModeUI();
+  eventPt=null; // 모드 전환: 사건 좌표 의미가 달라지므로 초기화
+};
+document.getElementById('sBreak').addEventListener('input',function(){
+  bellBreakG=parseFloat(this.value);
+  document.getElementById('vBreak').textContent=bellBreakG.toFixed(2);
+  fillSlider(this);
+});
+document.getElementById('sTurn').addEventListener('input',function(){
+  twinTurnFrac=parseFloat(this.value);
+  document.getElementById('vTurn').textContent=
+    twinTurnFrac<=0.001?'순간 반전':(twinTurnFrac*100).toFixed(0)+'%';
+  fillSlider(this);
+});
+document.getElementById('bViewS').onclick=function(){
+  if(viewMode==='S')return;
+  viewMode='S';setSeg(['bViewS','bViewSP'],'bViewS');startAnim(1,0);
+};
+document.getElementById('bViewSP').onclick=function(){
+  if(viewMode==='SP')return;
+  viewMode='SP';setSeg(['bViewS','bViewSP'],'bViewSP');startAnim(0,1);
+};
+function toggleBtn(id,cb){document.getElementById(id).onclick=function(){cb();this.classList.toggle('on');};}
+// 길이 우주선 / 고유시간 / 광신호는 상호 배타: 하나를 켜면 나머지는 꺼짐
+function setExclusiveMode(which){
+  const turnOn = (which==='ship')?!showShip : (which==='clock')?!showClock : !showSignal;
+  showShip=false; showClock=false; showSignal=false;
+  if(turnOn){
+    if(which==='ship') showShip=true;
+    else if(which==='clock') showClock=true;
+    else showSignal=true;
+  }
+  document.getElementById('btnShip').classList.toggle('on',showShip);
+  document.getElementById('btnClock').classList.toggle('on',showClock);
+  document.getElementById('btnSignal').classList.toggle('on',showSignal);
+  document.getElementById('segSignal').style.display=showSignal?'':'none';
+}
+document.getElementById('btnShip').onclick=()=>setExclusiveMode('ship');
+document.getElementById('btnClock').onclick=()=>setExclusiveMode('clock');
+document.getElementById('btnSignal').onclick=()=>setExclusiveMode('signal');
+document.getElementById('bSigA').onclick=function(){sigEmitter='A';this.classList.add('act');document.getElementById('bSigB').classList.remove('act');};
+document.getElementById('bSigB').onclick=function(){sigEmitter='B';this.classList.add('act');document.getElementById('bSigA').classList.remove('act');};
+toggleBtn('btnInterval',()=>{showInterval=!showInterval;if(!showInterval)eventPt=null;});
+
+cv.addEventListener('click',function(e){
+  if(!showInterval)return;
+  if(motionType==='orbit')return; // 곡선 시공간: 떨어진 두 사건의 간격은 경로에 의존
+  const r=cv.getBoundingClientRect();
+  const[wx,wct]=toWorld(e.clientX-r.left,e.clientY-r.top);
+  const t=animating?animT:(viewMode==='SP'?1:0);
+  // 클릭한 화면좌표를 물리적 사건(민코프스키 좌표)으로 환산해서 저장
+  // → 관점을 전환해도 마커가 같은 사건을 계속 가리킴 (사건은 좌표계에 무관)
+  if(motionType==='inertial'){
+    // 현재 카메라(속도 u=βt)의 좌표 → 역부스트로 S 좌표 복원
+    const u=beta*t;
+    if(Math.abs(u)<1e-9) eventPt={x:wx,ct:wct};
+    else{const[xS,ctS]=lorentz(wx,wct,-u);eventPt={x:xS,ct:ctS};}
+  } else if(motionType==='barn'){
+    // 막대·헛간 카메라는 bnU (|β|>0.949 클램프 + p.deg면 0) — beta*t가 아니다
+    const u=bnU;
+    if(Math.abs(u)<1e-9) eventPt={x:wx,ct:wct};
+    else{const[xS,ctS]=lorentz(wx,wct,-u);eventPt={x:xS,ct:ctS};}
+  } else if(motionType==='twin'){
+    // 카메라 = 부스트+평행이동(포앵카레) → 역사상으로 S 좌표 복원
+    const r2=twInvW(wx,wct);
+    eventPt={x:r2[0],ct:r2[1]};
+  } else if(motionType==='bell'){
+    const r2=beInvW(wx,wct);
+    eventPt={x:r2[0],ct:r2[1]};
+  } else {
+    if(t>0.5){
+      // S' 관점: 화면좌표 = 린들러 (ρ,τ) → 민코프스키로 환산 (지평선 밖 클릭은 무시)
+      const R=1/alpha+wx;
+      if(R<=0.01) return;
+      eventPt={x:R*Math.cosh(alpha*wct), ct:R*Math.sinh(alpha*wct)};
+    } else {
+      // S 관점: 화면좌표 = 민코프스키 (x,ct)
+      eventPt={x:wx,ct:wct};
+    }
+  }
+});
+cv.addEventListener('mousemove',function(e){
+  const r=cv.getBoundingClientRect();
+  mouseX=e.clientX-r.left;mouseY=e.clientY-r.top;mouseOnCanvas=true;
+});
+cv.addEventListener('mouseleave',function(){
+  mouseOnCanvas=false;tip.style.display='none';
+});
+
+['sBeta','sAlpha','sSpeed','sTurn','sBreak','sOrbR'].forEach(id=>fillSlider(document.getElementById(id)));
+applyModeUI();
+resize();
+// 유일한 렌더 루프
+function mainLoop(){ draw(); requestAnimationFrame(mainLoop); }
+mainLoop();
+</script>
+</body>
+</html>
