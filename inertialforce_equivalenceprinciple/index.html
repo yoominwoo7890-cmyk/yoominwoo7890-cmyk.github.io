@@ -1,1 +1,981 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>관성력과 등가원리 시뮬레이션</title>
+<style>
+:root{
+  --bg:#EEF2F7; --panel:#FFFFFF; --ink:#17263B; --sub:#5B6B82; --line:#DDE5EF;
+  --grav:#E8590C; --inert:#1971C2; --tens:#3B5BDB; --net:#AE3EC9; --light:#F5A800;
+  --teal:#12B886; --pink:#F06595; --accent:#2F6FED;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"Pretendard","Apple SD Gothic Neo","Malgun Gothic","Segoe UI",sans-serif;
+  font-size:15px; line-height:1.55; padding:18px 20px 40px;
+}
+.layout{max-width:1280px; margin:0 auto; display:grid; grid-template-columns:1fr 302px; gap:16px; align-items:start;}
+@media(max-width:1000px){.layout{grid-template-columns:1fr;}}
+.sidebar{position:sticky; top:14px; display:flex; flex-direction:column; gap:12px;
+  max-height:calc(100vh - 28px); overflow:auto; padding-right:2px;}
+header{margin:0 0 14px;}
+header h1{font-size:22px; font-weight:800; letter-spacing:-.3px;}
+header p{color:var(--sub); font-size:13.5px; margin-top:2px;}
+.legend{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;}
+.chip{display:inline-flex; align-items:center; gap:6px; background:transparent;
+  border:1px solid var(--line); border-radius:999px; padding:2px 10px; font-size:12px; color:var(--sub);}
+.chip i{width:18px; height:4px; border-radius:2px; display:inline-block;}
+.tabs{display:flex; flex-direction:column; gap:6px;}
+.tab{border:1px solid var(--line); background:var(--panel); color:var(--sub); text-align:left;
+  padding:10px 14px; border-radius:10px; cursor:pointer; font-size:13.5px; font-weight:600;}
+.tab.on{background:var(--ink); color:#fff; border-color:var(--ink);}
+.tab:focus-visible{outline:2px solid var(--accent); outline-offset:2px;}
+main{min-width:0;}
+.mod{display:none;}
+.mod.on{display:block;}
+.grid{display:block;}
+.card{background:var(--panel); border:1px solid var(--line); border-radius:14px; overflow:hidden;}
+.card canvas{display:block; width:100%; height:auto;}
+.panel{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px;}
+.panel h3{font-size:13px; color:var(--sub); text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px;}
+.panel + .panel{margin-top:12px;}
+.sbm{display:none;}
+.sbm.on{display:block;}
+.seg{display:flex; border:1px solid var(--line); border-radius:9px; overflow:hidden; margin-bottom:10px;}
+.seg button{flex:1; border:0; background:#F5F8FC; color:var(--sub); padding:8px 4px; font-size:13px; font-weight:600; cursor:pointer;}
+.seg button.on{background:var(--accent); color:#fff;}
+.row{display:flex; justify-content:space-between; align-items:center; font-size:13px; color:var(--sub); margin:10px 0 4px;}
+.row b{color:var(--ink); font-variant-numeric:tabular-nums;}
+input[type=range]{width:100%; accent-color:var(--accent);}
+.btns{display:flex; flex-wrap:wrap; gap:7px; margin-top:6px;}
+.btn{border:1px solid var(--line); background:#F5F8FC; color:var(--ink); border-radius:9px;
+  padding:7px 12px; font-size:13px; font-weight:600; cursor:pointer;}
+.btn:hover{background:#EAF0F8;}
+.btn.sel{background:var(--ink);color:#fff;border-color:var(--ink);}
+.btn:disabled{opacity:0.42;cursor:default;}
+.btn.warn{background:#FFF4E6; border-color:#FFD8A8; color:#D9480F;}
+.note{background:#F5F8FC; border:1px solid var(--line); border-radius:12px;
+  padding:13px 15px; font-size:14px; margin-top:14px;}
+.note b{color:var(--accent);}
+.note .tag{display:inline-block; font-size:11.5px; font-weight:700; color:#fff;
+  background:var(--accent); border-radius:6px; padding:1px 8px; margin-right:7px;}
+.formula{font-family:"Cambria Math",Georgia,serif; background:#fff; border:1px dashed var(--line);
+  border-radius:9px; padding:8px 10px; margin-top:8px; font-size:15px; text-align:center;}
+</style>
+</head>
+<body>
+<header>
+  <h1>관성력과 등가원리 <span style="color:var(--sub);font-weight:600;font-size:15px">— 교육용 물리 시뮬레이션</span></h1>
+  <p>관찰자의 기준계에 따라 같은 현상이 어떻게 다르게 설명되는지 비교합니다.</p>
+  
+</header>
 
+
+
+<div class="layout">
+<main>
+
+<!-- ============ MODULE 1 : BUS ============ -->
+<section class="mod on" id="m0">
+  <div class="grid">
+    <div class="card"><canvas id="cv0" width="920" height="540"></canvas></div>
+    
+  </div>
+  <div class="note" id="busNote"></div>
+</section>
+
+<!-- ============ MODULE 2 : ELEVATOR ============ -->
+<section class="mod" id="m1">
+  <div class="grid">
+    <div class="card"><canvas id="cv1" width="920" height="540"></canvas></div>
+    
+  </div>
+  <div class="note" id="elNote"></div>
+</section>
+
+<!-- ============ MODULE 3 : EQUIVALENCE ============ -->
+<section class="mod" id="m2">
+  <div class="grid">
+    <div class="card"><canvas id="cv2" width="920" height="640"></canvas></div>
+    
+  </div>
+  <div class="note" id="eqNote"></div>
+</section>
+
+
+
+</main>
+<aside class="sidebar">
+<div class="tabs" role="tablist">
+  <button class="tab on" data-t="0">1. 버스 — 물컵과 손잡이</button>
+  <button class="tab" data-t="1">2. 엘리베이터 — 몸무게</button>
+  <button class="tab" data-t="2">3. 등가원리 · 시공간</button>
+  </div>
+<div class="sbm on" id="sb0">
+      <div class="panel">
+        <h3>버스의 운동</h3>
+        <div class="seg" id="busMode">
+          <button class="on" data-v="const">등속도 운동</button>
+          <button data-v="accel">가속도 운동</button>
+        </div>
+        <div class="row"><span>가속도 a</span><b id="busAVal">2.0 m/s²</b></div>
+        <input type="range" id="busA" min="-6" max="6" step="0.1" value="2">
+        <p style="font-size:12px;color:var(--sub);margin-top:8px">1 m = 5.5 px 축척. 속도가 클수록 화면을 빨리 지나갑니다.</p>
+        <div class="row"><span>속력 v</span><b id="busVVal">0.0 m/s</b></div>
+        <input type="range" id="busV" min="0" max="60" step="0.5" value="8">
+      </div>
+      <div class="panel">
+        <h3>관찰자</h3>
+        <div class="seg" id="busObs">
+          <button class="on" data-v="ground">버스 밖 (지면)</button>
+          <button data-v="bus">버스 안</button>
+        </div>
+        <div class="btns">
+          <button class="btn" id="busJump" style="background:var(--accent);color:#fff;border-color:var(--accent)">사람 점프</button>
+          <button class="btn" id="busPause">❚❚ 일시정지</button>
+        </div>
+        <div class="btns" style="margin-top:7px">
+          <button class="btn" id="busJumpReset">사람 위치 초기화</button>
+          <button class="btn" id="busReset">전체 초기화</button>
+        </div>
+        <p id="busJumpMsg" style="font-size:12px;color:var(--sub);margin-top:9px">
+          버스 안에서 제자리 점프합니다. 착지 지점을 보세요.</p>
+      </div>
+      <div class="panel">
+        <h3>진자의 기울기</h3>
+        <div class="formula">tan θ = a / g</div>
+        <div class="row"><span>기울기 θ</span><b id="busTh">0.0°</b></div>
+      </div>
+    </div>
+<div class="sbm" id="sb1">
+      <div class="panel">
+        <h3>엘리베이터 가속도 (위쪽 +)</h3>
+        <div class="row"><span>가속도 a</span><b id="elAVal">0.0 m/s²</b></div>
+        <input type="range" id="elA" min="-9.8" max="9.8" step="0.1" value="0">
+        <div class="row"><span>현재 속도 v</span><b id="elVVal">0.0 m/s</b></div>
+        <div class="btns" style="margin-top:10px"><button class="btn" id="elReset">초기화 (a = 0)</button></div>
+        <p style="font-size:12px;color:var(--sub);margin-top:10px">
+          슬라이더를 <b>−9.8</b>까지 내리면 자유낙하 — <b>무중력</b> 상태가 됩니다.</p>
+      </div>
+      
+    </div>
+<div class="sbm" id="sb2">
+      <div class="panel">
+        <h3>① 관찰자 (기준계) — 언제든 전환</h3>
+        <div class="seg" id="eqFrame">
+          <button class="on" data-v="fall">자유낙하하는 사람</button>
+          <button data-v="ground">지면에 정지한 사람</button>
+        </div>
+        <h3 style="margin-top:14px">② 엘리베이터 위치</h3>
+        <div class="seg" id="eqScene">
+          <button class="on" data-v="fall">공중 → 자유낙하</button>
+          <button data-v="rest">지면 위에 정지</button>
+        </div>
+        <h3 style="margin-top:14px">③ 실험 선택 (시작 전)</h3>
+        <div class="btns" id="eqExp">
+          <button class="btn sel" data-e="d">사과 놓기</button>
+          <button class="btn" data-e="h">사과 수평 발사</button>
+          <button class="btn" data-e="light">빛 발사</button>
+        </div>
+        <h3 style="margin-top:14px">④ 실행</h3>
+        <div class="btns">
+          <button class="btn" id="eqStart" style="background:var(--accent);color:#fff;border-color:var(--accent)">▶ 시작</button>
+          <button class="btn" id="eqReset">초기화</button>
+        </div>
+        <p style="font-size:12px;color:var(--sub);margin-top:12px">
+          ※ 빛의 속도는 관찰 가능하도록 크게 축소(휘어짐 과장)했습니다.</p>
+      </div>
+    </div>
+</aside>
+</div>
+
+<script>
+/* ===================== 공통 ===================== */
+const G = 9.8;
+const COL = {grav:'#E8590C', inert:'#1971C2', tens:'#3B5BDB', net:'#AE3EC9',
+             light:'#F5A800', teal:'#12B886', pink:'#F06595', ink:'#17263B', sub:'#5B6B82'};
+let activeTab = 0;
+
+document.querySelectorAll('.tab').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+    document.querySelectorAll('.mod').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+    activeTab = +b.dataset.t;
+    document.getElementById('m'+activeTab).classList.add('on');
+    document.querySelectorAll('.sbm').forEach(x=>x.classList.remove('on'));
+    document.getElementById('sb'+activeTab).classList.add('on');
+  });
+});
+function segInit(id, cb){
+  const el = document.getElementById(id);
+  el.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
+    el.querySelectorAll('button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); cb(b.dataset.v);
+  }));
+}
+function arrow(ctx,x1,y1,x2,y2,color,w=4,label='',lblOff=[10,0]){
+  const dx=x2-x1, dy=y2-y1, L=Math.hypot(dx,dy);
+  if(L<3) return;
+  const a=Math.atan2(dy,dx), hs=Math.min(13,6+w*1.6);
+  ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=w; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(x1,y1);
+  ctx.lineTo(x2-hs*0.8*Math.cos(a), y2-hs*0.8*Math.sin(a)); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-hs*Math.cos(a-0.45), y2-hs*Math.sin(a-0.45));
+  ctx.lineTo(x2-hs*Math.cos(a+0.45), y2-hs*Math.sin(a+0.45));
+  ctx.closePath(); ctx.fill();
+  if(label){
+    ctx.font='bold 15px "Cambria Math",Georgia,serif';
+    ctx.textAlign='left'; ctx.textBaseline='middle';
+    ctx.fillText(label, x2+lblOff[0], y2+lblOff[1]);
+  }
+}
+function bubble(ctx,x,y,w,txts,align='left'){
+  const lh=19, h=txts.length*lh+18;
+  ctx.fillStyle='rgba(255,255,255,0.95)'; ctx.strokeStyle='#C8D4E4'; ctx.lineWidth=1.5;
+  roundRect(ctx,x,y,w,h,10); ctx.fill(); ctx.stroke();
+  ctx.fillStyle=COL.ink; ctx.font='13.5px sans-serif'; ctx.textAlign=align; ctx.textBaseline='top';
+  const tx = align==='left'? x+12 : x+w/2;
+  txts.forEach((t,i)=>ctx.fillText(t,tx,y+10+i*lh));
+}
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
+function person(ctx,x,y,h,color='#3E5C86',float=false){
+  // x=발 중앙, y=발끝, h=키
+  const hd=h*0.13, headY=y-h+hd, neckY=y-h+hd*2.15, hipY=y-h*0.42;
+  ctx.strokeStyle=color; ctx.fillStyle=color;
+  ctx.lineWidth=Math.max(3,h*0.055); ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.beginPath(); ctx.arc(x,headY,hd,0,7); ctx.fill();                    // 머리
+  ctx.beginPath(); ctx.moveTo(x,neckY); ctx.lineTo(x,hipY); ctx.stroke(); // 몸통
+  const shY=neckY+h*0.045, hx=h*0.20;                                     // 어깨
+  const handY=float? shY-h*0.14 : shY+h*0.24;
+  ctx.beginPath(); ctx.moveTo(x-hx,handY); ctx.lineTo(x,shY); ctx.lineTo(x+hx,handY); ctx.stroke(); // 팔
+  const fx=h*0.12, footY=float? y-h*0.09 : y;
+  ctx.beginPath(); ctx.moveTo(x-fx,footY); ctx.lineTo(x,hipY); ctx.lineTo(x+fx,footY); ctx.stroke(); // 다리
+}
+</script>
+
+
+<script>
+/* ===================== 모듈 1 : 버스 ===================== */
+(function(){
+const cv=document.getElementById('cv0'), ctx=cv.getContext('2d');
+const W=cv.width, H=cv.height, PXM=5.5, VMAX=1000, HORIZ=452, EXAG=2.0;
+const PPM=72;                       // 인셋 확대도: 픽셀/미터
+const JV0=3.4;                      // 점프 초기 속도 (m/s) // 기울기 2배 과장 표시
+let mode='const', obs='ground', aSet=2, v=8, busX=90, scenX=0;
+let jump=null, landX=0, jumped=false;   // 상대좌표(m). landX: 착지 변위, jumped: 안내 표시용
+let paused=false;
+const noteEl=document.getElementById('busNote');
+
+segInit('busMode', m=>{ mode=m; upd(); });
+segInit('busObs', o=>{ obs=o; });
+document.getElementById('busA').addEventListener('input',e=>{ aSet=+e.target.value; upd(); });
+document.getElementById('busV').addEventListener('input',e=>{ v=+e.target.value; });
+document.getElementById('busReset').addEventListener('click',()=>{
+  v=8; busX=90; scenX=0; jump=null; landX=0; jumped=false;
+  paused=false; document.getElementById('busPause').textContent='\u275a\u275a 일시정지';
+  document.getElementById('busV').value=8;
+});
+document.getElementById('busPause').addEventListener('click',()=>{
+  paused=!paused;
+  document.getElementById('busPause').textContent = paused? '\u25b6 계속' : '\u275a\u275a 일시정지';
+});
+document.getElementById('busJumpReset').addEventListener('click',()=>{
+  jump=null; landX=0; jumped=false;      // 사람만 이륙선으로 복귀 (버스 운동은 유지)
+});
+document.getElementById('busJump').addEventListener('click',()=>{
+  if(jump) return;                       // 공중이면 무시
+  landX=0; jumped=true;                  // 항상 제자리(이륙선)에서 출발
+  jump={y:0, vy:JV0, x:0, vx:0};
+});
+function aEff(){
+  if(mode==='const') return 0;
+  if(v>=VMAX && aSet>0) return 0;
+  if(v<=0 && aSet<0) return 0;
+  return aSet;
+}
+function dispTh(a){ return Math.atan2(EXAG*a,G); }   // 표시용(과장)
+function upd(){
+  document.getElementById('busAVal').textContent=(mode==='const'?0:aSet).toFixed(1)+' m/s\u00b2';
+  document.getElementById('busA').disabled=(mode==='const');
+}
+upd();
+const trees=[]; for(let i=0;i<6;i++) trees.push(180+i*330+((i*97)%90));
+
+window.step0=function(dt){
+  if(paused) dt=0;                     // 시간 정지: 위치·속도·점프가 모두 멈춘다
+  const a=aEff();
+  v=Math.min(VMAX,Math.max(0,v+(mode==='const'?0:aSet)*dt));
+  /* 화면 이동은 표시 속도와 정확히 정비례: 1 m = PXM 픽셀 */
+  if(obs==='ground'){ busX+=v*PXM*dt; if(busX>W+120){busX=-240;} }
+  else { scenX-=v*PXM*dt; }
+  /* 점프 적분 (버스 기준 상대좌표)
+     지면계: 사람은 이륙 순간의 속도를 유지 → 버스만 a로 가속
+     버스계: 사람에게 −a의 관성력이 작용 → 상대 가속도 −a */
+  if(jump){
+    jump.vx += -a*dt;   jump.x += jump.vx*dt;
+    jump.vy += -G*dt;   jump.y += jump.vy*dt;
+    if(jump.y<=0){ landX=jump.x; jump=null; }
+  }
+  draw(a);
+  document.getElementById('busVVal').textContent=v.toFixed(1)+' m/s';
+  document.getElementById('busV').value=Math.min(60,v);
+  document.getElementById('busTh').textContent=(Math.atan2(Math.abs(a),G)*180/Math.PI).toFixed(1)+'\u00b0';
+  note(a);
+};
+function note(a){
+  const st = mode==='const' ? '등속도 운동' : (a>0?'가속(속력 증가)':(a<0?'감속(브레이크)':'가속도 0 (정지 또는 최고 속력)'));
+  const dx=(jump? jump.x : landX);
+  let jt='';
+  if(jumped){
+    jt = Math.abs(a)<0.01
+      ? ` <b>점프:</b> 가속도가 0이므로 사람은 버스와 같은 속도를 유지해 <b>제자리에 착지</b>합니다. 버스가 아무리 빨라도 마찬가지입니다.`
+      : ` <b>점프:</b> 공중에서 사람은 이륙 순간의 속도를 유지하지만 버스는 계속 ${a>0?'가속':'감속'}하므로,
+          착지 지점이 <b>${dx<0?'뒤로':'앞으로'} ${Math.abs(dx).toFixed(2)} m</b> 밀립니다
+          (버스 안에서는 관성력 −ma를 받아 밀린 것으로 설명).`;
+  }
+  if(obs==='ground'){
+    noteEl.innerHTML=`<span class="tag">버스 밖 관찰자</span> 버스는 <b>${st}</b> 중입니다.
+    손잡이에는 <b style="color:${COL.tens}">장력 T</b>와 <b style="color:${COL.grav}">중력 mg</b>의
+    <b>실제 힘만</b> 작용하고, 두 힘의 합력 <b style="color:${COL.net}">F = ma</b>가
+    손잡이를 버스와 함께 가속시킨다고 설명합니다.${jt}`;
+  } else {
+    noteEl.innerHTML=`<span class="tag">버스 안 관찰자</span> 버스는 <b>${st}</b> 중입니다.
+    버스 안(가속계)에서는 기울어진 손잡이가 <b>정지</b>해 보이므로, 가속도와 <b>반대 방향</b>의
+    가상의 힘 <b style="color:${COL.inert}">관성력 f = −ma</b>를 도입해야 힘의 평형이 설명됩니다.${jt}`;
+  }
+}
+function draw(a){
+  ctx.fillStyle='#E8F1FA'; ctx.fillRect(0,0,W,HORIZ);
+  ctx.fillStyle='#E2E8F0'; ctx.fillRect(0,HORIZ,W,H-HORIZ);
+  ctx.fillStyle='#C6D2DF'; ctx.fillRect(0,HORIZ,W,4);
+  const off = obs==='bus' ? scenX : 0;
+  ctx.fillStyle='rgba(255,255,255,0.85)';
+  for(let i=0;i<2;i++){ const cx=mod2(240+i*470+off*0.25,W+240)-120;
+    ctx.beginPath(); ctx.arc(cx,64+i*18,20,0,7); ctx.arc(cx+24,58+i*18,15,0,7); ctx.arc(cx-22,61+i*18,13,0,7); ctx.fill(); }
+  trees.forEach(t=>{ const x=mod2(t+off,1980)-180;
+    ctx.fillStyle='#A08260'; ctx.fillRect(x-4,HORIZ-40,8,40);
+    ctx.fillStyle='#93BE8E'; ctx.beginPath(); ctx.arc(x,HORIZ-56,24,0,7); ctx.fill(); });
+  ctx.fillStyle='#fff';
+  for(let i=0;i<12;i++){ const x=mod2(i*100+off,1200)-100; ctx.fillRect(x,HORIZ+46,46,6); }
+  const bx = obs==='ground' ? busX : 130;
+  drawBus(bx,a);
+  drawInset(a);
+  ctx.fillStyle='rgba(255,255,255,0.9)'; ctx.strokeStyle='#D5DEE9'; ctx.lineWidth=1;
+  roundRect(ctx,14,12,232,50,9); ctx.fill(); ctx.stroke();
+  ctx.fillStyle=COL.ink; ctx.font='bold 13px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='top';
+  ctx.fillText(obs==='ground'?'기준계: 지면':'기준계: 버스 내부',26,19);
+  ctx.fillStyle=COL.sub; ctx.font='12.5px sans-serif';
+  ctx.fillText(`v = ${v.toFixed(1)} m/s\u2003a = ${a.toFixed(1)} m/s\u00b2`,26,39);
+}
+function drawBus(bx,a){
+  const bw=168, bh=76, by=HORIZ-bh-12, th=dispTh(a);
+  ctx.fillStyle='#5D93CF'; roundRect(ctx,bx,by,bw,bh,11); ctx.fill();
+  ctx.fillStyle='#4A79AC'; ctx.fillRect(bx,by+bh-17,bw,10);
+  // 내부가 보이는 큰 창(컷어웨이)
+  const wx=bx+11, wy=by+9, ww=bw-22, wh=42;
+  ctx.fillStyle='#EFF6FC'; roundRect(ctx,wx,wy,ww,wh,7); ctx.fill();
+  ctx.strokeStyle='#3E6795'; ctx.lineWidth=2; roundRect(ctx,wx,wy,ww,wh,7); ctx.stroke();
+  // --- 내부: 소형 물컵 ---
+  const cX=wx+30, cY=wy+wh-6, cwv=16, chv=17;
+  ctx.fillStyle='#C7D5E4'; ctx.fillRect(cX-19,cY,42,3);
+  ctx.save(); ctx.beginPath();
+  ctx.moveTo(cX-cwv/2,cY-chv); ctx.lineTo(cX-cwv/2+2,cY); ctx.lineTo(cX+cwv/2-2,cY); ctx.lineTo(cX+cwv/2,cY-chv);
+  ctx.closePath(); ctx.clip();
+  const sl=EXAG*a/G, mY=cY-chv*0.5;
+  ctx.fillStyle='#5FABE8';
+  ctx.beginPath(); ctx.moveTo(cX-cwv/2,mY-(cwv/2)*sl); ctx.lineTo(cX+cwv/2,mY+(cwv/2)*sl);
+  ctx.lineTo(cX+cwv/2,cY); ctx.lineTo(cX-cwv/2,cY); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle='#6C86A0'; ctx.lineWidth=1.5;
+  ctx.beginPath();
+  ctx.moveTo(cX-cwv/2,cY-chv); ctx.lineTo(cX-cwv/2+2,cY); ctx.lineTo(cX+cwv/2-2,cY); ctx.lineTo(cX+cwv/2,cY-chv);
+  ctx.stroke();
+  // --- 내부: 점프하는 사람 ---
+  const PPMB=15;                                   // 소형 버스 확대도: 픽셀/미터
+  const jRel = jump? jump : null;
+  const jx = jRel? jRel.x : landX, jy = jRel? jRel.y : 0;
+  const jpX = wx+ww*0.49 + jx*PPMB, jpFloor = wy+wh-4;
+  // 이륙 기준선
+  if(jumped){
+    ctx.strokeStyle='#AEBCCC'; ctx.setLineDash([3,3]); ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(wx+ww*0.49,jpFloor); ctx.lineTo(wx+ww*0.49,jpFloor-24); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  person(ctx, jpX, jpFloor - jy*PPMB, 24, '#2F5480', false);
+  // --- 내부: 소형 진자 ---
+  const pX=wx+ww-32, pY=wy+3, Lm=27;
+  const bX=pX-Lm*Math.sin(th), bY=pY+Lm*Math.cos(th);
+  ctx.strokeStyle='#3A4B60'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(pX,pY); ctx.lineTo(bX,bY); ctx.stroke();
+  ctx.fillStyle='#3A4B60'; ctx.beginPath(); ctx.arc(bX,bY,4,0,7); ctx.fill();
+  // 바퀴
+  [bx+34,bx+bw-34].forEach(wxx=>{
+    ctx.fillStyle='#33404F'; ctx.beginPath(); ctx.arc(wxx,HORIZ-1,12,0,7); ctx.fill();
+    ctx.fillStyle='#B9C4D1'; ctx.beginPath(); ctx.arc(wxx,HORIZ-1,5,0,7); ctx.fill();
+  });
+  arrow(ctx,bx+bw+8,by+12,bx+bw+44,by+12,'#7C8CA1',3,'v',[6,0]);
+  if(a!==0){ const sg=Math.sign(a);
+    arrow(ctx,bx+bw+8,by+36,bx+bw+8+36*sg,by+36,'#E03131',3.5,'a',[6*sg,0]); }
+  // 인셋 연결선
+  ctx.strokeStyle='#B7C4D4'; ctx.setLineDash([5,5]); ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(bx+bw*0.55,by+2); ctx.lineTo(478,300); ctx.stroke(); ctx.setLineDash([]);
+}
+function drawInset(a){
+  const ix=468,iy=14,iw=438,ih=292, th=dispTh(a);
+  ctx.fillStyle='#FFFFFF'; ctx.strokeStyle='#C9D5E3'; ctx.lineWidth=2;
+  roundRect(ctx,ix,iy,iw,ih,12); ctx.fill(); ctx.stroke();
+  ctx.fillStyle='#8896AB'; ctx.font='bold 12px sans-serif'; ctx.textAlign='left';
+  ctx.fillText('버스 내부 확대', ix+14, iy+21);
+  ctx.font='11px sans-serif'; ctx.textAlign='right';
+  ctx.fillText('가벼운 손잡이 · 기울기 2배 과장', ix+iw-14, iy+21);
+
+  /* ---- 상단: 물컵 + 진자 ---- */
+  const cupX=ix+78, cupY=iy+176, cw=56, chh=66;
+  ctx.fillStyle='#CBD8E6'; ctx.fillRect(cupX-50,cupY,130,6);
+  ctx.save(); ctx.beginPath();
+  ctx.moveTo(cupX-cw/2,cupY-chh); ctx.lineTo(cupX-cw/2+5,cupY); ctx.lineTo(cupX+cw/2-5,cupY); ctx.lineTo(cupX+cw/2,cupY-chh);
+  ctx.closePath(); ctx.clip();
+  const slope=EXAG*a/G, midY=cupY-chh*0.5;
+  ctx.fillStyle='#5FABE8';
+  ctx.beginPath();
+  ctx.moveTo(cupX-cw/2, midY-(cw/2)*slope); ctx.lineTo(cupX+cw/2, midY+(cw/2)*slope);
+  ctx.lineTo(cupX+cw/2,cupY); ctx.lineTo(cupX-cw/2,cupY); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle='#6C86A0'; ctx.lineWidth=2.5;
+  ctx.beginPath();
+  ctx.moveTo(cupX-cw/2,cupY-chh); ctx.lineTo(cupX-cw/2+5,cupY); ctx.lineTo(cupX+cw/2-5,cupY); ctx.lineTo(cupX+cw/2,cupY-chh);
+  ctx.stroke();
+
+  const pvX=ix+iw-128, pvY=iy+36, L=92;
+  const bobX=pvX-L*Math.sin(th), bobY=pvY+L*Math.cos(th);
+  ctx.strokeStyle='#AAB8C9'; ctx.setLineDash([4,4]); ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(pvX,pvY); ctx.lineTo(pvX,pvY+L+8); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle='#3A4B60'; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(pvX,pvY); ctx.lineTo(bobX,bobY); ctx.stroke();
+  ctx.fillStyle='#3A4B60'; ctx.beginPath(); ctx.arc(pvX,pvY,4,0,7); ctx.fill();
+  ctx.fillStyle='#F3F7FB'; ctx.beginPath(); ctx.arc(bobX,bobY,12,0,7); ctx.fill();
+  ctx.strokeStyle='#3A4B60'; ctx.lineWidth=2.5; ctx.beginPath(); ctx.arc(bobX,bobY,12,0,7); ctx.stroke();
+  if(Math.abs(th)>0.02){
+    ctx.strokeStyle='#E03131'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(pvX,pvY,36,Math.PI/2,Math.PI/2+th,th<0); ctx.stroke();
+    ctx.fillStyle='#E03131'; ctx.font='bold 13px Georgia'; ctx.textAlign='center';
+    ctx.fillText('\u03b8', pvX-22*Math.sin(th/2), pvY+48);
+  }
+  const FG=56, FA=FG*Math.abs(a)/G*EXAG, sgn=Math.sign(a)||0, Tlen=FG/Math.cos(th);
+  arrow(ctx,bobX,bobY,bobX,bobY+FG,COL.grav,4,'mg',[8,2]);
+  arrow(ctx,bobX,bobY,bobX+(pvX-bobX)/L*Tlen,bobY+(pvY-bobY)/L*Tlen,COL.tens,4,'T',[6,-8]);
+  if(a!==0){
+    if(obs==='ground') arrow(ctx,bobX,bobY,bobX+FA*sgn,bobY,COL.net,4,'F=ma',[sgn>0?8:-62,0]);
+    else               arrow(ctx,bobX,bobY,bobX-FA*sgn,bobY,COL.inert,4,'f=\u2212ma',[sgn>0?-70:8,0]);
+  }
+
+  /* ---- 하단: 점프 무대 ---- */
+  const flY=iy+ih-34, cx=ix+iw/2;
+  ctx.strokeStyle='#E4EAF1'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(ix+14,flY-74); ctx.lineTo(ix+iw-14,flY-74); ctx.stroke();
+  ctx.fillStyle='#CBD8E6'; ctx.fillRect(ix+18,flY,iw-36,5);          // 버스 바닥
+  const relX = jump? jump.x : landX;
+  const relY = jump? jump.y : 0;
+  const px=cx+relX*PPM, py=flY-relY*PPM;
+  const x0=cx;                                   // 이륙 기준선 (항상 제자리)
+  ctx.strokeStyle='#9AA9BC'; ctx.setLineDash([4,4]); ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(x0,flY); ctx.lineTo(x0,flY-70); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle='#8896AB'; ctx.font='11px sans-serif'; ctx.textAlign='center';
+  ctx.fillText('이륙 지점', x0, flY+18);
+  person(ctx,px,py,66,'#3E5C86',false);
+  // 이동량 표시
+  const dx=relX;
+  if(Math.abs(dx)>0.02){
+    ctx.strokeStyle='#E03131'; ctx.lineWidth=1.5;
+    arrow(ctx,x0,flY-4,px,flY-4,'#E03131',3,'',[0,0]);
+    ctx.fillStyle='#E03131'; ctx.font='bold 11.5px sans-serif'; ctx.textAlign='center';
+    ctx.fillText((dx<0?'뒤로 ':'앞으로 ')+Math.abs(dx).toFixed(2)+' m', (x0+px)/2, flY-12);
+  }
+  ctx.fillStyle='#8896AB'; ctx.font='11px sans-serif'; ctx.textAlign='left';
+  ctx.fillText(jump? '공중 \u2014 사람은 이륙 순간의 속도를 유지'
+    : (Math.abs(dx)>0.02? '착지 \u2014 제자리가 아님' : (jumped?'착지 \u2014 제자리 그대로':'바닥')), ix+18, flY-80);
+}
+function mod2(x,m){ x%=m; return x<0?x+m:x; }
+})();
+</script>
+<script>
+/* ===================== 모듈 2 : 엘리베이터 ===================== */
+(function(){
+const cv=document.getElementById('cv1'), ctx=cv.getContext('2d');
+const W=cv.width, H=cv.height, M=60;
+let a=0, v=0, floorOff=0, freeFall=false, squash=0, kgDisp=60;
+const noteEl=document.getElementById('elNote');
+const slider=document.getElementById('elA');
+
+slider.addEventListener('input',e=>{ a=+e.target.value; upd(); });
+document.getElementById('elReset').addEventListener('click',()=>{ a=0; v=0; floorOff=0; slider.value=0; document.getElementById('elVVal').textContent='0.0 m/s'; upd(); });
+function upd(){
+  freeFall = (a<=-G+0.05);                      // a = −9.8 → 자유낙하(무중력)
+  document.getElementById('elAVal').textContent=a.toFixed(1)+' m/s\u00b2'+(freeFall?'  (무중력)':'');
+}
+upd();
+
+window.step1=function(dt){
+  v=Math.max(-120,Math.min(120,v+a*dt));
+  if(Math.abs(a)<0.05) v*=Math.pow(0.35,dt);      // a=0이면 서서히 정지
+  floorOff+=v*11*dt;                              // 1 m = 11 px 축척
+  document.getElementById('elVVal').textContent=v.toFixed(1)+' m/s';
+  const target=Math.max(-1,Math.min(1,a/G*1.35));   // 반응 과장
+  squash+=(target-squash)*Math.min(1,dt*7);
+  const kgT=Math.max(0,M*(G+a))/G;
+  kgDisp+=(kgT-kgDisp)*Math.min(1,dt*3.2);          // 바늘이 부드럽게 따라감
+  if(Math.abs(kgT-kgDisp)<0.05) kgDisp=kgT;
+  draw(); note();
+};
+function note(){
+  if(freeFall)
+    noteEl.innerHTML=`<span class="tag">자유낙하 · 무중력 (a = \u2212g)</span> 위쪽 관성력이 중력과 정확히 상쇄되어
+      저울 눈금 <b>0</b> \u2014 사람은 <b>둥둥 떠오릅니다</b>. 3번 모듈(등가원리)의 출발점입니다.`;
+  else if(Math.abs(a)<0.05)
+    noteEl.innerHTML=`<span class="tag">정지·등속</span> 관성력이 없어 몸무게는 그대로 <b>mg</b>.
+      정지와 등속도 운동은 구별할 수 없습니다 (관성계).`;
+  else if(a>0)
+    noteEl.innerHTML=`<span class="tag">위로 가속</span> 아래 방향 관성력 때문에 몸이 <b>무릎이 굽으며 주저앉듯 눌립니다</b>.
+      몸무게는 <b>W = mg + ma</b>로 크게 측정됩니다.`;
+  else
+    noteEl.innerHTML=`<span class="tag">아래로 가속</span> 위 방향 관성력 때문에 <b>까치발로 붕 뜨듯</b> 몸이 쏠립니다.
+      몸무게는 <b>W = mg \u2212 ma</b>로 작게 측정됩니다.`;
+}
+/* 자세가 변하는 전용 사람 그리기: s>0 눌림(무릎 굽힘), s<0 들림(까치발) */
+function elevPerson(x,footY,s,free){
+  const c='#3E5C86';
+  if(free){ person(ctx,x,footY-36,150,c,true); return; }
+  const h=150, press=Math.max(0,s), lift=Math.max(0,-s);
+  const drop=34*press, toe=14*lift;
+  const hipY=footY-h*0.42+drop-toe;
+  const neckY=hipY-h*0.36;
+  const headR=h*0.13, headY=neckY-headR-2;
+  ctx.strokeStyle=c; ctx.fillStyle=c; ctx.lineWidth=8; ctx.lineCap='round'; ctx.lineJoin='round';
+  const kneeOut=6+30*press, kneeY=(hipY+footY-toe)/2+8*press;
+  [[-1],[1]].forEach(([sg])=>{
+    ctx.beginPath();
+    ctx.moveTo(x+sg*17,footY-toe);
+    ctx.lineTo(x+sg*kneeOut,kneeY);
+    ctx.lineTo(x,hipY);
+    ctx.stroke();
+    if(lift>0.05){ ctx.beginPath(); ctx.moveTo(x+sg*17,footY-toe); ctx.lineTo(x+sg*24,footY); ctx.stroke(); }
+  });
+  ctx.beginPath(); ctx.moveTo(x,hipY); ctx.lineTo(x,neckY); ctx.stroke();
+  const shY=neckY+6, armAng=-0.45+1.15*press-1.9*lift, armL=h*0.30;
+  [[-1],[1]].forEach(([sg])=>{
+    const hy = shY + (armAng>=0? armL*Math.sin(armAng)+10 : -armL*Math.sin(-armAng));
+    ctx.beginPath(); ctx.moveTo(x,shY); ctx.lineTo(x+sg*armL*Math.cos(0.5), hy); ctx.stroke();
+  });
+  ctx.beginPath(); ctx.arc(x,headY,headR,0,7); ctx.fill();
+}
+function draw(){
+  ctx.fillStyle='#E4EAF2'; ctx.fillRect(0,0,W,H);
+  const sx=110, sw=340;
+  ctx.fillStyle='#CBD5E3'; ctx.fillRect(sx-24,0,24,H); ctx.fillRect(sx+sw,0,24,H);
+  ctx.fillStyle='#F1F5FA'; ctx.fillRect(sx,0,sw,H);
+  // 속도 스트릭: 빠를수록 길고 진해져 속도감을 준다
+  const sp=Math.abs(v);
+  if(sp>3){
+    const alpha=Math.min(0.45, sp/260), len=Math.min(180, sp*1.6);
+    ctx.strokeStyle=`rgba(120,145,175,${alpha})`; ctx.lineWidth=2;
+    for(let k=0;k<16;k++){
+      const sx2=sx+14+((k*97)%(sw-28));
+      const y0=((k*173+floorOff*1.6)%700+700)%700-90;
+      ctx.beginPath(); ctx.moveTo(sx2,y0); ctx.lineTo(sx2,y0+len*(v>0?1:-1)); ctx.stroke();
+    }
+  }
+  const fl0=Math.floor(floorOff/150);
+  for(let i=-1;i<5;i++){ const y=((i*150+floorOff)%600+600)%600-30;
+    ctx.strokeStyle='#B9C6D8'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(sx,y); ctx.lineTo(sx+sw,y); ctx.stroke();
+    ctx.fillStyle='#AEBCCC'; ctx.font='11px sans-serif'; ctx.textAlign='left';
+    ctx.fillText((fl0- i + 12)+'F', sx+6, y-6); }
+  const cw=270, ch=360, cx0=sx+(sw-cw)/2, cy0=(H-ch)/2;
+  ctx.fillStyle='#fff'; roundRect(ctx,cx0,cy0,cw,ch,12); ctx.fill();
+  ctx.strokeStyle='#5B799B'; ctx.lineWidth=3; roundRect(ctx,cx0,cy0,cw,ch,12); ctx.stroke();
+  ctx.fillStyle='#DDE7F2'; ctx.fillRect(cx0,cy0+ch-16,cw,16);
+  if(Math.abs(a)>0.05){
+    const sg=(a>0?1:-1);
+    arrow(ctx,sx-84,H/2+46*sg,sx-84,H/2-46*sg,'#E03131',6,'a',[12,0]);
+  }
+  if(Math.abs(v)>0.15){
+    const sv=(v>0?1:-1), Lv=Math.min(150,Math.abs(v)*1.3);
+    arrow(ctx,sx-42,H/2,sx-42,H/2-Lv*sv,'#3B5BDB',5,'v',[11,0]);
+    ctx.fillStyle='#3B5BDB'; ctx.font='11.5px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(Math.abs(v).toFixed(1)+' m/s', sx-42, H/2-Lv*sv-(sv>0?14:-22));
+  }
+  // 저울 (표시값은 연속 추종)
+  const kg=kgDisp, N=kgDisp*G;
+  const scW=118, scX=cx0+cw/2-scW/2;
+  const scH=17-5*Math.max(0,squash), scY=cy0+ch-16-scH;
+  ctx.fillStyle='#E9573F'; roundRect(ctx,scX,scY,scW,scH,5); ctx.fill();
+  elevPerson(cx0+cw/2, scY, squash, freeFall);
+  const px=cx0+cw/2, py=scY-96, FG=72, FA=FG*Math.abs(a)/G;
+  arrow(ctx,px+52,py,px+52,py+FG,COL.grav,4,'mg',[8,0]);
+  if(Math.abs(a)>0.05){
+    const dir=a>0?1:-1;
+    arrow(ctx,px-52,py,px-52,py+FA*dir,COL.inert,4,'ma',[-38,0]);
+  }
+  ctx.textAlign='center';
+  if(freeFall){ ctx.fillStyle='#12B886'; ctx.font='bold 13.5px sans-serif';
+    ctx.fillText('무중력 \u2014 발이 저울에서 떨어짐', cx0+cw/2, cy0+32); }
+  else if(squash>0.15){ ctx.fillStyle='#D9480F'; ctx.font='bold 13.5px sans-serif';
+    ctx.fillText('몸이 아래로 눌림 (무릎 굽힘)', cx0+cw/2, cy0+32); }
+  else if(squash<-0.15){ ctx.fillStyle='#1971C2'; ctx.font='bold 13.5px sans-serif';
+    ctx.fillText('몸이 위로 붕 뜸 (까치발)', cx0+cw/2, cy0+32); }
+  // 저울 눈금 + 설명
+  const dx=705, dy=170;
+  ctx.strokeStyle='#9AA9BC'; ctx.setLineDash([5,5]); ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(scX+scW,scY+scH/2); ctx.lineTo(dx-92,dy+40); ctx.stroke(); ctx.setLineDash([]);
+  drawDial(dx,dy,kg);
+  ctx.fillStyle='#FFFFFF'; ctx.strokeStyle='#C8D4E4'; ctx.lineWidth=1.5;
+  roundRect(ctx,dx-140,dy+140,280,120,12); ctx.fill(); ctx.stroke();
+  ctx.textAlign='center'; ctx.textBaseline='top';
+  ctx.fillStyle=COL.sub; ctx.font='12px sans-serif';
+  ctx.fillText('저울이 미는 힘 = 측정 몸무게', dx, dy+152);
+  ctx.fillStyle=COL.ink; ctx.font='bold 17px "Cambria Math",Georgia,serif';
+  let fm;
+  if(freeFall) fm='W = mg \u2212 mg = 0';
+  else if(Math.abs(a)<0.05) fm='W = mg';
+  else if(a>0) fm='W = mg + ma';
+  else fm='W = mg \u2212 ma';
+  ctx.fillText(fm, dx, dy+174);
+  ctx.font='bold 21px sans-serif';
+  ctx.fillStyle= kg>62? '#D9480F' : (kg<58? '#1971C2' : COL.ink);
+  ctx.fillText(kg.toFixed(1)+' kg', dx, dy+202);
+  ctx.fillStyle=COL.sub; ctx.font='12.5px sans-serif';
+  ctx.fillText('(N = '+N.toFixed(0)+' N, m = 60 kg)', dx, dy+232);
+  ctx.fillStyle=COL.sub; ctx.font='13px sans-serif'; ctx.textBaseline='alphabetic';
+  ctx.fillText('승강기 내부 (가속 기준계)', cx0+cw/2, cy0-12);
+}
+function drawDial(dx,dy,kg){
+  ctx.fillStyle='#fff'; ctx.strokeStyle='#C8D4E4'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(dx,dy,84,0,7); ctx.fill(); ctx.stroke();
+  ctx.lineWidth=2;
+  for(let k=0;k<=120;k+=10){
+    const ang=-Math.PI*0.75 + (k/120)*Math.PI*1.5;
+    const r1=k%20===0?68:74;
+    ctx.strokeStyle='#8896AB';
+    ctx.beginPath();
+    ctx.moveTo(dx+r1*Math.cos(ang),dy+r1*Math.sin(ang));
+    ctx.lineTo(dx+78*Math.cos(ang),dy+78*Math.sin(ang)); ctx.stroke();
+    if(k%40===0){ ctx.fillStyle='#5B6B82'; ctx.font='11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(k,dx+56*Math.cos(ang),dy+56*Math.sin(ang)); }
+  }
+  const ang=-Math.PI*0.75 + (Math.min(120,kg)/120)*Math.PI*1.5;
+  ctx.strokeStyle='#E03131'; ctx.lineWidth=4; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(dx,dy); ctx.lineTo(dx+60*Math.cos(ang),dy+60*Math.sin(ang)); ctx.stroke();
+  ctx.fillStyle='#37475C'; ctx.beginPath(); ctx.arc(dx,dy,6,0,7); ctx.fill();
+  ctx.fillStyle=COL.sub; ctx.font='13px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+  ctx.fillText('저울 눈금', dx, dy-100);
+}
+})();
+</script>
+<script>
+/* ===================== 모듈 3 : 등가원리 ===================== */
+(function(){
+const cv=document.getElementById('cv2'), ctx=cv.getContext('2d');
+const W=cv.width, H=cv.height;
+const S=40, GROUND=H-44;
+const ELEVW=5, ELEVH=4, H0=10;        // 엘리베이터 폭·높이(m), 낙하 시작 높이 10 m
+const TS=0.55, TFALL=Math.sqrt(2*H0/G);
+let scene='fall', frame='fall', t=0, phase='setup';   // setup | run
+let apSel='d', lightSel=false, objs=[];
+const noteEl=document.getElementById('eqNote');
+const expEl=document.getElementById('eqExp');
+const sceneEl=document.getElementById('eqScene');
+
+segInit('eqScene', v=>{ if(phase!=='setup')return; scene=v; });
+segInit('eqFrame', v=>{ frame=v; });
+expEl.querySelectorAll('.btn').forEach(b=>b.addEventListener('click',()=>{
+  if(phase!=='setup') return;
+  const e=b.dataset.e;
+  if(e==='light'){ lightSel=!lightSel; b.classList.toggle('sel',lightSel); }
+  else{
+    apSel=(apSel===e)?null:e;
+    expEl.querySelectorAll('.btn[data-e="h"],.btn[data-e="d"]')
+      .forEach(x=>x.classList.toggle('sel',x.dataset.e===apSel));
+  }
+}));
+document.getElementById('eqStart').addEventListener('click',()=>{
+  if(phase!=='setup') return;
+  phase='run'; t=0; objs=[];
+  if(apSel==='h') spawn('apple',2.6,0);
+  if(apSel==='d') spawn('apple',0,0);
+  if(lightSel)    spawn('light',11,0);
+  lock(true);
+});
+document.getElementById('eqReset').addEventListener('click',()=>{
+  phase='setup'; t=0; objs=[]; lock(false);
+});
+function lock(on){
+  expEl.querySelectorAll('.btn').forEach(b=>b.disabled=on);
+  sceneEl.querySelectorAll('button').forEach(b=>b.disabled=on);
+  document.getElementById('eqStart').disabled=on;
+}
+function elevY(tt){ return scene==='fall' ? Math.max(0, H0-.5*G*tt*tt) : 0; }
+function obsY(tt){ return Math.max(0, H0-.5*G*tt*tt); }   // 낙하 관찰자(두 시나리오 공통 t=0에 H0에서 낙하)
+function obsRefY(tt){ return scene==='fall'? elevY(tt) : obsY(tt); }
+function spawn(kind,vx,vy){
+  const x0=(kind==='light')? -ELEVW/2+0.15 : -ELEVW/2+0.9;
+  const y0=elevY(0) + (kind==='light'? ELEVH*0.62 : ELEVH*0.45);
+  objs.push({kind,x0,y0,vx,vy,landed:false,wx:x0,wy:y0,trail:[]});
+}
+function floorFor(o){
+  const inElev=Math.abs(o.wx)<ELEVW/2+0.05;
+  return (inElev? elevY(t):0)+0.13;
+}
+window.step2=function(dt){
+  if(phase==='run') t+=dt*TS;
+  const elevLanded = scene==='fall' && phase==='run' && elevY(t)<=0;
+  objs.forEach(o=>{
+    if(o.landed) return;
+    if(elevLanded){ o.landed=true; return; }   // 엘리베이터 착지 → 즉시 정지
+    o.wx=o.x0+o.vx*t;
+    o.wy=o.y0+o.vy*t-.5*G*t*t;
+    const fl=floorFor(o);
+    if(o.wy<=fl){ o.wy=fl; o.landed=true; }
+    if(o.trail.length===0||Math.hypot(o.wx-o.trail[o.trail.length-1].x,o.wy-o.trail[o.trail.length-1].y)>0.06)
+      o.trail.push({x:o.wx,y:o.wy,t:t});
+  });
+  draw(); note();
+};
+function anchorY(){ return frame==='fall'? H*0.32 : GROUND; }
+function refNow(){ return frame==='fall'? obsRefY(t):0; }
+function toScr(wx,wy){ return [W*0.42+wx*S, anchorY()-(wy-refNow())*S]; }
+
+function draw(){
+  const refY=refNow();
+  ctx.fillStyle='#E3F0FB'; ctx.fillRect(0,0,W,H);
+  const gy=anchorY()+refY*S;
+  if(gy<H+400){
+    ctx.fillStyle='#9CC68B'; ctx.fillRect(0,gy,W,Math.max(0,H-gy)+400);
+    ctx.fillStyle='#7DAF6A'; ctx.fillRect(0,gy,W,8);
+    if(gy<H-6){ ctx.fillStyle='#5B6B82'; ctx.font='13px sans-serif'; ctx.textAlign='left';
+      ctx.fillText('지면',16,gy+26); }
+  }
+  drawElev(); drawObjs(); drawObservers(); hud();
+}
+/* ── 상태 판정 헬퍼 ───────────────────────────────────────────
+   frame==='fall' 은 '자유낙하로 정의되는 국소 관성계'를 뜻한다.
+   국소 관성계에는 중력이 존재하지 않으므로 mg는 절대 그리지 않는다.        */
+function elevFalling(){ return scene==='fall' && phase==='run' && elevY(t)>0; }
+function outObsFalling(){ return phase==='run' && obsY(t)>0; }
+
+/* 한 사람에게 작용하는 힘을 그린다.
+   상태는 셋 중 하나:
+     falling   : 자유낙하 중
+     supported : 지면(또는 지면에 놓인 엘리베이터 바닥)에 지지됨 → 수직항력 존재
+     airborne  : 공중에 떠 있으나 아직 낙하 시작 전 → 지지면이 없으므로 N을 그리지 않는다
+   기준계 규칙:
+     지면 기준계 : 낙하 중 → mg 만 / 지지됨 → mg + N
+     자유낙하계  : 낙하 중 → 힘 없음(화살표 없음) / 지지됨 → N 만 (중력이 없는 좌표계) */
+function drawForces(px, feetY, state, compact){
+  const FG = compact? 42 : 56, dx = compact? 22 : 28, cy = feetY - (compact? 34 : 46);
+  const lab = compact? '11px sans-serif' : 'bold 12px sans-serif';
+  ctx.textAlign='center';
+  if(state==='airborne'){                       // 공중 대기 — 지지면 없음
+    ctx.fillStyle='#9AA9BC'; ctx.font=lab;
+    ctx.fillText('시작 전 (공중에 정지)', px, cy+FG+20);
+    return;
+  }
+  if(frame==='ground'){
+    arrow(ctx,px+dx,cy,px+dx,cy+FG,COL.grav,compact?3:4,'mg',[7,0]);
+    if(state==='falling'){
+      ctx.fillStyle=COL.grav; ctx.font=lab;
+      ctx.fillText('알짜힘 = mg \u2192 g로 낙하', px, cy+FG+20);
+    }else{
+      arrow(ctx,px-dx,cy,px-dx,cy-FG,'#2F9E44',compact?3:4,'N',[-22,-2]);
+      ctx.fillStyle=COL.sub; ctx.font=lab;
+      ctx.fillText('N = mg \u2192 알짜힘 0 (정지)', px, cy+FG+20);
+    }
+  }else{
+    if(state==='falling'){
+      ctx.fillStyle=COL.teal; ctx.font=lab;
+      ctx.fillText('무중력 \u2014 작용하는 힘 없음', px, cy+FG+20);
+    }else{
+      arrow(ctx,px-dx,cy,px-dx,cy-FG,'#2F9E44',compact?3:4,'N',[-22,-2]);
+      ctx.fillStyle='#2F9E44'; ctx.font=lab;
+      ctx.fillText('알짜힘 = N \u2192 g로 위로 가속', px, cy+FG+20);
+      if(!compact){
+        ctx.fillStyle='#9AA9BC'; ctx.font='11px sans-serif';
+        ctx.fillText('(이 기준계엔 중력이 없다)', px, cy+FG+38);
+      }
+    }
+  }
+}
+/* 각 인물의 상태 판정 */
+function elevState(){                       // 엘리베이터 안 사람
+  if(scene==='rest') return 'supported';    // 지면에 놓인 엘리베이터 바닥이 지지
+  if(elevY(t)<=0)    return 'supported';    // 착지 완료
+  return phase==='run' ? 'falling' : 'airborne';
+}
+function outState(){                        // 밖에 있는 사람
+  if(scene==='fall') return 'supported';    // 지면에 서 있는 관찰자
+  if(obsY(t)<=0)     return 'supported';    // 착지 완료
+  return phase==='run' ? 'falling' : 'airborne';
+}
+
+function drawElev(){
+  const cy=elevY(t);
+  const [x0,y0]=toScr(-ELEVW/2,cy+ELEVH), [x1,y1]=toScr(ELEVW/2,cy);
+  ctx.fillStyle='#FFFFFF'; ctx.strokeStyle='#5B799B'; ctx.lineWidth=3.5;
+  roundRect(ctx,x0,y0,x1-x0,y1-y0,10); ctx.fill(); ctx.stroke();
+  ctx.fillStyle='#DDE7F2'; ctx.fillRect(x0,y1-10,x1-x0,10);
+
+  const subjFalling = elevFalling();
+  ctx.fillStyle='#94A6BC'; ctx.font='12.5px sans-serif'; ctx.textAlign='center';
+  ctx.fillText(scene==='fall'
+    ? (subjFalling?'자유낙하하는 엘리베이터':'엘리베이터 (공중에 정지)')
+    : '지표면에 정지한 엘리베이터',(x0+x1)/2,y0-10);
+
+  const px=(x0+x1)/2+42, pfY=y1-12-(subjFalling?26:0);
+  const insideIsSelected = (scene==='fall') ? (frame==='fall') : (frame==='ground');
+  person(ctx,px,pfY,96, insideIsSelected?'#0B7285':'#8896AB', subjFalling);
+  if(scene==='rest'){
+    ctx.fillStyle= frame==='ground'?'#0B7285':'#94A6BC';
+    ctx.font=(frame==='ground'?'bold ':'')+'12px sans-serif'; ctx.textAlign='center';
+    ctx.fillText((frame==='ground'?'\u25cf ':'')+'지면 관찰자',px,y0+18);
+  }
+  drawForces(px, pfY, elevState(), false);
+
+  /* 지면·엘리베이터가 위로 가속하는 모습 — 자유낙하계에서 지지된 물체일 때 */
+  if(scene==='rest' && frame==='fall' && outObsFalling()){
+    arrow(ctx,x1+16,(y0+y1)/2+40,x1+16,(y0+y1)/2-40,COL.pink,5,'a=g',[8,0]);
+    ctx.fillStyle=COL.pink; ctx.font='bold 12px sans-serif'; ctx.textAlign='left';
+    ctx.fillText('위로 가속!',x1+10,(y0+y1)/2-52);
+  }
+}
+
+function drawObjs(){
+  const gyClip=anchorY()+refNow()*S;      // 현재 지면 화면 y — 그 아래로는 그리지 않음
+  ctx.save(); ctx.beginPath(); ctx.rect(0,-600,W,gyClip+600); ctx.clip();
+  objs.forEach(o=>{
+    ctx.lineWidth=2.5; ctx.setLineDash(o.kind==='light'?[]:[5,5]);
+    ctx.strokeStyle=o.kind==='light'?COL.light:'#D9480F';
+    ctx.beginPath();
+    o.trail.forEach((p,i)=>{
+      const refAt=frame==='fall'? (scene==='fall'?Math.max(0,H0-.5*G*p.t*p.t):Math.max(0,H0-.5*G*p.t*p.t)) : 0;
+      const sx=W*0.42+p.x*S, sy=anchorY()-(p.y-refAt)*S;
+      i?ctx.lineTo(sx,sy):ctx.moveTo(sx,sy);
+    });
+    ctx.stroke(); ctx.setLineDash([]);
+    const [sx,sy]=toScr(o.wx,o.wy);
+    if(o.kind==='apple'){
+      ctx.fillStyle='#E03131'; ctx.beginPath(); ctx.arc(sx,sy,9,0,7); ctx.fill();
+      ctx.strokeStyle='#2F9E44'; ctx.lineWidth=2.5;
+      ctx.beginPath(); ctx.moveTo(sx,sy-9); ctx.quadraticCurveTo(sx+5,sy-14,sx+8,sy-12); ctx.stroke();
+    }else{
+      ctx.fillStyle=COL.light; ctx.shadowColor=COL.light; ctx.shadowBlur=12;
+      ctx.beginPath(); ctx.arc(sx,sy,6,0,7); ctx.fill(); ctx.shadowBlur=0;
+    }
+    if(o.landed){ ctx.fillStyle='#5B6B82'; ctx.font='11px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('정지',sx,sy-14); }
+  });
+  ctx.restore();
+}
+function drawObservers(){
+  const refY=refNow(), gy=anchorY()+refY*S;
+  if(scene==='fall'){                       // 밖에 서 있는 지면 관찰자
+    if(gy<H+140){
+      person(ctx,W*0.15,gy,90, frame==='ground'?'#0B7285':'#8896AB');
+      drawForces(W*0.15, gy, 'supported', true);   // 지면에 서 있는 관찰자
+    }
+    labelObs(W*0.15,gy-114,'지면 관찰자',frame==='ground');
+  }else{                                    // 밖에서 자유낙하하는 관찰자
+    const [ox,oyp]=toScr(ELEVW/2+1.7,obsY(t));
+    const fl = outObsFalling();
+    person(ctx,ox,oyp,90, frame==='fall'?'#0B7285':'#8896AB', fl);
+    drawForces(ox, oyp, outState(), true);
+    labelObs(ox,oyp-124,'자유낙하 관찰자',frame==='fall');
+  }
+  if(scene==='fall'){
+    const [x1,y1]=toScr(ELEVW/2,elevY(t));
+    labelObs(x1-78,y1-180,'엘리베이터 안 = 자유낙하 관찰자',frame==='fall');
+  }
+}
+
+function labelObs(x,y,txt,on){
+  if(y<-30||y>H)return;
+  ctx.fillStyle=on?'#0B7285':'#94A6BC';
+  ctx.font=(on?'bold ':'')+'12.5px sans-serif'; ctx.textAlign='center';
+  ctx.fillText((on?'\u25cf ':'')+txt,x,y);
+}
+function hud(){
+  const BW=336, BH=62, bx=W-BW-14, by=12;      // 우측 상단
+  ctx.fillStyle='rgba(255,255,255,0.94)'; ctx.strokeStyle='#C8D4E4'; ctx.lineWidth=1.5;
+  roundRect(ctx,bx,by,BW,BH,10); ctx.fill(); ctx.stroke();
+  ctx.fillStyle=COL.ink; ctx.font='bold 14px sans-serif'; ctx.textAlign='left'; ctx.textBaseline='top';
+  ctx.fillText('기준계: '+(frame==='fall'?'자유낙하하는 사람':'지면에 정지한 사람'),bx+14,by+8);
+  ctx.fillStyle= phase==='setup'? '#D9480F':COL.sub;
+  ctx.font=(phase==='setup'?'bold ':'')+'12.5px sans-serif';
+  ctx.fillText(phase==='setup'
+    ? '\u2462 실험 선택 \u2192 \u25b6 시작 버튼을 누르세요'
+    : (frame==='fall'?'이 기준계에서 나는 정지 \u2014 지면이 g로 다가온다':'낙하하는 것들이 g로 가속한다'),bx+14,by+32);
+}
+function note(){
+  const eSt=elevState(), oSt=outState();
+  if(phase==='setup'){
+    noteEl.innerHTML=`<span class="tag">준비</span> 아직 아무것도 낙하하지 않았습니다.
+      <b>공중에 있는 사람은 받쳐 주는 면이 없으므로 수직항력도 없습니다</b> \u2014
+      지면(또는 지면에 놓인 엘리베이터 바닥)에 서 있는 사람에게만 수직항력이 작용합니다.
+      실험을 고르고 <b>▶ 시작</b>을 누르세요.`;
+    return;
+  }
+  if(frame==='fall'){
+    if(eSt==='falling')
+      noteEl.innerHTML=`<span class="tag">자유낙하 기준계 · 국소 관성계</span>
+        이 기준계에는 <b>중력이 존재하지 않습니다</b>. 함께 낙하하는 사람에게 작용하는 힘은 <b>하나도 없어</b>
+        그릴 화살표가 없고, 가속도계도 0을 가리킵니다 \u2014 우주 공간의 관성계와 <b>구별할 수 없습니다</b>.
+        사과는 던진 방향 그대로 등속 직선 운동하고 빛도 곧게 나아갑니다.
+        <span style="color:var(--sub)">(교과서식으로는 "위쪽 관성력이 중력과 상쇄된다"고 설명하지만,
+        아인슈타인의 관점에서는 애초에 중력이 없는 좌표계입니다.)</span>`;
+    else
+      noteEl.innerHTML=`<span class="tag">자유낙하 기준계 · 국소 관성계</span>
+        이 기준계에는 <b>중력이 없습니다</b>. 바닥에 <b>지지된</b> 사람에게 남는 힘은
+        <b style="color:#2F9E44">수직항력 N 하나뿐</b>이고, 그것이 알짜힘이 되어 사람을 <b>위로 g로 가속</b>시킵니다.
+        <b style="color:${COL.pink}">지면과 엘리베이터가 위로 올라오는</b> 것으로 보이는 이유이며,
+        무중력 공간에서 위로 g로 가속하는 로켓 안과 똑같은 상황입니다.`;
+    return;
+  }
+  if(scene==='fall'&&eSt==='falling')
+    noteEl.innerHTML=`<span class="tag">지면 기준계</span> 엘리베이터·사람·사과가 <b>모두 같은 가속도 g</b>로
+      떨어집니다. 낙하하는 사람에게 작용하는 힘은 <b style="color:${COL.grav}">중력 mg 하나뿐</b>이고 이것이 알짜힘입니다.
+      밖의 지면 관찰자는 mg와 <b style="color:#2F9E44">N</b>이 균형을 이뤄 정지해 있습니다.
+      사과 궤적은 포물선이지만 엘리베이터에 대한 <b>상대 운동은 등속 직선</b> \u2014 그래서 안은 무중력으로 보입니다.`;
+  else if(scene==='rest'&&oSt==='falling')
+    noteEl.innerHTML=`<span class="tag">지면 기준계</span> 엘리베이터 안 사람은 <b>중력 mg</b>와
+      <b style="color:#2F9E44">수직항력 N</b>이 균형을 이뤄 정지해 있고, 밖에서 <b>낙하하는 사람</b>에게는
+      <b style="color:${COL.grav}">mg 하나만</b> 작용해 g로 가속합니다. 사과는 <b>포물선</b>으로 떨어지고
+      빛도 (과장하면) 같은 g로 <b>아래로 휘어집니다</b>.`;
+  else
+    noteEl.innerHTML=`<span class="tag">지면 기준계</span> 낙하가 끝나 모두 지면에 정지해 있습니다.
+      각 사람에게 <b>중력 mg</b>와 <b style="color:#2F9E44">수직항력 N</b>이 균형을 이룹니다.
+      다시 보려면 <b>초기화</b>를 누르세요.`;
+}
+})();
+</script>
+
+<script>
+/* ===================== 메인 루프 ===================== */
+let last=performance.now();
+function loop(now){
+  let dt=Math.min(0.033,(now-last)/1000); last=now;
+  if(activeTab===0&&window.step0) step0(dt);
+  if(activeTab===1&&window.step1) step1(dt);
+  if(activeTab===2&&window.step2) step2(dt);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
