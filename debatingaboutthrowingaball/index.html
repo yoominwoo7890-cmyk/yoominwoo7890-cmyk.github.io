@@ -174,12 +174,12 @@ import { getFirestore, doc, setDoc, getDoc, onSnapshot, serverTimestamp }
 
 /* ▼▼▼ 여기에 Firebase 콘솔에서 복사한 값을 붙여넣으세요 ▼▼▼ */
 const firebaseConfig = {
-  apiKey: "AIzaSyCJwS8qyO9Ew9MgXo9zLWqxI1jPmLqWxzg",
-  authDomain: "debating-about-throwing-a-ball.firebaseapp.com",
-  projectId: "debating-about-throwing-a-ball",
-  storageBucket: "debating-about-throwing-a-ball.firebasestorage.app",
-  messagingSenderId: "318859589063",
-  appId: "1:318859589063:web:2d4a83fe63384aaa92d5e2"
+  apiKey: "여기에_붙여넣기",
+  authDomain: "여기에_붙여넣기",
+  projectId: "여기에_붙여넣기",
+  storageBucket: "여기에_붙여넣기",
+  messagingSenderId: "여기에_붙여넣기",
+  appId: "여기에_붙여넣기"
 };
 /* ▲▲▲ 여기까지 ▲▲▲ */
 
@@ -231,24 +231,24 @@ const API = {
     if(!no || !name) throw new Error('학번과 이름을 모두 입력하세요.');
     if(!UID) throw new Error('연결 중입니다. 잠시 후 다시 눌러주세요.');
 
-    const ref = doc(db, 'students', UID);
+    const ref = doc(db, 'students', myDoc());
     const snap = await getDoc(ref);
     if(snap.exists()){
       const d = snap.data();
-      return { session: UID, studentNo: d.no, name: d.name, order: d.order };
+      return { session: myDoc(), studentNo: d.no, name: d.name, order: d.order };
     }
     const order = shuffle(OPTIONS.map(function(o){ return o.id; }));
     await setDoc(ref, { no: no, name: name, order: order, joinedAt: serverTimestamp() });
-    return { session: UID, studentNo: no, name: name, order: order };
+    return { session: myDoc(), studentNo: no, name: name, order: order };
   },
 
   /** 새로고침 후 이어서 참여 */
   restoreSession: async function(){
     if(!UID) return null;
-    const snap = await getDoc(doc(db, 'students', UID));
+    const snap = await getDoc(doc(db, 'students', myDoc()));
     if(!snap.exists()) return null;
     const d = snap.data();
-    return { session: UID, studentNo: d.no, name: d.name, order: d.order };
+    return { session: myDoc(), studentNo: d.no, name: d.name, order: d.order };
   },
 
   /** 2단계: 답과 이유 */
@@ -256,7 +256,7 @@ const API = {
     const o = OPT[optId];
     if(!o) throw new Error('보기를 선택하세요.');
     if(!String(reason||'').trim()) throw new Error('그렇게 생각한 이유를 적어주세요.');
-    await setDoc(doc(db, 'responses', UID), {
+    await setDoc(doc(db, 'responses', myDoc()), {
       no: S.no, name: S.name, optId: o.id, optNo: o.no, optLabel: o.label,
       displayPos: displayPos || 0, reason: String(reason).trim(), at: serverTimestamp()
     });
@@ -266,7 +266,7 @@ const API = {
   /** 3단계: 토론 후 생각 */
   submitPostThought: async function(session, text, changed){
     if(!String(text||'').trim()) throw new Error('토론 후 생각을 적어주세요.');
-    await setDoc(doc(db, 'posts', UID), {
+    await setDoc(doc(db, 'posts', myDoc()), {
       no: S.no, name: S.name, text: String(text).trim(),
       changed: changed || '', at: serverTimestamp()
     });
@@ -276,7 +276,7 @@ const API = {
   /** 4단계: 시뮬레이션 관찰 기록 */
   submitSimLog: async function(session, force, note){
     const o = OPT[force];
-    await setDoc(doc(db, 'sims', UID), {
+    await setDoc(doc(db, 'sims', myDoc()), {
       no: S.no, name: S.name,
       force: o ? (o.no + '번 · ' + o.label) : '',
       note: String(note||'').trim(), at: serverTimestamp()
@@ -290,7 +290,7 @@ async function loadMine(stage){
   const out = {};
   if(!UID) return out;
   const grab = async function(coll){
-    try { const s = await getDoc(doc(db, coll, UID)); return s.exists() ? s.data() : null; }
+    try { const s = await getDoc(doc(db, coll, myDoc())); return s.exists() ? s.data() : null; }
     catch(e){ return null; }
   };
   if(stage >= 2){ const r = await grab('responses');
@@ -307,7 +307,10 @@ async function loadMine(stage){
    ═════════════════════════════════════════ */
 
 const S = { session:null, order:null, name:'', no:'', stage:-1, reveal:false,
-            renderedKey:'', data:{}, mine:{} };
+            round:0, renderedKey:'', data:{}, mine:{} };
+
+/** 문서 이름 규칙: "회차__내번호". 회차를 올리면 이전 응답은 보이지 않는다. */
+function myDoc(){ return S.round + '__' + UID; }
 
 let unsubControl = null, unsubTally = null;
 
@@ -320,10 +323,7 @@ function initStudent(){
   onAuthStateChanged(auth, async function(user){
     if(!user){ try{ await signInAnonymously(auth); }catch(e){ showErr($('gateErr'), '연결 실패: '+e.message); } return; }
     UID = user.uid;
-    try {
-      const me = await API.restoreSession();
-      if(me){ enterClass(me); }
-    } catch(e){ /* 처음 접속 */ }
+    watchControl();          // 회차·단계를 먼저 구독한다
   });
 }
 
@@ -342,25 +342,35 @@ function enterClass(me){
   $('sBody').classList.remove('hide');
   $('sOut').classList.remove('hide');
   $('sWho').textContent = S.no + ' ' + S.name;
-  listen();
+  S.stage = -1; S.renderedKey = '';
 }
 
 /** 폴링이 아니라 실시간 구독. 교사가 단계를 바꾸면 즉시 반영된다. */
-function listen(){
-  stopListen();
-  unsubControl = onSnapshot(doc(db, 'control', 'state'), function(snap){
-    const c = snap.exists() ? snap.data() : { stage: 0, reveal: false };
-    applyState(Number(c.stage)||0, !!c.reveal);
+function watchControl(){
+  if(unsubControl) return;
+  unsubControl = onSnapshot(doc(db, 'control', 'state'), async function(snap){
+    const c = snap.exists() ? snap.data() : {};
+    const round = Number(c.round) || 1;
+    const first = (S.round === 0);
+    const roundChanged = !first && (round !== S.round);
+    S.round = round;
+
+    if(first){
+      // 새로고침 후 이어서 참여할 수 있는지 확인
+      try { const me = await API.restoreSession(); if(me) enterClass(me); } catch(e){}
+    }
+    if(roundChanged){
+      // 선생님이 수업을 새로 시작했다. 다시 입장해야 한다.
+      backToGate('선생님이 수업을 새로 시작했습니다. 다시 입장해 주세요.');
+      return;
+    }
+    if(S.session) applyState(Number(c.stage)||0, !!c.reveal);
   }, function(){ /* 일시적 오류는 무시. 자동 재연결됨 */ });
 
   unsubTally = onSnapshot(doc(db, 'public', 'tally'), function(snap){
     S.counts = snap.exists() ? snap.data() : null;
     if(S.reveal) draw();
   }, function(){});
-}
-function stopListen(){
-  if(unsubControl){ unsubControl(); unsubControl = null; }
-  if(unsubTally){ unsubTally(); unsubTally = null; }
 }
 
 async function applyState(stage, reveal){
@@ -394,14 +404,18 @@ async function refreshMine(){
 
 function studentLogout(){
   if(!confirm('수업에서 나갑니다. 같은 기기로 다시 들어오면 이어서 참여할 수 있습니다.')) return;
-  stopListen();
-  S.session = null; S.renderedKey = ''; S.mine = {}; S.stage = -1;
+  backToGate('');
+}
+
+function backToGate(msg){
+  S.session = null; S.renderedKey = ''; S.mine = {}; S.stage = -1; S.counts = null;
   $('sBody').innerHTML = ''; $('sBody').classList.add('hide');
   $('sWho').textContent = '';
   $('sOut').classList.add('hide');
   $('gate').classList.remove('hide');
   $('btnEnter').disabled = false; $('btnEnter').textContent = '입장하기';
   $('inNo').value = ''; $('inName').value = ''; $('inNo').focus();
+  if(msg) showErr($('gateErr'), msg); else $('gateErr').classList.add('hide');
 }
 
 /* ═════════════════════════════════════════
