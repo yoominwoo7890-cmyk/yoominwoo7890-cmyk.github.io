@@ -1,1 +1,384 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>전위 · 전기장 시뮬레이션</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,sans-serif;background:#f5f5f2;color:#2c2c2a;
+  height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden;
+  user-select:none;-webkit-tap-highlight-color:transparent}
+header{padding:8px 14px;border-bottom:1px solid #d4d2ca;display:flex;align-items:center;flex-shrink:0;background:#fff}
+header h1{font-size:14px;font-weight:600;color:#2c2c2a}
+.main{display:flex;flex:1;overflow:hidden}
+.viz{flex:1;position:relative;overflow:hidden;background:#ececea}
+canvas{display:block;width:100%;height:100%;cursor:crosshair;touch-action:none}
+.hint{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);font-size:11px;color:#888780;
+  pointer-events:none;white-space:nowrap;background:rgba(245,245,242,.85);padding:3px 10px;border-radius:20px}
+/* 우측 패널: 기본 */
+.panel{width:190px;flex-shrink:0;border-left:1px solid #d4d2ca;display:flex;flex-direction:column;overflow-y:auto;background:#fff}
+.sec{padding:10px 12px;border-bottom:1px solid #ececea}
+.sec-title{font-size:10px;font-weight:600;color:#888780;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+.type-row{display:flex;gap:5px;margin-bottom:8px}
+/* 버튼 터치 타깃 최소 40px */
+.tbtn{flex:1;height:40px;border-radius:8px;border:1px solid #d4d2ca;background:transparent;
+  color:#5f5e5a;font-size:12px;cursor:pointer;transition:all .15s}
+.tbtn:active{opacity:.7}
+.tbtn.ap{border-color:#e24b4a;color:#e24b4a;background:rgba(226,75,74,.07)}
+.tbtn.an{border-color:#378add;color:#378add;background:rgba(55,138,221,.07)}
+.qrow{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;font-size:11px}
+.qlabel{color:#5f5e5a}.qval{font-weight:600;font-size:12px}
+.qval.qp{color:#e24b4a}.qval.qn{color:#378add}
+input[type=range]{width:100%;height:6px;accent-color:#378add;cursor:pointer;touch-action:pan-x}
+.vbtn{width:100%;height:38px;padding:0 10px;margin-bottom:5px;border-radius:8px;
+  border:1px solid #d4d2ca;background:transparent;color:#5f5e5a;font-size:11px;
+  cursor:pointer;text-align:left;display:flex;align-items:center;gap:7px;transition:all .15s}
+.vbtn:last-child{margin-bottom:0}
+.vbtn:active{opacity:.7}
+.vdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.vbtn.of{border-color:#ef9f27;color:#ef9f27;background:rgba(239,159,39,.07)}
+.vbtn.oe{border-color:#1d9e75;color:#1d9e75;background:rgba(29,158,117,.07)}
+.vbrow{display:flex;gap:4px}
+.vvbtn{flex:1;height:36px;border-radius:8px;border:1px solid #d4d2ca;background:transparent;
+  color:#5f5e5a;font-size:11px;cursor:pointer;text-align:center;white-space:nowrap;transition:background .15s}
+.vvbtn:hover{background:#ececea}
+.vvbtn:active{opacity:.7}
+.clist{display:flex;flex-direction:column;gap:4px;max-height:120px;overflow-y:auto}
+.citem{display:flex;align-items:center;justify-content:space-between;padding:5px 7px;border-radius:5px;border:1px solid #ececea;font-size:10px}
+.citem.cp{border-left:3px solid #e24b4a}.citem.cn{border-left:3px solid #378add}
+.citem span{color:#5f5e5a}
+.citem button{background:none;border:none;color:#b4b2a9;cursor:pointer;font-size:14px;padding:2px 4px;line-height:1;min-width:28px;min-height:28px}
+.citem button:hover{color:#e24b4a}
+.clrbtn{width:100%;margin-top:6px;height:36px;border-radius:8px;border:1px solid #d4d2ca;
+  background:transparent;color:#5f5e5a;font-size:11px;cursor:pointer;transition:all .15s}
+.clrbtn:hover{border-color:#e24b4a;color:#e24b4a}
+.clrbtn:active{opacity:.7}
+.leg{display:flex;flex-direction:column;gap:5px}
+.legrow{display:flex;align-items:center;gap:7px;font-size:10px;color:#5f5e5a}
+.legbar{width:22px;height:3px;border-radius:2px;flex-shrink:0}
+.ehint{font-size:10px;color:#b4b2a9;text-align:center;padding:10px 0}
 
+/* ── 모바일: 패널 하단 배치 ────────────────────────────── */
+@media(max-width:540px){
+  .main{flex-direction:column}
+  .viz{flex:1;min-height:0}
+  .panel{width:100%;height:auto;max-height:44vh;border-left:none;border-top:1px solid #d4d2ca;
+    flex-direction:row;flex-wrap:wrap;overflow-y:auto}
+  .sec{flex:1;min-width:140px;border-bottom:none;border-right:1px solid #ececea;padding:8px 10px}
+  .sec:last-child{border-right:none}
+  .clist{max-height:80px}
+}
+
+@media(prefers-color-scheme:dark){
+  body{background:#0f0f12;color:#e8eaf0}
+  header{background:#18181e;border-color:#2a2d40}
+  header h1{color:#e8eaf0}
+  .viz{background:#12121a}
+  .hint{color:#6b7080;background:rgba(15,15,18,.85)}
+  .panel{background:#18181e;border-color:#2a2d40}
+  .sec{border-color:#22253a}
+  .sec-title{color:#6b7080}
+  .tbtn{border-color:#2a2d40;color:#9098b0}
+  .tbtn.ap{border-color:#e24b4a;color:#e24b4a;background:rgba(226,75,74,.1)}
+  .tbtn.an{border-color:#378add;color:#378add;background:rgba(55,138,221,.1)}
+  .qlabel{color:#9098b0}
+  .vbtn{border-color:#2a2d40;color:#9098b0}
+  .vbtn.of{border-color:#ef9f27;color:#ef9f27;background:rgba(239,159,39,.1)}
+  .vbtn.oe{border-color:#1d9e75;color:#1d9e75;background:rgba(29,158,117,.1)}
+  .vvbtn{border-color:#2a2d40;color:#9098b0}
+  .vvbtn:hover{background:#22253a}
+  .citem{border-color:#22253a}
+  .citem span{color:#9098b0}
+  .citem button{color:#6b7080}
+  .clrbtn{border-color:#2a2d40;color:#9098b0}
+  .legrow{color:#9098b0}
+}
+</style>
+</head>
+<body>
+<header><h1>전위 · 전기장 시뮬레이션</h1></header>
+<div class="main">
+  <div class="viz">
+    <canvas id="cv"></canvas>
+    <div class="hint" id="hint">탭: 전하 배치 &nbsp;|&nbsp; 드래그: 회전 &nbsp;|&nbsp; 핀치: 줌</div>
+  </div>
+  <div class="panel">
+    <div class="sec">
+      <div class="sec-title">전하 설정</div>
+      <div class="type-row">
+        <button class="tbtn ap" id="bP" onclick="setType(1)">＋ 양전하</button>
+        <button class="tbtn" id="bN" onclick="setType(-1)">－ 음전하</button>
+      </div>
+      <div class="qrow"><span class="qlabel">전하량</span><span class="qval qp" id="qv">+1.0 C</span></div>
+      <input type="range" min="0.1" max="3" step="0.1" value="1" oninput="setMag(this.value)">
+    </div>
+    <div class="sec">
+      <div class="sec-title">시각화</div>
+      <button class="vbtn" id="bF" onclick="togF()"><div class="vdot" style="background:#ef9f27"></div>전기장 화살표</button>
+      <button class="vbtn" id="bE" onclick="togE()"><div class="vdot" style="background:#1d9e75"></div>등전위선</button>
+    </div>
+    <div class="sec">
+      <div class="sec-title">시점</div>
+      <div class="vbrow">
+        <button class="vvbtn" onclick="setView(30,-35)">사선</button>
+        <button class="vvbtn" onclick="setView(0,0)">정면</button>
+        <button class="vvbtn" onclick="setView(88,0)">위</button>
+      </div>
+    </div>
+    <div class="sec" style="flex:1">
+      <div class="sec-title">배치된 전하</div>
+      <div class="clist" id="cl"></div>
+      <button class="clrbtn" onclick="clearAll()">↺ 모두 지우기</button>
+    </div>
+    <div class="sec">
+      <div class="sec-title">범례</div>
+      <div class="leg">
+        <div class="legrow"><div class="legbar" style="background:linear-gradient(90deg,#378add,#1d9e75,#ef9f27,#e24b4a)"></div>전위 낮→높</div>
+        <div class="legrow"><div class="legbar" style="background:#ffe650;height:2px"></div>전기장 방향</div>
+        <div class="legrow"><div class="legbar" style="background:transparent;border-top:2px solid #1d9e75"></div>등전위선</div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const K=9,WD=5,N=24,VZ=0.18;
+let charges=[],ctype=1,cmag=1.0,sF=false,sE=false;
+let az=-35,el=30,zoom=1;
+let W=0,H=0;
+const canvas=document.getElementById('cv');
+const ctx=canvas.getContext('2d');
+
+function setupCanvas(){
+  const rect=canvas.parentElement.getBoundingClientRect();
+  W=rect.width;H=rect.height;
+  const dpr=devicePixelRatio||1;
+  canvas.width=W*dpr;canvas.height=H*dpr;
+  canvas.style.width=W+'px';canvas.style.height=H+'px';
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+
+function project(wx,wy,wz){
+  const a=az*Math.PI/180,e=el*Math.PI/180;
+  const rx=wx*Math.cos(a)+wy*Math.sin(a);
+  const ry=-wx*Math.sin(a)+wy*Math.cos(a);
+  const sx=rx,sy=ry*Math.sin(e)-wz*Math.cos(e);
+  const sc=Math.min(W,H)*0.095*zoom;
+  return[W/2+sx*sc,H/2+sy*sc];
+}
+function unproject(mx,my){
+  const a=az*Math.PI/180,e=el*Math.PI/180;
+  const sc=Math.min(W,H)*0.095*zoom;
+  const sx=(mx-W/2)/sc,sy=(my-H/2)/sc;
+  const se=Math.abs(Math.sin(e))<0.05?(Math.sin(e)<0?-0.05:0.05):Math.sin(e);
+  const ry=sy/se;
+  const wx=sx*Math.cos(a)-ry*Math.sin(a);
+  const wy=sx*Math.sin(a)+ry*Math.cos(a);
+  return[Math.max(-WD+.1,Math.min(WD-.1,wx)),Math.max(-WD+.1,Math.min(WD-.1,wy))];
+}
+function calcV(wx,wy){
+  let v=0;
+  for(const c of charges){const r=Math.hypot(wx-c.x,wy-c.y);if(r<0.15)return c.q>0?60:-60;v+=K*c.q/r;}
+  return v;
+}
+function calcE(wx,wy){
+  let ex=0,ey=0;
+  for(const c of charges){const dx=wx-c.x,dy=wy-c.y,r2=dx*dx+dy*dy;if(r2<0.04)continue;const r3=r2**1.5;ex+=K*c.q*dx/r3;ey+=K*c.q*dy/r3;}
+  return[ex,ey];
+}
+function vToZ(v){return Math.max(-4.5,Math.min(4.5,v*VZ));}
+function vColor(v,alpha=1){
+  const t=Math.max(-1,Math.min(1,v/12));let r,g,b;
+  if(t<-0.5){const s=(t+1)/0.5;r=Math.round(55+s*(29-55));g=Math.round(138+s*(158-138));b=Math.round(221+s*(117-221));}
+  else if(t<0){const s=(t+0.5)/0.5;r=Math.round(29+s*(55-29));g=Math.round(158+s*(138-158));b=Math.round(117+s*(221-117));}
+  else if(t<0.5){const s=t/0.5;r=Math.round(29+s*(239-29));g=Math.round(158+s*(159-158));b=Math.round(117+s*(39-117));}
+  else{const s=(t-0.5)/0.5;r=Math.round(239+s*(226-239));g=Math.round(159+s*(75-159));b=Math.round(39+s*(74-39));}
+  return`rgba(${r},${g},${b},${alpha})`;
+}
+
+let grid=null;
+function buildGrid(){
+  if(!charges.length){grid=null;return;}
+  const g=new Array(N+1);
+  for(let i=0;i<=N;i++){g[i]=new Array(N+1);for(let j=0;j<=N;j++){const wx=-WD+2*WD*i/N,wy=-WD+2*WD*j/N;const v=calcV(wx,wy);const[ex,ey]=calcE(wx,wy);const mag=Math.hypot(ex,ey);const ez_unit=mag>0?-mag*VZ:0;g[i][j]={wx,wy,wz:vToZ(v),v,ex,ey,ez_unit};}}
+  grid=g;
+}
+
+function drawGridLines(){
+  ctx.strokeStyle='rgba(128,128,128,0.1)';ctx.lineWidth=0.5;
+  for(let x=-WD;x<=WD;x+=2){const[ax,ay]=project(x,-WD,0),[bx,by]=project(x,WD,0);ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.stroke();}
+  for(let y=-WD;y<=WD;y+=2){const[ax,ay]=project(-WD,y,0),[bx,by]=project(WD,y,0);ctx.beginPath();ctx.moveTo(ax,ay);ctx.lineTo(bx,by);ctx.stroke();}
+  const[ox,oy]=project(0,0,0);
+  [[[WD+0.5,0,0],'x','rgba(220,80,80,.7)'],[[0,WD+0.5,0],'y','rgba(80,200,80,.7)'],[[0,0,5.5],'V','rgba(140,140,255,.9)']].forEach(([[wx,wy,wz],lbl,col])=>{
+    const[px,py]=project(wx,wy,wz);ctx.beginPath();ctx.moveTo(ox,oy);ctx.lineTo(px,py);ctx.strokeStyle=col;ctx.lineWidth=1.2;ctx.stroke();ctx.fillStyle=col;ctx.font='bold 11px monospace';ctx.fillText(lbl,px+3,py+3);
+  });
+}
+function drawSurface(){
+  const g=grid,quads=[];
+  for(let i=0;i<N;i++)for(let j=0;j<N;j++){const cv=(g[i][j].v+g[i+1][j].v+g[i][j+1].v+g[i+1][j+1].v)/4;const[mx,my]=project((g[i][j].wx+g[i+1][j+1].wx)/2,(g[i][j].wy+g[i+1][j+1].wy)/2,0);quads.push({i,j,d:mx+my,v:cv});}
+  quads.sort((a,b)=>a.d-b.d);
+  for(const{i,j,v}of quads){
+    const[x0,y0]=project(g[i][j].wx,g[i][j].wy,g[i][j].wz);const[x1,y1]=project(g[i+1][j].wx,g[i+1][j].wy,g[i+1][j].wz);const[x2,y2]=project(g[i+1][j+1].wx,g[i+1][j+1].wy,g[i+1][j+1].wz);const[x3,y3]=project(g[i][j+1].wx,g[i][j+1].wy,g[i][j+1].wz);
+    ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);ctx.lineTo(x2,y2);ctx.lineTo(x3,y3);ctx.closePath();ctx.fillStyle=vColor(v,0.88);ctx.strokeStyle=vColor(v,0.18);ctx.lineWidth=0.3;ctx.fill();ctx.stroke();
+  }
+}
+function drawEquipotential(){
+  const g=grid,levels=[-9,-5,-2.5,-1,1,2.5,5,9];
+  ctx.setLineDash([]);ctx.lineWidth=2.2;
+  for(const lv of levels){
+    ctx.strokeStyle=lv<0?'rgba(80,200,255,1)':'rgba(255,210,60,1)';
+    for(let i=0;i<N;i++)for(let j=0;j<N;j++){
+      const v00=g[i][j].v,v10=g[i+1][j].v,v01=g[i][j+1].v,v11=g[i+1][j+1].v;
+      function ip(va,vb,ga,gb){if((va-lv)*(vb-lv)<0){const t=(lv-va)/(vb-va);return project(ga.wx+t*(gb.wx-ga.wx),ga.wy+t*(gb.wy-ga.wy),ga.wz+t*(gb.wz-ga.wz));}return null;}
+      const pts=[ip(v00,v10,g[i][j],g[i+1][j]),ip(v10,v11,g[i+1][j],g[i+1][j+1]),ip(v11,v01,g[i+1][j+1],g[i][j+1]),ip(v01,v00,g[i][j+1],g[i][j])].filter(Boolean);
+      if(pts.length===2){ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);ctx.lineTo(pts[1][0],pts[1][1]);ctx.stroke();}
+    }
+  }
+}
+function drawArrows(){
+  const g=grid,step=2,lift=0.3;
+  for(let i=step;i<N;i+=step)for(let j=step;j<N;j+=step){
+    const{wx,wy,wz,ex,ey,ez_unit}=g[i][j];
+    const mag2d=Math.hypot(ex,ey);if(mag2d<0.01)continue;
+    const ex3=ex/mag2d,ey3=ey/mag2d,ez3=ez_unit/mag2d;
+    const mag3=Math.hypot(ex3,ey3,ez3)||1;
+    const dx3=ex3/mag3,dy3=ey3/mag3,dz3=ez3/mag3;
+    const arrowLen=Math.min(0.42,1.0/(1+mag2d*0.08));
+    const wx1=wx+dx3*arrowLen,wy1=wy+dy3*arrowLen,wz1=wz+dz3*arrowLen;
+    const[px0,py0]=project(wx,wy,wz+lift);const[px1,py1]=project(wx1,wy1,wz1+lift);
+    const pdx=px1-px0,pdy=py1-py0,plen=Math.hypot(pdx,pdy);if(plen<2)continue;
+    const alpha=Math.min(1,0.55+mag2d*0.025);
+    ctx.strokeStyle=`rgba(255,235,60,${alpha})`;ctx.fillStyle=`rgba(255,235,60,${alpha})`;ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(px0,py0);ctx.lineTo(px1,py1);ctx.stroke();
+    const ux=pdx/plen,uy=pdy/plen,s=5;
+    ctx.beginPath();ctx.moveTo(px1,py1);ctx.lineTo(px1-s*ux+s*0.44*uy,py1-s*uy-s*0.44*ux);ctx.lineTo(px1-s*ux-s*0.44*uy,py1-s*uy+s*0.44*ux);ctx.closePath();ctx.fill();
+  }
+}
+function drawCharges(){
+  const g=grid;
+  for(const c of charges){
+    const gi=Math.max(0,Math.min(N,Math.round((c.x+WD)/(2*WD)*N)));
+    const gj=Math.max(0,Math.min(N,Math.round((c.y+WD)/(2*WD)*N)));
+    const wz=g[gi][gj].wz;
+    const[px,py]=project(c.x,c.y,wz+0.4);const[bx,by]=project(c.x,c.y,0);
+    ctx.beginPath();ctx.moveTo(bx,by);ctx.lineTo(px,py);ctx.strokeStyle=c.q>0?'rgba(226,75,74,.5)':'rgba(55,138,221,.5)';ctx.lineWidth=1;ctx.setLineDash([2,3]);ctx.stroke();ctx.setLineDash([]);
+    const r=8+Math.abs(c.q)*2;
+    const grad=ctx.createRadialGradient(px-r*0.3,py-r*0.3,r*0.1,px,py,r);
+    if(c.q>0){grad.addColorStop(0,'#ff9999');grad.addColorStop(1,'rgba(226,55,55,.9)');}
+    else{grad.addColorStop(0,'#99bbff');grad.addColorStop(1,'rgba(44,88,255,.9)');}
+    ctx.beginPath();ctx.arc(px,py,r,0,Math.PI*2);ctx.fillStyle=grad;ctx.fill();
+    ctx.strokeStyle=c.q>0?'rgba(255,180,180,.7)':'rgba(160,190,255,.7)';ctx.lineWidth=1.5;ctx.stroke();
+    ctx.fillStyle='#fff';ctx.font='bold 11px monospace';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(c.q>0?'+':'−',px,py);
+  }
+  ctx.textAlign='left';ctx.textBaseline='alphabetic';
+}
+
+function paint(){
+  const dark=window.matchMedia('(prefers-color-scheme:dark)').matches;
+  ctx.setTransform(devicePixelRatio||1,0,0,devicePixelRatio||1,0,0);
+  ctx.clearRect(0,0,W,H);ctx.fillStyle=dark?'#12121a':'#ececea';ctx.fillRect(0,0,W,H);
+  drawGridLines();
+  if(!grid){ctx.fillStyle='rgba(120,120,120,.45)';ctx.font='12px monospace';ctx.textAlign='center';ctx.fillText('캔버스를 탭해 전하를 배치하세요',W/2,H/2);ctx.textAlign='left';return;}
+  drawSurface();
+  if(sE)drawEquipotential();
+  if(sF)drawArrows();
+  drawCharges();
+}
+function refresh(){buildGrid();paint();}
+function repaint(){paint();}
+
+// ── 터치 이벤트 (핀치줌 포함) ───────────────────────────────
+let dragging=false,mx0=0,my0=0,sx0=0,sy0=0;
+let pinching=false,pinchDist0=0,zoom0=1;
+
+function touchDist(e){
+  const dx=e.touches[0].clientX-e.touches[1].clientX;
+  const dy=e.touches[0].clientY-e.touches[1].clientY;
+  return Math.hypot(dx,dy);
+}
+function touchMid(e){
+  return{
+    x:(e.touches[0].clientX+e.touches[1].clientX)/2,
+    y:(e.touches[0].clientY+e.touches[1].clientY)/2
+  };
+}
+
+function getPos(e){return e.touches?e.touches[0]:e;}
+function onStart(e){
+  if(e.touches&&e.touches.length===2){
+    // 핀치 시작
+    pinching=true;dragging=false;
+    pinchDist0=touchDist(e);zoom0=zoom;
+    return;
+  }
+  const p=getPos(e);
+  dragging=true;pinching=false;
+  mx0=p.clientX;my0=p.clientY;sx0=p.clientX;sy0=p.clientY;
+}
+function onMove(e){
+  if(pinching&&e.touches&&e.touches.length===2){
+    const d=touchDist(e);
+    zoom=Math.max(0.3,Math.min(3,zoom0*(d/pinchDist0)));
+    repaint();return;
+  }
+  if(!dragging)return;
+  const p=getPos(e);
+  az-=(p.clientX-mx0)*0.4;
+  el=Math.max(-89,Math.min(89,el+(p.clientY-my0)*0.3));
+  mx0=p.clientX;my0=p.clientY;
+  repaint();
+}
+function onEnd(e){
+  if(pinching){pinching=false;return;}
+  dragging=false;
+  const p=e.changedTouches?e.changedTouches[0]:e;
+  if(Math.abs(p.clientX-sx0)+Math.abs(p.clientY-sy0)<10){
+    const rect=canvas.getBoundingClientRect();
+    const[wx,wy]=unproject(p.clientX-rect.left,p.clientY-rect.top);
+    charges.push({x:wx,y:wy,q:ctype*cmag});
+    updList();refresh();
+  }
+}
+canvas.addEventListener('mousedown',onStart);
+canvas.addEventListener('mousemove',onMove);
+canvas.addEventListener('mouseup',onEnd);
+canvas.addEventListener('touchstart',e=>{e.preventDefault();onStart(e);},{passive:false});
+canvas.addEventListener('touchmove',e=>{e.preventDefault();onMove(e);},{passive:false});
+canvas.addEventListener('touchend',e=>{e.preventDefault();onEnd(e);},{passive:false});
+canvas.addEventListener('wheel',e=>{
+  e.preventDefault();
+  zoom=Math.max(0.3,Math.min(3,zoom*(1-e.deltaY*0.001)));
+  repaint();
+},{passive:false});
+
+// hint 텍스트: 데스크톱/모바일 구분
+function updateHint(){
+  const isMob=window.matchMedia('(max-width:540px)').matches||navigator.maxTouchPoints>0;
+  document.getElementById('hint').textContent=isMob
+    ?'탭: 전하 배치 \u00a0|\u00a0 드래그: 회전 \u00a0|\u00a0 핀치: 줌'
+    :'클릭: 전하 배치 \u00a0|\u00a0 드래그: 회전 \u00a0|\u00a0 스크롤: 줌';
+}
+
+function setType(t){ctype=t;document.getElementById('bP').className='tbtn'+(t===1?' ap':'');document.getElementById('bN').className='tbtn'+(t===-1?' an':'');updQ();}
+function setMag(v){cmag=parseFloat(v);updQ();}
+function updQ(){const q=ctype*cmag,e=document.getElementById('qv');e.textContent=(q>0?'+':'')+q.toFixed(1)+' C';e.className='qval '+(ctype>0?'qp':'qn');}
+function togF(){sF=!sF;document.getElementById('bF').className='vbtn'+(sF?' of':'');paint();}
+function togE(){sE=!sE;document.getElementById('bE').className='vbtn'+(sE?' oe':'');paint();}
+function setView(e,a){el=e;az=a;repaint();}
+function rmv(i){charges.splice(i,1);updList();refresh();}
+function clearAll(){charges.length=0;grid=null;updList();paint();}
+function updList(){
+  const cl=document.getElementById('cl');cl.innerHTML='';
+  if(!charges.length){cl.innerHTML='<div class="ehint">캔버스를 탭하세요</div>';return;}
+  charges.forEach((c,i)=>{
+    const d=document.createElement('div');d.className='citem '+(c.q>0?'cp':'cn');
+    d.innerHTML=`<span>${c.q>0?'+':''}${c.q.toFixed(1)}C</span><span>(${c.x.toFixed(1)},${c.y.toFixed(1)})</span><button onclick="rmv(${i})">✕</button>`;
+    cl.appendChild(d);
+  });
+}
+
+new ResizeObserver(()=>{setupCanvas();charges.length?refresh():paint();}).observe(canvas.parentElement);
+setupCanvas();updList();updateHint();paint();
+</script>
+</body>
+</html>
