@@ -53,6 +53,16 @@ input[type=range]{width:100%; accent-color:var(--accent);}
 .btn{border:1px solid var(--line); background:#F5F8FC; color:var(--ink); border-radius:9px;
   padding:7px 12px; font-size:13px; font-weight:600; cursor:pointer;}
 .btn:hover{background:#EAF0F8;}
+.scn-group{font-size:12px;font-weight:700;color:var(--sub);margin:10px 0 6px;}
+.scn-group:first-of-type{margin-top:4px;}
+.scn{display:block;width:100%;text-align:left;border:1.5px solid var(--line);background:#F7F9FC;
+  border-radius:10px;padding:9px 12px;margin-bottom:6px;cursor:pointer;font-family:inherit;}
+.scn b{display:block;font-size:13.5px;color:var(--ink);}
+.scn small{display:block;font-size:12px;color:var(--sub);margin-top:2px;}
+.scn.on{border-color:var(--accent);background:#EAF1FF;}
+.scn.on b{color:var(--accent);}
+.scn:disabled{opacity:0.4;cursor:default;}
+.flip{width:100%;margin-top:4px;}
 .btn.sel{background:var(--ink);color:#fff;border-color:var(--ink);}
 .btn:disabled{opacity:0.42;cursor:default;}
 .btn.warn{background:#FFF4E6; border-color:#FFD8A8; color:#D9480F;}
@@ -106,12 +116,18 @@ input[type=range]{width:100%; accent-color:var(--accent);}
 
 
 
+<section class="mod" id="m3">
+  <div class="card"><canvas id="cv3" width="920" height="560"></canvas></div>
+  <div class="card" style="margin-top:14px"><canvas id="cvvt" width="920" height="290"></canvas></div>
+  <div class="note" id="fbNote"></div>
+</section>
 </main>
 <aside class="sidebar">
 <div class="tabs" role="tablist">
   <button class="tab on" data-t="0">1. 버스 — 물컵과 손잡이</button>
   <button class="tab" data-t="1">2. 엘리베이터 — 몸무게</button>
-  <button class="tab" data-t="2">3. 등가원리 · 시공간</button>
+  <button class="tab" data-t="2">3. 등가원리</button>
+  <button class="tab" data-t="3">4. 자유낙하 관찰자</button>
   </div>
 <div class="sbm on" id="sb0">
       <div class="panel">
@@ -163,29 +179,63 @@ input[type=range]{width:100%; accent-color:var(--accent);}
     </div>
 <div class="sbm" id="sb2">
       <div class="panel">
-        <h3>① 관찰자 (기준계) — 언제든 전환</h3>
-        <div class="seg" id="eqFrame">
-          <button class="on" data-v="fall">자유낙하하는 사람</button>
-          <button data-v="ground">지면에 정지한 사람</button>
-        </div>
-        <h3 style="margin-top:14px">② 엘리베이터 위치</h3>
-        <div class="seg" id="eqScene">
-          <button class="on" data-v="fall">공중 → 자유낙하</button>
-          <button data-v="rest">지면 위에 정지</button>
-        </div>
-        <h3 style="margin-top:14px">③ 실험 선택 (시작 전)</h3>
+        <h3>① 장면 고르기</h3>
+        <div class="scn-group">엘리베이터가 떨어질 때</div>
+        <button class="scn on" data-scene="fall" data-frame="fall">
+          <b>안에 탄 사람의 눈으로</b><small>함께 떨어지면 → 무중력, 사과가 둥둥</small></button>
+        <button class="scn" data-scene="fall" data-frame="ground">
+          <b>땅에 선 사람의 눈으로</b><small>엘리베이터·사람·사과가 모두 g로 낙하</small></button>
+        <div class="scn-group">엘리베이터가 땅에 있을 때</div>
+        <button class="scn" data-scene="rest" data-frame="ground">
+          <b>안에 선 사람의 눈으로</b><small>평범한 중력 → 사과가 포물선으로 낙하</small></button>
+        <button class="scn" data-scene="rest" data-frame="fall">
+          <b>옆에서 떨어지는 사람의 눈으로</b><small>내가 정지, 땅이 g로 솟아오른다</small></button>
+        <button class="btn flip" id="eqFlip">⇄ 같은 장면을 다른 사람 눈으로 보기</button>
+        <p style="font-size:11.5px;color:var(--sub);margin-top:6px">실행 중에도 시점을 바꿀 수 있습니다.</p>
+
+        <h3 style="margin-top:16px">② 실험 고르기</h3>
         <div class="btns" id="eqExp">
           <button class="btn sel" data-e="d">사과 놓기</button>
           <button class="btn" data-e="h">사과 수평 발사</button>
           <button class="btn" data-e="light">빛 발사</button>
         </div>
-        <h3 style="margin-top:14px">④ 실행</h3>
+        <h3 style="margin-top:16px">③ 실행</h3>
         <div class="btns">
           <button class="btn" id="eqStart" style="background:var(--accent);color:#fff;border-color:var(--accent)">▶ 시작</button>
           <button class="btn" id="eqReset">초기화</button>
         </div>
         <p style="font-size:12px;color:var(--sub);margin-top:12px">
           ※ 빛의 속도는 관찰 가능하도록 크게 축소(휘어짐 과장)했습니다.</p>
+      </div>
+    </div>
+<div class="sbm" id="sb3">
+      <div class="panel">
+        <h3>① 공을 던지는 사람</h3>
+        <div class="seg" id="fbWho">
+          <button class="on" data-v="A">A 자유낙하 관찰자</button>
+          <button data-v="B">B 지면 관찰자</button>
+        </div>
+        <h3 style="margin-top:14px">② 던지는 방법 (t = 1 s에 던짐)</h3>
+        <div class="btns" id="fbMode">
+          <button class="btn sel" data-m="drop">가만히 놓기</button>
+          <button class="btn" data-m="up">위로 던지기</button>
+          <button class="btn" data-m="horiz">수평으로 던지기</button>
+          <button class="btn" data-m="oblique">비스듬히 던지기</button>
+        </div>
+        <div class="row"><span>던지는 속력 (던진 사람 기준)</span><b id="fbSpdVal">10 m/s</b></div>
+        <input type="range" id="fbSpd" min="2" max="15" step="1" value="10">
+        <h3 style="margin-top:14px">③ 서로 관측하기</h3>
+        <label style="display:flex;gap:8px;align-items:center;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="fbMutual" checked> 상대 관찰자의 궤적과 v–t 그래프 표시</label>
+        <h3 style="margin-top:14px">④ 실행</h3>
+        <div class="btns">
+          <button class="btn" id="fbStart" style="background:var(--accent);color:#fff;border-color:var(--accent)">▶ 시작</button>
+          <button class="btn" id="fbPause">❚❚ 일시정지</button>
+          <button class="btn" id="fbReset">초기화</button>
+        </div>
+        <div class="row"><span>시간 t</span><b id="fbT">0.00 s</b></div>
+        <p style="font-size:12px;color:var(--sub);margin-top:8px">
+          ※ 0.5배속 재생. 사람·공의 크기는 보기 쉽게 과장했습니다. A가 지면에 닿는 순간(약 3.5 s) 관측이 끝납니다.</p>
       </div>
     </div>
 </aside>
@@ -692,10 +742,22 @@ let scene='fall', frame='fall', t=0, phase='setup';   // setup | run
 let apSel='d', lightSel=false, objs=[];
 const noteEl=document.getElementById('eqNote');
 const expEl=document.getElementById('eqExp');
-const sceneEl=document.getElementById('eqScene');
+const scnBtns=[...document.querySelectorAll('#sb2 .scn')];
 
-segInit('eqScene', v=>{ if(phase!=='setup')return; scene=v; });
-segInit('eqFrame', v=>{ frame=v; });
+function syncScn(){
+  scnBtns.forEach(b=>{
+    b.classList.toggle('on', b.dataset.scene===scene && b.dataset.frame===frame);
+    // 실행 중에는 같은 장면(엘리베이터 상태)의 카드만 선택 가능 = 시점만 전환
+    b.disabled = (phase!=='setup' && b.dataset.scene!==scene);
+  });
+}
+scnBtns.forEach(b=>b.addEventListener('click',()=>{
+  if(phase!=='setup' && b.dataset.scene!==scene) return;
+  scene=b.dataset.scene; frame=b.dataset.frame; syncScn();
+}));
+document.getElementById('eqFlip').addEventListener('click',()=>{
+  frame = (frame==='fall')? 'ground' : 'fall'; syncScn();
+});
 expEl.querySelectorAll('.btn').forEach(b=>b.addEventListener('click',()=>{
   if(phase!=='setup') return;
   const e=b.dataset.e;
@@ -719,7 +781,7 @@ document.getElementById('eqReset').addEventListener('click',()=>{
 });
 function lock(on){
   expEl.querySelectorAll('.btn').forEach(b=>b.disabled=on);
-  sceneEl.querySelectorAll('button').forEach(b=>b.disabled=on);
+  syncScn();
   document.getElementById('eqStart').disabled=on;
 }
 function elevY(tt){ return scene==='fall' ? Math.max(0, H0-.5*G*tt*tt) : 0; }
@@ -919,7 +981,7 @@ function hud(){
   ctx.fillStyle= phase==='setup'? '#D9480F':COL.sub;
   ctx.font=(phase==='setup'?'bold ':'')+'12.5px sans-serif';
   ctx.fillText(phase==='setup'
-    ? '\u2462 실험 선택 \u2192 \u25b6 시작 버튼을 누르세요'
+    ? '\u2461 실험 고르기 \u2192 \u25b6 시작 버튼을 누르세요'
     : (frame==='fall'?'이 기준계에서 나는 정지 \u2014 지면이 g로 다가온다':'낙하하는 것들이 g로 가속한다'),bx+14,by+32);
 }
 function note(){
@@ -966,6 +1028,267 @@ function note(){
 </script>
 
 <script>
+/* ===================== 모듈 4 : 자유낙하 관찰자 ===================== */
+(function(){
+const cv=document.getElementById('cv3'), ctx=cv.getContext('2d');
+const gv=document.getElementById('cvvt'), gc=gv.getContext('2d');
+const W=cv.width, H=cv.height, PW=W/2;
+/* 세계 설정 (지면 y=0, 위쪽 +) */
+const H0=60, TL=1, TA=Math.sqrt(2*H0/G), XB=12, S=5.5, TS=0.5;
+const AX=120, AY=190, GY=520;          // 화면 기준점: A(t=0) 위치, 지면
+const C_A='#1971C2', C_B='#2F9E44', C_BALL='#F08C00';
+let thrower='A', mode='drop', spd=10, mutual=true, t=0, phase='setup', paused=false;
+const noteEl=document.getElementById('fbNote');
+
+/* ── 운동 (지면 기준계에서 해석적으로 계산) ── */
+function obsPos(w,tt){ return w==='A'? {x:0, y:H0-0.5*G*Math.min(tt,TA)**2} : {x:XB, y:0}; }
+function obsVel(w,tt){ return w==='A'? {x:0, y:(tt<TA? -G*tt : 0)} : {x:0, y:0}; }
+function other(w){ return w==='A'?'B':'A'; }
+function hand(){ return thrower==='A'? {x:2.6, y:3.6} : {x:-2.4, y:4.4}; }   // 발 기준 손 위치(m)
+function vrel(){
+  const d = thrower==='A'? 1 : -1;               // 상대 관찰자 쪽으로 던진다
+  if(mode==='drop')  return {x:0, y:0};
+  if(mode==='up')    return {x:0, y:spd};
+  if(mode==='horiz') return {x:d*spd, y:0};
+  return {x:d*spd*Math.SQRT1_2, y:spd*Math.SQRT1_2};
+}
+let L;
+function recompute(){
+  const p=obsPos(thrower,TL), h=hand(), v=obsVel(thrower,TL), r=vrel();
+  const P0={x:p.x+h.x, y:p.y+h.y}, V0={x:v.x+r.x, y:v.y+r.y};
+  const tau=(V0.y+Math.sqrt(V0.y*V0.y+2*G*P0.y))/G;
+  L={P0,V0,tLand:TL+tau};
+}
+function ballPos(tt){
+  if(tt<TL){ const p=obsPos(thrower,tt), h=hand(); return {x:p.x+h.x, y:p.y+h.y}; }
+  const tau=Math.min(tt,L.tLand)-TL;
+  return {x:L.P0.x+L.V0.x*tau, y:Math.max(0, L.P0.y+L.V0.y*tau-0.5*G*tau*tau)};
+}
+function ballVel(tt){
+  if(tt<TL) return obsVel(thrower,tt);
+  if(tt>=L.tLand) return {x:0,y:0};
+  return {x:L.V0.x, y:L.V0.y-G*(tt-TL)};
+}
+/* 관찰자 F가 본 상대 위치/속도 */
+const relP=(p,F,tt)=>{ const o=obsPos(F,tt); return {x:p.x-o.x, y:p.y-o.y}; };
+const relV=(v,F,tt)=>{ const o=obsVel(F,tt); return {x:v.x-o.x, y:v.y-o.y}; };
+
+/* ── 화면 변환: 패널 k(0=A의 눈, 1=B의 눈) ── */
+const viewer=k=> k===0?'A':'B';
+function scr(k,p,tt){
+  const F=viewer(k), r=relP(p,F,tt);
+  const ox = (F==='A'? AX : AX+XB*S) + k*PW, oy = (F==='A'? AY : GY);
+  return [ox + r.x*S, oy - r.y*S];
+}
+
+/* ── UI ── */
+segInit('fbWho', v=>{ thrower=v; recompute(); });
+const modeEl=document.getElementById('fbMode'), spdEl=document.getElementById('fbSpd');
+modeEl.querySelectorAll('.btn').forEach(b=>b.addEventListener('click',()=>{
+  if(phase!=='setup') return;
+  mode=b.dataset.m;
+  modeEl.querySelectorAll('.btn').forEach(x=>x.classList.toggle('sel',x===b));
+  spdEl.disabled=(mode==='drop'); recompute();
+}));
+spdEl.addEventListener('input',e=>{ spd=+e.target.value;
+  document.getElementById('fbSpdVal').textContent=spd+' m/s'; recompute(); });
+spdEl.disabled=true;
+document.getElementById('fbMutual').addEventListener('change',e=>{ mutual=e.target.checked; });
+const pauseBtn=document.getElementById('fbPause');
+function lock(on){
+  document.querySelectorAll('#fbWho button').forEach(b=>b.disabled=on);
+  modeEl.querySelectorAll('.btn').forEach(b=>b.disabled=on);
+  spdEl.disabled = on || mode==='drop';
+}
+document.getElementById('fbStart').addEventListener('click',()=>{
+  if(phase==='run') return;
+  if(phase==='done') t=0;
+  phase='run'; paused=false; pauseBtn.textContent='\u275a\u275a 일시정지'; lock(true);
+});
+pauseBtn.addEventListener('click',()=>{
+  if(phase!=='run') return;
+  paused=!paused; pauseBtn.textContent=paused?'\u25b6 계속':'\u275a\u275a 일시정지';
+});
+document.getElementById('fbReset').addEventListener('click',()=>{
+  phase='setup'; t=0; paused=false; pauseBtn.textContent='\u275a\u275a 일시정지'; lock(false);
+});
+recompute();
+
+window.step3=function(dt){
+  if(phase==='run' && !paused){ t+=dt*TS; if(t>=TA){ t=TA; phase='done'; } }
+  document.getElementById('fbT').textContent=t.toFixed(2)+' s';
+  drawScene(); drawGraphs(); note();
+};
+
+/* ── 장면 ── */
+function drawPanel(k){
+  const F=viewer(k), O=other(F), x0=k*PW;
+  ctx.save(); ctx.beginPath(); ctx.rect(x0,0,PW,H); ctx.clip();
+  ctx.fillStyle='#E3F0FB'; ctx.fillRect(x0,0,PW,H);
+  // 지면
+  const gy=scr(k,{x:0,y:0},t)[1];
+  if(gy<H){ ctx.fillStyle='#9CC68B'; ctx.fillRect(x0,gy,PW,H-gy+10);
+            ctx.fillStyle='#7DAF6A'; ctx.fillRect(x0,gy,PW,5); }
+  if(F==='A' && phase!=='setup' && t<TA && gy<H+60){
+    arrow(ctx,x0+PW-40,Math.min(H-12,gy+46),x0+PW-40,Math.min(H-12,gy+46)-36,C_B,4,'',[0,0]);
+    ctx.fillStyle=C_B; ctx.font='bold 12px sans-serif'; ctx.textAlign='right';
+    ctx.fillText('지면이 올라온다', x0+PW-52, Math.min(H-12,gy+46)-16);
+  }
+  // 궤적 (현재 지면 위쪽만)
+  ctx.save(); ctx.beginPath(); ctx.rect(x0,0,PW,gy); ctx.clip();
+  const trail=(fn,color,dash,w)=>{
+    ctx.strokeStyle=color; ctx.lineWidth=w; ctx.setLineDash(dash); ctx.beginPath();
+    const n=160;
+    for(let i=0;i<=n;i++){ const tt=t*i/n, [sx,sy]=scr(k,fn(tt),tt); i?ctx.lineTo(sx,sy):ctx.moveTo(sx,sy); }
+    ctx.stroke(); ctx.setLineDash([]);
+  };
+  if(mutual && t>0) trail(tt=>obsPos(O,tt), O==='A'?C_A:C_B, [3,5], 2);
+  if(t>TL) trail(tt=>ballPos(tt), C_BALL, [6,4], 2.5);
+  ctx.restore();
+  // 관찰자
+  const drawObs=w=>{
+    const [sx,sy]=scr(k,obsPos(w,t),t), col=w==='A'?C_A:C_B, me=(w===F);
+    if(w==='A') person(ctx,sx,sy,40,col, t<TA);          // 기준점 = 발
+    else        person(ctx,sx,sy,34,col,false);
+    ctx.fillStyle=col; ctx.font='bold 13px sans-serif'; ctx.textAlign='center';
+    ctx.fillText((me?'\u25cf 나 ':'')+w, sx, (w==='A'? sy-48 : sy-40));
+    if(!me && mutual){                               // 상대 관찰자의 속도 화살표
+      const v=relV(obsVel(w,t),F,t);
+      if(Math.abs(v.y)>0.3){
+        const Lv=Math.max(-90,Math.min(90,v.y*2.4));
+        arrow(ctx,sx-26,sy-18,sx-26,sy-18-Lv,col,3,'v',[6,0]);
+      }
+    }
+  };
+  drawObs('A'); drawObs('B');
+  // 공
+  const bp=ballPos(t), [bx,by]=scr(k,bp,t);
+  if(by<-8){                                          // 화면 위로 벗어남
+    ctx.fillStyle=C_BALL; ctx.beginPath();
+    ctx.moveTo(bx,58); ctx.lineTo(bx-7,70); ctx.lineTo(bx+7,70); ctx.closePath(); ctx.fill();
+    ctx.font='11px sans-serif'; ctx.textAlign='center'; ctx.fillText('공 (화면 위)',bx,84);
+  }else{
+    const bv=relV(ballVel(t),F,t), sp=Math.hypot(bv.x,bv.y);
+    if(sp>0.3 && t>=TL){
+      const sc=Math.min(2.4, 90/sp);
+      arrow(ctx,bx,by,bx+bv.x*sc,by-bv.y*sc,'#C2410C',3,'',[0,0]);
+    }
+    ctx.fillStyle='#FFF3E0'; ctx.strokeStyle=C_BALL; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.arc(bx,by,7,0,7); ctx.fill(); ctx.stroke();
+  }
+  // 제목
+  ctx.fillStyle='rgba(255,255,255,0.94)'; ctx.strokeStyle='#C8D4E4'; ctx.lineWidth=1.5;
+  roundRect(ctx,x0+12,10,PW-24,44,9); ctx.fill(); ctx.stroke();
+  ctx.textAlign='left'; ctx.textBaseline='top';
+  ctx.fillStyle=F==='A'?C_A:C_B; ctx.font='bold 14px sans-serif';
+  ctx.fillText(F==='A'?'A (자유낙하 관찰자)의 눈':'B (지면 관찰자)의 눈', x0+24, 16);
+  ctx.fillStyle=COL.sub; ctx.font='12px sans-serif';
+  ctx.fillText(F==='A'? (t<TA?'나는 정지 · 이 기준계엔 중력이 없다':'착지 — 더 이상 자유낙하가 아님')
+                      : '나는 정지 · 중력이 아래로 작용', x0+24, 35);
+  // 수치
+  const bv=relV(ballVel(t),F,t);
+  const rx=x0+PW-232, ry=62;
+  ctx.fillStyle='rgba(255,255,255,0.92)'; ctx.strokeStyle='#DDE5EF'; ctx.lineWidth=1;
+  roundRect(ctx,rx,ry,220,mutual?46:28,8); ctx.fill(); ctx.stroke();
+  ctx.fillStyle='#C2410C'; ctx.font='12px sans-serif';
+  ctx.fillText(`공  vx = ${bv.x.toFixed(1)},  vy = ${bv.y.toFixed(1)} m/s`, rx+10, ry+7);
+  if(mutual){
+    const ov=relV(obsVel(O,t),F,t);
+    ctx.fillStyle=O==='A'?C_A:C_B;
+    ctx.fillText(`${O}  vy = ${ov.y.toFixed(1)} m/s`, rx+10, ry+26);
+  }
+  ctx.textBaseline='alphabetic';
+  ctx.restore();
+}
+function drawScene(){
+  drawPanel(0); drawPanel(1);
+  ctx.strokeStyle='#B7C4D4'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(PW,0); ctx.lineTo(PW,H); ctx.stroke();
+}
+
+/* ── v–t 그래프 ── */
+const VMAX=40;
+function drawGraphs(){
+  const GW=gv.width, GH=gv.height;
+  gc.fillStyle='#FFFFFF'; gc.fillRect(0,0,GW,GH);
+  [0,1].forEach(k=>{
+    const F=viewer(k), O=other(F), x0=k*(GW/2);
+    const L0=x0+50, R0=x0+GW/2-18, T0=40, B0=GH-34;
+    const tx=tt=>L0+(R0-L0)*tt/TA, vy=v=>T0+(B0-T0)*(VMAX-v)/(2*VMAX);
+    gc.fillStyle=F==='A'?C_A:C_B; gc.font='bold 13.5px sans-serif'; gc.textAlign='left';
+    gc.fillText(`${F}가 측정한 v–t 그래프 (수직 속도, 위쪽 +)`, L0-30, 22);
+    // 격자
+    gc.font='11px sans-serif'; gc.fillStyle='#8896AB';
+    for(let v=-40;v<=40;v+=10){
+      gc.strokeStyle=v===0?'#8896AB':'#EDF2F8'; gc.lineWidth=v===0?1.5:1;
+      gc.beginPath(); gc.moveTo(L0,vy(v)); gc.lineTo(R0,vy(v)); gc.stroke();
+      if(v%20===0){ gc.textAlign='right'; gc.fillText(v, L0-6, vy(v)+4); }
+    }
+    for(let s=0;s<=3;s++){ gc.textAlign='center'; gc.fillText(s+' s', tx(s), B0+16); }
+    gc.strokeStyle='#8896AB'; gc.lineWidth=1.5;
+    gc.beginPath(); gc.moveTo(L0,T0); gc.lineTo(L0,B0); gc.stroke();
+    gc.save(); gc.translate(x0+14,(T0+B0)/2); gc.rotate(-Math.PI/2);
+    gc.textAlign='center'; gc.fillText('v (m/s)',0,0); gc.restore();
+    // 던진 순간
+    gc.strokeStyle='#C9D5E3'; gc.setLineDash([4,4]);
+    gc.beginPath(); gc.moveTo(tx(TL),T0); gc.lineTo(tx(TL),B0); gc.stroke(); gc.setLineDash([]);
+    gc.fillStyle='#8896AB'; gc.textAlign='left'; gc.fillText('던짐', tx(TL)+4, T0+12);
+    // 선
+    const line=(fn,color,w)=>{
+      gc.strokeStyle=color; gc.lineWidth=w; gc.beginPath();
+      const n=140;
+      for(let i=0;i<=n;i++){ const tt=t*i/n, X=tx(tt), Y=vy(Math.max(-VMAX,Math.min(VMAX,fn(tt))));
+        i?gc.lineTo(X,Y):gc.moveTo(X,Y); }
+      gc.stroke();
+    };
+    if(t>0){
+      line(tt=>relV(ballVel(tt),F,tt).y, C_BALL, 3.5);
+      if(mutual){ gc.setLineDash([7,5]); line(tt=>relV(obsVel(O,tt),F,tt).y, O==='A'?C_A:C_B, 2.5); gc.setLineDash([]); }
+    }
+    // 현재 시각
+    gc.strokeStyle='rgba(23,38,59,0.25)'; gc.lineWidth=1;
+    gc.beginPath(); gc.moveTo(tx(t),T0); gc.lineTo(tx(t),B0); gc.stroke();
+    // 범례 + 가속도
+    const accBall = (t<TL)? (thrower===F?0:(obsAccY(thrower)-obsAccY(F)))
+                  : (t<L.tLand? -G-obsAccY(F) : -obsAccY(F));
+    gc.font='12px sans-serif'; gc.textAlign='left';
+    gc.fillStyle=C_BALL; gc.fillRect(R0-190,T0+2,14,4);
+    gc.fillStyle=COL.ink; gc.fillText(`공 (가속도 ${fmtA(accBall)})`, R0-172, T0+8);
+    if(mutual){
+      const accO=obsAccY(O)-obsAccY(F);
+      gc.strokeStyle=O==='A'?C_A:C_B; gc.lineWidth=2.5; gc.setLineDash([4,3]);
+      gc.beginPath(); gc.moveTo(R0-190,T0+20); gc.lineTo(R0-174,T0+20); gc.stroke(); gc.setLineDash([]);
+      gc.fillStyle=COL.ink; gc.fillText(`${O} (가속도 ${fmtA(accO)})`, R0-172, T0+24);
+    }
+  });
+  gc.strokeStyle='#DDE5EF'; gc.lineWidth=1.5;
+  gc.beginPath(); gc.moveTo(GW/2,8); gc.lineTo(GW/2,GH-8); gc.stroke();
+}
+function obsAccY(w){ return (w==='A' && t<TA)? -G : 0; }
+function fmtA(a){ return (Math.abs(a)<0.05? '0' : (a>0?'+':'\u2212')+Math.abs(a).toFixed(1))+' m/s\u00b2'; }
+
+/* ── 설명 ── */
+function note(){
+  const nm={drop:'가만히 놓은',up:'위로 던진',horiz:'수평으로 던진',oblique:'비스듬히 던진'}[mode];
+  let what;
+  if(thrower==='A'){
+    what = mode==='drop' ? `A가 놓은 공은 <b>A에게는 옆에 그대로 떠 있고</b>, B에게는 A와 나란히 g로 떨어집니다.`
+         : mode==='up'   ? `A가 위로 던진 공은 <b>A에게는 일정한 속도로 계속 멀어질 뿐 다시 떨어지지 않습니다</b>. B에게는 올라갔다 떨어지는 운동입니다.`
+         : `A가 ${nm} 공은 <b>A에게는 곧은 직선</b>으로 날아가고, B에게는 <b>포물선</b>입니다.`;
+  }else{
+    what = `B가 ${nm} 공은 B에게는 ${mode==='drop'?'자유낙하':mode==='up'?'올라갔다 떨어지는 운동':'포물선 운동'}이지만,
+            A에게는 <b>손을 떠나는 순간의 속도 그대로 곧은 직선(등속) 운동</b>입니다 — 지면과 B가 위로 가속하며 공을 따라잡습니다.`;
+  }
+  const landed = t>=L.tLand ? ` 공이 지면에 닿은 뒤에는 지면과 함께 움직이므로, A의 그래프에서 공의 속도가 <b>+g 기울기</b>로 늘어납니다.` : '';
+  noteEl.innerHTML=`<span class="tag">${phase==='setup'?'준비':'관측 중'}</span> ${what}${landed}<br>
+    <b style="color:${C_A}">A의 그래프</b>: 공중에 있는 공의 선이 <b>수평</b>(가속도 0) — 자유낙하 기준계는 중력이 없는 관성계와 구별할 수 없습니다.
+    <b style="color:${C_B}">B의 그래프</b>: 같은 공의 선이 기울기 <b>\u22129.8 m/s\u00b2</b>.
+    ${mutual?`서로를 보면 <b>A는 B가 +g로 가속</b>하며 올라온다고, <b>B는 A가 \u2212g로 가속</b>하며 떨어진다고 측정합니다 — 두 그래프는 매 순간 정확히 A의 속도(\u2212gt)만큼 차이 납니다.`:''}`;
+}
+})();
+</script>
+
+<script>
 /* ===================== 메인 루프 ===================== */
 let last=performance.now();
 function loop(now){
@@ -973,6 +1296,7 @@ function loop(now){
   if(activeTab===0&&window.step0) step0(dt);
   if(activeTab===1&&window.step1) step1(dt);
   if(activeTab===2&&window.step2) step2(dt);
+  if(activeTab===3&&window.step3) step3(dt);
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
