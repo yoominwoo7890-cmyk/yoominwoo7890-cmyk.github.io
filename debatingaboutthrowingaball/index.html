@@ -69,6 +69,13 @@ label.fld{display:block;font-size:13px;font-weight:600;color:var(--muted);margin
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 
 /* ── 보기 그리드 ────────────────────────── */
+.boardwrap{background:var(--paper);border-radius:var(--r);padding:10px}
+.boardwrap svg{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.boardwrap .cellbox{transition:stroke .12s}
+.boardwrap svg:hover .cellbox{stroke:#c3ccd6}
+.pickmsg{font-size:13.5px;color:var(--muted);margin:12px 0 4px;min-height:20px}
+.pickmsg.ok{color:var(--ok);font-weight:600}
+.mydot{color:var(--vec)}
 .optgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
 @media(max-width:640px){.optgrid{grid-template-columns:1fr}}
 .opt{position:relative;background:#fff;border:1.5px solid var(--line);border-radius:var(--r);
@@ -173,14 +180,14 @@ import { getFirestore, doc, setDoc, getDoc, onSnapshot, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 
 /* ▼▼▼ 여기에 Firebase 콘솔에서 복사한 값을 붙여넣으세요 ▼▼▼ */
- const firebaseConfig = {
-    apiKey: "AIzaSyCJwS8qyO9Ew9MgXo9zLWqxI1jPmLqWxzg",
-    authDomain: "debating-about-throwing-a-ball.firebaseapp.com",
-    projectId: "debating-about-throwing-a-ball",
-    storageBucket: "debating-about-throwing-a-ball.firebasestorage.app",
-    messagingSenderId: "318859589063",
-    appId: "1:318859589063:web:2d4a83fe63384aaa92d5e2"
-  };
+const firebaseConfig = {
+  apiKey: "여기에_붙여넣기",
+  authDomain: "여기에_붙여넣기",
+  projectId: "여기에_붙여넣기",
+  storageBucket: "여기에_붙여넣기",
+  messagingSenderId: "여기에_붙여넣기",
+  appId: "여기에_붙여넣기"
+};
 /* ▲▲▲ 여기까지 ▲▲▲ */
 
 const app  = initializeApp(firebaseConfig);
@@ -252,13 +259,16 @@ const API = {
   },
 
   /** 2단계: 답과 이유 */
-  submitVote: async function(session, optId, reason, displayPos){
+  submitVote: async function(session, optId, reason, displayPos, u, v){
     const o = OPT[optId];
-    if(!o) throw new Error('보기를 선택하세요.');
+    if(!o) throw new Error('그림 위를 찍어 점을 남겨주세요.');
     if(!String(reason||'').trim()) throw new Error('그렇게 생각한 이유를 적어주세요.');
     await setDoc(doc(db, 'responses', myDoc()), {
       no: S.no, name: S.name, optId: o.id, optNo: o.no, optLabel: o.label,
-      displayPos: displayPos || 0, reason: String(reason).trim(), at: serverTimestamp()
+      displayPos: displayPos || 0,
+      dotU: Math.round((u||0)*1000)/1000,      // 칸 안에서의 가로 위치 (0~1)
+      dotV: Math.round((v||0)*1000)/1000,      // 칸 안에서의 세로 위치 (0~1)
+      reason: String(reason).trim(), at: serverTimestamp()
     });
     return { ok: true };
   },
@@ -294,7 +304,8 @@ async function loadMine(stage){
     catch(e){ return null; }
   };
   if(stage >= 2){ const r = await grab('responses');
-    if(r){ out.myVote = r.optId; out.myReason = r.reason; } }
+    if(r){ out.myVote = r.optId; out.myReason = r.reason;
+           out.myDot = { o:r.optId, u:(r.dotU||0.5), v:(r.dotV||0.5) }; } }
   if(stage >= 3){ const p = await grab('posts');
     if(p){ out.myPost = p.text; out.myChanged = p.changed; } }
   if(stage >= 4){ const g = await grab('sims');
@@ -452,7 +463,7 @@ function txt(x,y,s,anchor){
 }
 
 /** 보기 그림. optId: OPT_G / OPT_T / OPT_GT / OPT_GH */
-function optionSVG(optId){
+function optionParts(optId){
   const id = ++uid;
   const bx = tx(TR.tB), by = ty(TR.tB);
   // B점 접선 방향 단위벡터  (dx/dt, dy/dt) = (58, 30t)
@@ -468,12 +479,68 @@ function optionSVG(optId){
   if(hasT){ g += arrow(bx,by,bx+ux*70,by+uy*70,id) + txt(bx+80,by+64,'던진 힘'); }
   if(hasH){ g += arrow(bx,by,bx+78,by,id) + txt(bx+86,by-14,'던진 힘'); }
 
-  return '<svg viewBox="0 0 320 312" xmlns="http://www.w3.org/2000/svg" role="img">'
-    + '<defs><marker id="ah'+id+'" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5.5" '
+  const inner = '<defs><marker id="ah'+id+'" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5.5" '
     + 'markerHeight="5.5" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="var(--vec)"/></marker></defs>'
     + '<path d="'+trajD(0)+'" fill="none" stroke="#111820" stroke-width="2.6" stroke-dasharray="9 8" stroke-linecap="round"/>'
-    + ball(0,'A') + ball(TR.tC,'C') + ball(TR.tB,'B') + g
-    + '</svg>';
+    + ball(0,'A') + ball(TR.tC,'C') + ball(TR.tB,'B') + g;
+  return { inner: inner, svg: '<svg viewBox="0 0 320 312" xmlns="http://www.w3.org/2000/svg" role="img">'
+           + inner + '</svg>' };
+}
+
+/** 예전처럼 완성된 <svg> 하나가 필요할 때 */
+function optionSVG(optId){ return optionParts(optId).svg; }
+
+/* ── 점 찍기 판 ──────────────────────────────────────────
+ * 보기 네 칸을 한 장의 SVG 에 담는다. 좌표계가 하나뿐이라
+ * 화면 크기가 달라도 학생들이 찍은 점이 같은 자리에 겹친다.       */
+const BOARD = { cw:320, ch:312, lab:26, gap:16 };
+BOARD.w = BOARD.cw*2 + BOARD.gap;
+BOARD.h = (BOARD.ch + BOARD.lab)*2 + BOARD.gap;
+
+/** i번째 칸의 왼쪽 위 모서리 (그림 영역 기준) */
+function cellPos(i){
+  const col = i % 2, row = Math.floor(i / 2);
+  return { x: col*(BOARD.cw + BOARD.gap),
+           y: row*(BOARD.ch + BOARD.lab + BOARD.gap) + BOARD.lab };
+}
+
+/**
+ * order  : 칸에 놓을 보기 순서 (학생 화면은 섞인 순서, 공개 화면은 고정 순서)
+ * dots   : [{o:보기id, u:0~1, v:0~1}] — 찍힌 점들
+ * mine   : 내 점 (강조 표시)
+ * labels : 칸 위에 쓸 이름 배열
+ */
+function boardSVG(order, dots, mine, labels){
+  let g = '';
+  order.forEach(function(optId, i){
+    const c = cellPos(i);
+    g += '<text x="'+(c.x+2)+'" y="'+(c.y-9)+'" font-size="13" font-weight="700" '
+       + 'fill="var(--muted)" font-family="IBM Plex Mono,monospace">' + esc(labels[i]) + '</text>';
+    g += '<rect class="cellbox" data-opt="'+optId+'" data-i="'+i+'" '
+       + 'x="'+c.x+'" y="'+c.y+'" width="'+BOARD.cw+'" height="'+BOARD.ch+'" rx="12" '
+       + 'fill="#fff" stroke="var(--line)" stroke-width="1.5"/>';
+    g += '<g transform="translate('+c.x+','+c.y+')" style="pointer-events:none">'
+       + optionParts(optId).inner + '</g>';
+  });
+
+  // 남이 찍은 점 먼저, 내 점을 맨 위에
+  const place = function(d, own){
+    const i = order.indexOf(d.o);
+    if(i < 0) return '';
+    const c = cellPos(i);
+    const x = c.x + d.u*BOARD.cw, y = c.y + d.v*BOARD.ch;
+    return own
+      ? '<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="11" fill="var(--vec)" '
+        + 'stroke="#fff" stroke-width="3"/>'
+      : '<circle cx="'+x.toFixed(1)+'" cy="'+y.toFixed(1)+'" r="8" fill="rgba(17,80,200,.55)" '
+        + 'stroke="#fff" stroke-width="1.5"/>';
+  };
+  (dots||[]).forEach(function(d){ g += place(d, false); });
+  if(mine) g += place(mine, true);
+
+  return '<svg id="voteBoard" viewBox="0 0 '+BOARD.w+' '+BOARD.h+'" '
+       + 'xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block">'
+       + g + '</svg>';
 }
 
 /** 문제 그림(이미지 1) */
@@ -531,35 +598,33 @@ function renderProblem(b){
 /* ── 02 정답과 이유는? ──────────────────── */
 function renderVote(b, d){
   const order = S.order || OPTIONS.map(function(o){return o.id;});
-  const counts = d.counts ? d.counts.counts : null;
-  const total  = d.counts ? d.counts.total : 0;
+  const labels = order.map(function(_,i){ return '보기 ' + (i+1); });
 
-  let grid = '<div class="optgrid">';
-  order.forEach(function(id, i){
-    let stamp = '';
-    if(d.reveal && counts){
-      const c = counts[id] || 0;
-      const pct = total ? Math.round(c/total*100) : 0;
-      stamp = '<div class="stamp"><div class="num">'+c+'</div><div class="pct">'+pct+'%</div></div>';
-    }
-    grid += '<button class="opt' + (d.myVote===id?' sel':'') + (d.reveal?' static':'') + '" '
-          + 'data-opt="'+id+'" data-pos="'+(i+1)+'"'+(d.reveal?' disabled':'')+'>'
-          + '<div class="tag">보기 ' + (i+1) + '</div>' + optionSVG(id) + stamp + '</button>';
-  });
-  grid += '</div>';
-
+  // ── 결과 공개 화면 ──────────────────────────────────
   if(d.reveal){
-    b.innerHTML = eyebrow(2) + '<h1>우리 반의 투표 결과</h1>'
-      + '<p class="lede">숫자는 그 보기를 고른 사람 수입니다. 아직 정답은 공개하지 않습니다.</p>'
-      + '<div class="card">' + grid + '</div>'
-      + '<div class="note">내가 고른 것과 다른 보기를 고른 친구가 있다면, <b>왜 그렇게 생각했는지</b> 서로 물어보세요.</div>'
-      + (d.myReason ? '<div class="card"><h2 style="margin-top:0">내가 쓴 이유</h2><p style="margin:0;white-space:pre-wrap">'+esc(d.myReason)+'</p></div>' : '');
+    const canon  = OPTIONS.map(function(o){ return o.id; });   // 2·3·4·5번 순서
+    const cLabel = OPTIONS.map(function(o){ return o.no + '번'; });
+    const dots   = (d.counts && d.counts.dots) ? d.counts.dots : [];
+    const mine   = d.myDot || null;
+    b.innerHTML = eyebrow(2) + '<h1>우리 반이 찍은 점</h1>'
+      + '<p class="lede">친구들이 찍은 점을 한 화면에 모았습니다. '
+        + '<b class="mydot">빨간 점</b>이 내가 찍은 자리입니다. 아직 정답은 알려주지 않습니다.</p>'
+      + '<div class="card">' + boardSVG(canon, dots, mine, cLabel)
+        + '<p class="hint" style="margin-top:12px">모두 ' + dots.length + '명이 찍었습니다. '
+        + '왜 점이 여기저기 모였는지 이야기해 봅시다.</p>'
+      + '</div>';
     return;
   }
 
+  // ── 투표 화면 ────────────────────────────────────
+  const mine0 = d.myDot || null;
   b.innerHTML = eyebrow(2) + '<h1>정답과 이유는?</h1>'
-    + '<p class="lede">B 위치에서 공에 작용하는 힘을 바르게 나타낸 것을 하나 고르고, 그렇게 생각한 이유를 적어주세요.</p>'
-    + '<div class="card">' + grid
+    + '<p class="lede">B 위치에서 공에 작용하는 힘을 바르게 나타낸 그림을 찾아 '
+      + '<b>그 그림 위를 손가락(또는 마우스)으로 톡 찍어</b> 점을 남겨주세요. '
+      + '그리고 그렇게 생각한 이유를 적어주세요.</p>'
+    + '<div class="card">'
+      + '<div class="boardwrap">' + boardSVG(order, [], mine0, labels) + '</div>'
+      + '<div class="pickmsg" id="pickMsg"></div>'
       + '<label class="fld" for="reason">그렇게 생각한 이유</label>'
       + '<textarea id="reason" placeholder="예: 손을 떠난 뒤에도 앞으로 나아가니까…">'+esc(d.myReason||'')+'</textarea>'
       + '<div class="row" style="margin-top:14px">'
@@ -569,22 +634,61 @@ function renderVote(b, d){
       + '<div class="err hide" id="voteErr"></div>'
     + '</div>';
 
-  let picked = d.myVote || null, pickedPos = 0;
-  const btns = b.querySelectorAll('.opt');
-  btns.forEach(function(el){
-    el.onclick = function(){
-      btns.forEach(function(x){ x.classList.remove('sel'); });
-      el.classList.add('sel');
-      picked = el.dataset.opt; pickedPos = Number(el.dataset.pos);
+  let dot = mine0 ? { o:mine0.o, u:mine0.u, v:mine0.v } : null;
+  const svg = $('voteBoard');
+
+  const say = function(){
+    const el = $('pickMsg'); if(!el) return;
+    if(!dot){ el.textContent = '아직 점을 찍지 않았습니다.'; el.classList.remove('ok'); return; }
+    const i = order.indexOf(dot.o);
+    el.textContent = '보기 ' + (i+1) + ' 위에 점을 찍었습니다. 다른 곳을 다시 찍으면 옮길 수 있어요.';
+    el.classList.add('ok');
+  };
+  say();
+
+  /** 화면 좌표를 SVG 좌표로 바꾼다 */
+  const toBoard = function(ev){
+    const r = svg.getBoundingClientRect();
+    const t = (ev.touches && ev.touches[0]) || ev;
+    return { x: (t.clientX - r.left) / r.width  * BOARD.w,
+             y: (t.clientY - r.top ) / r.height * BOARD.h };
+  };
+
+  const redraw = function(){
+    const holder = svg.parentNode;
+    holder.innerHTML = boardSVG(order, [], dot, labels);
+    bind();
+  };
+
+  function bind(){
+    const el = $('voteBoard');
+    el.style.cursor = 'crosshair';
+    const onTap = function(ev){
+      const p = toBoard(ev);
+      for(let i=0;i<order.length;i++){
+        const c = cellPos(i);
+        if(p.x>=c.x && p.x<=c.x+BOARD.cw && p.y>=c.y && p.y<=c.y+BOARD.ch){
+          dot = { o: order[i],
+                  u: Math.min(1, Math.max(0, (p.x-c.x)/BOARD.cw)),
+                  v: Math.min(1, Math.max(0, (p.y-c.y)/BOARD.ch)) };
+          ev.preventDefault();
+          redraw(); say();
+          return;
+        }
+      }
     };
-  });
+    el.addEventListener('click', onTap);
+    el.addEventListener('touchstart', onTap, { passive:false });
+  }
+  bind();
+
   $('btnVote').onclick = function(){
     $('voteErr').classList.add('hide');
     const reason = $('reason').value.trim();
-    if(!picked){ showErr($('voteErr'),'보기를 하나 골라주세요.'); return; }
+    if(!dot){ showErr($('voteErr'),'그림 위를 찍어 점을 남겨주세요.'); return; }
     if(!reason){ showErr($('voteErr'),'그렇게 생각한 이유를 적어주세요.'); return; }
     $('btnVote').disabled = true; $('btnVote').textContent = '제출 중…';
-    call('submitVote', S.session, picked, reason, pickedPos)
+    call('submitVote', S.session, dot.o, reason, order.indexOf(dot.o)+1, dot.u, dot.v)
       .then(function(){ S.renderedKey=''; refreshMine(); })
       .catch(function(e){
         showErr($('voteErr'), e);
@@ -593,7 +697,6 @@ function renderVote(b, d){
   };
 }
 
-/* ── 03 토론 후 생각 작성 ────────────────── */
 function renderPost(b, d){
   const mine = d.myVote ? OPT[d.myVote] : null;
   b.innerHTML = eyebrow(3) + '<h1>토론 후 생각 작성</h1>'
