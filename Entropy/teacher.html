@@ -161,30 +161,29 @@ function render() {
   $("hRound").textContent = meta.round ? meta.round + "라운드" : "시작 전";
   $("nDone").textContent = phase === "lobby" ? 0 : list.length;
   $("nAll").textContent = nAll;
-  board.classList.toggle("open", phase !== "lobby");
+  board.classList.toggle("open", phase === "revealed");
 
   $("status").textContent =
-    phase === "lobby" ? "처음 상태입니다. 칸막이가 있어 분자 " + nAll + "개가 모두 왼쪽에 있습니다."
+    phase === "lobby" ? "처음 상태입니다. 분자 " + nAll + "개가 칸막이 왼쪽에 모여 있습니다."
     : phase === "selecting" ? (hidden ? "학생들이 위치를 정하는 중입니다. 선택한 칸은 숨겨져 있습니다." : "학생들이 위치를 정하는 중입니다. 선택된 칸이 연두색으로 표시됩니다.")
-    : "결과를 공개했습니다. 학생 화면에도 같은 결과가 보입니다.";
+    : "칸막이를 열어 결과를 공개했습니다. 학생 화면에도 같은 결과가 보입니다.";
 
+  setGas(board, phase === "revealed" ? revealedList(choices) : initialList(nAll), phase === "revealed");
   const counts = countCells(choices);
-  setDots(cells, phase === "lobby" ? initialCounts(nAll) : phase === "revealed" ? counts : {});
   const names = {};
   Object.entries(choices).forEach(([u, c]) => {
     const p = players[u];
     (names[c] = names[c] || []).push(p ? ((p.sid || "") + " " + (p.name || "")).trim() : "이름 없음");
   });
   for (let n = 1; n <= TOTAL; n++) {
-    const k = counts[n] || 0, show = phase !== "lobby" && !hidden && k > 0;
+    const show = phase !== "lobby" && !hidden && counts[n] > 0;
     cells[n].classList.toggle("picked", show);
     cells[n].title = show ? names[n].join(", ") : "";
-    cells[n].querySelector(".num").textContent = show && k > 1 && phase === "selecting" ? n + " ×" + k : n;
   }
 
   const nL = list.filter((c) => sideOf(c) === "L").length;
-  $("cL").textContent = phase === "lobby" ? nAll : hidden ? "" : nL;
-  $("cR").textContent = phase === "lobby" ? 0 : hidden ? "" : list.length - nL;
+  $("cL").textContent = phase === "revealed" ? nL : nAll;
+  $("cR").textContent = phase === "revealed" ? list.length - nL : 0;
 
   document.querySelectorAll(".seg button").forEach((b) => {
     b.classList.toggle("on", b.dataset.mode === meta.mode);
