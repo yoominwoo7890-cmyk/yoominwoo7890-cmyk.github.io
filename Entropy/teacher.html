@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>교사 화면 | 기체 확산과 엔트로피</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="wrap">
+  <p id="notice" class="notice" hidden>firebase-config.js에 Firebase 설정값을 넣어야 앱이 동작합니다.</p>
+
+  <section id="start" class="join">
+    <h1>교사 화면</h1>
+    <p class="sub">방을 만들면 학생에게 알려 줄 4자리 코드가 생깁니다.</p>
+    <p id="startErr" class="err"></p>
+    <button id="btnCreate" class="primary" disabled>방 만들기</button>
+  </section>
+
+  <section id="game" hidden>
+    <header class="bar">
+      <div><span class="room">방 코드<span id="hRoom" class="code"></span></span></div>
+      <div><span id="hRound" class="chip"></span> <button id="btnNew" class="ghost">새 방 만들기</button></div>
+    </header>
+    <div class="teacher">
+      <div>
+        <p id="status" class="status"></p>
+        <div class="sides"><span>왼쪽<b id="cL"></b></span><span></span><span>오른쪽<b id="cR"></b></span></div>
+        <div id="board" class="board"></div>
+        <section id="result" class="result" hidden>
+          <div class="scores">
+            <div class="now">이번 점수<span id="rScore" class="n"></span></div>
+            <div>누적 총점<span id="rTotal" class="n"></span></div>
+          </div>
+          <dl class="facts">
+            <dt>분포</dt><dd id="rSplit"></dd>
+            <dt>이 분포가 되는 경우의 수</dt><dd id="rWays"></dd>
+            <dt>무작위로 이 분포가 나올 확률</dt><dd id="rProb"></dd>
+          </dl>
+        </section>
+      </div>
+
+      <aside class="panel">
+        <div>
+          <h2>위치를 정하는 방식</h2>
+          <div class="seg">
+            <button id="mClick" data-mode="click">직접 선택</button>
+            <button id="mRandom" data-mode="random">무작위 번호</button>
+          </div>
+        </div>
+        <p class="count">제출 <b id="nDone">0</b> / 입장 <b id="nAll">0</b>명</p>
+        <label class="toggle"><input id="hide" type="checkbox"> 공개 전까지 선택한 칸 숨기기 (화면을 띄워 둘 때)</label>
+        <button id="btnStart" class="primary">라운드 시작</button>
+        <button id="btnReveal" class="primary" hidden>결과 보이기</button>
+
+        <div>
+          <h2>점수 기록</h2>
+          <p id="histEmpty" class="empty">아직 공개된 라운드가 없습니다.</p>
+          <table hidden><thead><tr><th>라운드</th><th>방식</th><th>왼쪽 : 오른쪽</th><th>점수</th><th>누적</th></tr></thead><tbody id="hist"></tbody></table>
+        </div>
+        <div>
+          <h2>방식별 평균 점수</h2>
+          <div class="avg">
+            <div>직접 선택<b id="avgClick">–</b></div>
+            <div>무작위 번호<b id="avgRandom">–</b></div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </section>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="common.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const board = $("board");
+const cells = buildBoard(board);
+let db, uid, code, roomRef, choicesRef;
+let meta = null, players = {}, choices = {}, results = {}, curKey = null;
+
+if (configReady()) {
+  firebase.initializeApp(window.firebaseConfig);
+  db = firebase.database();
+  firebase.auth().signInAnonymously().then(async (c) => {
+    uid = c.user.uid;
+    const saved = localStorage.getItem("entropy_teacher");
+    if (saved) {
+      const s = await db.ref("rooms/" + saved + "/meta").get();
+      if (s.exists() && s.val().teacherUid === uid) return open(saved);
+      localStorage.removeItem("entropy_teacher");
+    }
+    $("btnCreate").disabled = false;
+  }).catch(() => { $("startErr").textContent = "로그인에 실패했습니다. Firebase 콘솔에서 익명 로그인을 켰는지 확인하세요."; });
+}
+
+$("btnCreate").addEventListener("click", async () => {
+  $("btnCreate").disabled = true;
+  try {
+    for (let i = 0; i < 20; i++) {
+      const c = String(1000 + Math.floor(Math.random() * 9000));
+      const ref = db.ref("rooms/" + c + "/meta");
+      if ((await ref.get()).exists()) continue;
+      await ref.set({ teacherUid: uid, mode: "click", round: 0, roundKey: "r0", phase: "lobby", createdAt: Date.now() });
+      localStorage.setItem("entropy_teacher", c);
+      return open(c);
+    }
+    throw new Error();
+  } catch (e) {
+    $("startErr").textContent = "방을 만들지 못했습니다. 데이터베이스 규칙과 databaseURL을 확인하세요.";
+    $("btnCreate").disabled = false;
+  }
+});
+$("btnNew").addEventListener("click", () => {
+  if (confirm("지금 방을 닫고 새 방을 만들까요? 점수 기록은 이 화면에서 더 볼 수 없습니다.")) { localStorage.removeItem("entropy_teacher"); location.reload(); }
+});
+$("hide").addEventListener("change", render);
+document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => {
+  if (meta && meta.phase !== "selecting") roomRef.child("meta/mode").set(b.dataset.mode);
+}));
+$("btnStart").addEventListener("click", () => {
+  const next = meta.round + 1;
+  roomRef.child("meta").update({ round: next, roundKey: "r" + next, phase: "selecting" });
+});
+$("btnReveal").addEventListener("click", () => {
+  const list = Object.values(choices), n = list.length;
+  if (n === 0) return alert("아직 제출한 학생이 없습니다.");
+  const all = Object.keys(players).length;
+  if (n < all && !confirm("아직 " + (all - n) + "명이 제출하지 않았습니다. 그래도 공개할까요?")) return;
+  const nL = list.filter((c) => sideOf(c) === "L").length;
+  const upd = {};
+  upd["results/" + curKey] = { round: meta.round, mode: meta.mode, n, nL, nR: n - nL, score: calcScore(n, nL) };
+  upd["meta/phase"] = "revealed";
+  roomRef.update(upd);
+});
+
+function open(c) {
+  code = c; roomRef = db.ref("rooms/" + c);
+  $("start").hidden = true; $("game").hidden = false; $("hRoom").textContent = c;
+  roomRef.child("meta").on("value", (s) => {
+    meta = s.val(); if (!meta) return;
+    if (meta.roundKey !== curKey) {
+      if (choicesRef) choicesRef.off();
+      curKey = meta.roundKey; choices = {};
+      choicesRef = roomRef.child("choices/" + curKey);
+      choicesRef.on("value", (x) => { choices = x.val() || {}; render(); });
+    }
+    render();
+  });
+  roomRef.child("players").on("value", (s) => { players = s.val() || {}; render(); });
+  roomRef.child("results").on("value", (s) => { results = s.val() || {}; render(); });
+}
+
+function render() {
+  if (!meta) return;
+  const phase = meta.phase, nAll = Object.keys(players).length, list = Object.values(choices);
+  const hidden = $("hide").checked && phase === "selecting";
+  $("hRound").textContent = meta.round ? meta.round + "라운드" : "시작 전";
+  $("nDone").textContent = phase === "lobby" ? 0 : list.length;
+  $("nAll").textContent = nAll;
+  board.classList.toggle("open", phase !== "lobby");
+
+  $("status").textContent =
+    phase === "lobby" ? "처음 상태입니다. 칸막이가 있어 분자 " + nAll + "개가 모두 왼쪽에 있습니다."
+    : phase === "selecting" ? (hidden ? "학생들이 위치를 정하는 중입니다. 선택한 칸은 숨겨져 있습니다." : "학생들이 위치를 정하는 중입니다. 선택된 칸이 연두색으로 표시됩니다.")
+    : "결과를 공개했습니다. 학생 화면에도 같은 결과가 보입니다.";
+
+  const counts = countCells(choices);
+  setDots(cells, phase === "lobby" ? initialCounts(nAll) : phase === "revealed" ? counts : {});
+  const names = {};
+  Object.entries(choices).forEach(([u, c]) => {
+    const p = players[u];
+    (names[c] = names[c] || []).push(p ? ((p.sid || "") + " " + (p.name || "")).trim() : "이름 없음");
+  });
+  for (let n = 1; n <= TOTAL; n++) {
+    const k = counts[n] || 0, show = phase !== "lobby" && !hidden && k > 0;
+    cells[n].classList.toggle("picked", show);
+    cells[n].title = show ? names[n].join(", ") : "";
+    cells[n].querySelector(".num").textContent = show && k > 1 && phase === "selecting" ? n + " ×" + k : n;
+  }
+
+  const nL = list.filter((c) => sideOf(c) === "L").length;
+  $("cL").textContent = phase === "lobby" ? nAll : hidden ? "" : nL;
+  $("cR").textContent = phase === "lobby" ? 0 : hidden ? "" : list.length - nL;
+
+  document.querySelectorAll(".seg button").forEach((b) => {
+    b.classList.toggle("on", b.dataset.mode === meta.mode);
+    b.disabled = phase === "selecting";
+  });
+  $("btnStart").hidden = phase === "selecting";
+  $("btnStart").textContent = meta.round ? "다음 라운드 시작" : "라운드 시작";
+  $("btnReveal").hidden = phase !== "selecting";
+
+  const r = results[curKey];
+  $("result").hidden = !(phase === "revealed" && r);
+  if (phase === "revealed" && r) renderResult(r, results);
+  renderHistory($("hist"), $("histEmpty"), results);
+  ["click", "random"].forEach((m) => {
+    const rs = sortedResults(results).filter((x) => x.mode === m);
+    $(m === "click" ? "avgClick" : "avgRandom").textContent = rs.length ? (rs.reduce((s, x) => s + x.score, 0) / rs.length).toFixed(1) + "점" : "–";
+  });
+}
+</script>
+</body>
+</html>
