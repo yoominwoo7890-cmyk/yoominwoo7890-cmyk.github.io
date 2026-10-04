@@ -156,32 +156,29 @@ function render() {
   const phase = meta.phase, mode = meta.mode, done = myChoice && !rolling;
   $("hRound").textContent = meta.round ? meta.round + "라운드" : "시작 전";
   $("hMode").textContent = MODE_NAME[mode];
-  board.classList.toggle("open", phase !== "lobby");
+  const spread = phase === "revealed" && allChoices;
+  board.classList.toggle("open", !!spread);
   board.classList.toggle("pickable", phase === "selecting" && mode === "click" && !myChoice);
 
-  let counts = {}, status = "";
+  let status = "";
   if (phase === "lobby") {
-    counts = initialCounts(playerCount);
-    status = "칸막이가 있어서 분자 " + playerCount + "개가 모두 왼쪽에 있어요. 선생님이 시작하기를 기다리세요.";
+    status = "분자 " + playerCount + "개가 칸막이 왼쪽에 모여 있어요. 선생님이 시작하기를 기다리세요.";
   } else if (phase === "selecting") {
-    if (done) status = myChoice + "번 칸에 분자를 놓았어요. 결과 공개를 기다리세요.";
-    else if (mode === "click") status = pending ? pending + "번 칸을 골랐어요. 놓으려면 아래 버튼을 누르세요." : "칸막이가 사라졌어요. 분자를 놓을 칸을 누르세요.";
-    else status = rolling ? "번호를 뽑는 중…" : "칸막이가 사라졌어요. 번호를 뽑아 분자의 위치를 정하세요.";
+    if (done) status = myChoice + "번 칸을 정했어요. 칸막이가 열리기를 기다리세요.";
+    else if (mode === "click") status = pending ? pending + "번 칸을 골랐어요. 정하려면 아래 버튼을 누르세요." : "칸막이가 열리면 내 분자는 어디로 갈까요? 실린더 안의 칸을 누르세요.";
+    else status = rolling ? "번호를 뽑는 중…" : "칸막이가 열리면 내 분자가 갈 칸을 번호 뽑기로 정하세요.";
   } else {
-    counts = countCells(allChoices);
-    status = myChoice ? "결과가 공개됐어요. 내 분자는 " + myChoice + "번 칸(주황 테두리)에 있어요." : "결과가 공개됐어요.";
+    status = myChoice ? "칸막이가 열리고 기체가 퍼졌어요. 내 분자(주황색)는 " + myChoice + "번 칸에 있어요." : "칸막이가 열리고 기체가 퍼졌어요.";
   }
   $("status").textContent = status;
-  setDots(cells, counts);
-  for (let n = 1; n <= TOTAL; n++) {
+  setGas(board, spread ? revealedList(allChoices, uid) : initialList(playerCount), phase === "revealed");
+  for (let n = 1; n <= TOTAL; n++)
     cells[n].classList.toggle("sel", phase === "selecting" && (done ? myChoice === n : pending === n));
-    cells[n].classList.toggle("mine", phase === "revealed" && myChoice === n);
-  }
 
   const r = results[curKey];
   const showSplit = phase === "revealed" && r;
-  $("cL").textContent = phase === "lobby" ? playerCount : showSplit ? r.nL : "";
-  $("cR").textContent = phase === "lobby" ? 0 : showSplit ? r.nR : "";
+  $("cL").textContent = showSplit ? r.nL : playerCount;
+  $("cR").textContent = showSplit ? r.nR : 0;
 
   const acting = phase === "selecting" && !done;
   $("actions").hidden = !(phase === "selecting" && (acting || mode === "random"));
@@ -189,7 +186,7 @@ function render() {
   if (mode === "random" && !rolling) $("roll").textContent = myChoice || "?";
   const btn = $("btnAct");
   btn.hidden = !acting;
-  btn.textContent = mode === "click" ? "이 칸에 분자 놓기" : "번호 뽑기";
+  btn.textContent = mode === "click" ? "이 칸으로 정하기" : "번호 뽑기";
   btn.disabled = rolling || (mode === "click" && !pending);
 
   $("result").hidden = !showSplit;
