@@ -1,1 +1,201 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>기체 확산과 엔트로피</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="wrap">
+  <p id="notice" class="notice" hidden>firebase-config.js에 Firebase 설정값을 넣어야 앱이 동작합니다.</p>
 
+  <section id="join" class="join">
+    <h1>기체 확산과 엔트로피</h1>
+    <p class="sub">선생님이 알려 준 방 코드로 들어가세요.</p>
+    <label for="inCode">방 코드</label>
+    <input id="inCode" type="text" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="숫자 4자리">
+    <label for="inSid">학번</label>
+    <input id="inSid" type="text" inputmode="numeric" maxlength="10" autocomplete="off" placeholder="예: 20315">
+    <label for="inName">이름</label>
+    <input id="inName" type="text" maxlength="12" autocomplete="off" placeholder="예: 김하늘">
+    <p id="joinErr" class="err"></p>
+    <button id="btnJoin" class="primary">입장하기</button>
+  </section>
+
+  <section id="game" hidden>
+    <header class="bar">
+      <div><span class="room">방 <span id="hRoom"></span></span> <span id="hRound" class="sub"></span></div>
+      <div><span id="hMode" class="chip"></span> <button id="btnLeave" class="ghost">나가기</button></div>
+    </header>
+    <p id="status" class="status"></p>
+    <div class="sides"><span>왼쪽<b id="cL"></b></span><span></span><span>오른쪽<b id="cR"></b></span></div>
+    <div id="board" class="board"></div>
+    <div id="actions" class="actions" hidden>
+      <div id="roll" class="roll" hidden>?</div>
+      <button id="btnAct" class="primary"></button>
+    </div>
+
+    <section id="result" class="result" hidden>
+      <div class="scores">
+        <div class="now">이번 점수<span id="rScore" class="n"></span></div>
+        <div>누적 총점<span id="rTotal" class="n"></span></div>
+      </div>
+      <dl class="facts">
+        <dt>분포</dt><dd id="rSplit"></dd>
+        <dt>이 분포가 되는 경우의 수</dt><dd id="rWays"></dd>
+        <dt>무작위로 이 분포가 나올 확률</dt><dd id="rProb"></dd>
+      </dl>
+    </section>
+
+    <section class="history">
+      <h2>우리 반 점수 기록</h2>
+      <p id="histEmpty" class="empty">아직 공개된 라운드가 없어요.</p>
+      <table hidden><thead><tr><th>라운드</th><th>방식</th><th>왼쪽 : 오른쪽</th><th>점수</th><th>누적</th></tr></thead><tbody id="hist"></tbody></table>
+    </section>
+  </section>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="common.js"></script>
+<script>
+const $ = (id) => document.getElementById(id);
+const board = $("board");
+let db, uid, code, roomRef, choiceRef;
+let meta = null, results = {}, playerCount = 0;
+let myChoice = null, pending = null, allChoices = null, curKey = null, rolling = false;
+const cells = buildBoard(board, onCell);
+
+if (configReady()) {
+  firebase.initializeApp(window.firebaseConfig);
+  db = firebase.database();
+  firebase.auth().signInAnonymously().then((c) => {
+    uid = c.user.uid;
+    const saved = JSON.parse(localStorage.getItem("entropy_student") || "null");
+    if (saved) { $("inCode").value = saved.code; $("inSid").value = saved.sid || ""; $("inName").value = saved.name; if (saved.sid) join(); }
+  }).catch(() => { $("joinErr").textContent = "로그인에 실패했어요. Firebase 콘솔에서 익명 로그인을 켰는지 확인하세요."; });
+}
+$("btnJoin").addEventListener("click", join);
+$("btnLeave").addEventListener("click", () => { localStorage.removeItem("entropy_student"); location.reload(); });
+$("btnAct").addEventListener("click", onAct);
+
+async function join() {
+  const c = $("inCode").value.trim(), sid = $("inSid").value.trim(), name = $("inName").value.trim();
+  if (!uid) return;
+  if (!/^\d{4}$/.test(c)) return ($("joinErr").textContent = "방 코드는 숫자 4자리예요.");
+  if (!/^\d{1,10}$/.test(sid)) return ($("joinErr").textContent = "학번을 숫자로 입력하세요.");
+  if (!name) return ($("joinErr").textContent = "이름을 입력하세요.");
+  const ref = db.ref("rooms/" + c);
+  const snap = await ref.child("meta").get();
+  if (!snap.exists()) { localStorage.removeItem("entropy_student"); return ($("joinErr").textContent = c + " 방을 찾을 수 없어요. 코드를 다시 확인하세요."); }
+  code = c; roomRef = ref;
+  await ref.child("players/" + uid).set({ sid, name });
+  localStorage.setItem("entropy_student", JSON.stringify({ code: c, sid, name }));
+  $("join").hidden = true; $("game").hidden = false; $("hRoom").textContent = c;
+  ref.child("meta").on("value", onMeta);
+  ref.child("results").on("value", (s) => { results = s.val() || {}; render(); });
+  ref.child("players").on("value", (s) => { playerCount = s.numChildren(); render(); });
+}
+
+function onMeta(s) {
+  meta = s.val();
+  if (!meta) return;
+  if (meta.roundKey !== curKey) {
+    if (choiceRef) choiceRef.off();
+    curKey = meta.roundKey; myChoice = null; pending = null; allChoices = null;
+    choiceRef = roomRef.child("choices/" + curKey + "/" + uid);
+    choiceRef.on("value", (c) => { myChoice = c.val(); render(); });
+  }
+  if (meta.phase === "revealed" && !allChoices) {
+    roomRef.child("choices/" + curKey).get().then((c) => { allChoices = c.val() || {}; render(); }).catch(() => {});
+  }
+  render();
+}
+
+function onCell(n) {
+  if (!meta || meta.phase !== "selecting" || meta.mode !== "click" || myChoice) return;
+  pending = n; render();
+}
+
+function onAct() {
+  if (!meta || meta.phase !== "selecting" || myChoice || rolling) return;
+  if (meta.mode === "click") {
+    if (pending) choiceRef.set(pending).catch(() => {});
+  } else {
+    roll();
+  }
+}
+
+// 무작위 번호: 결과를 먼저 저장하고(다시 뽑기 방지) 숫자가 빠르게 바뀌다 멈추는 연출을 보여 준다
+function roll() {
+  const buf = new Uint32Array(1); crypto.getRandomValues(buf);
+  const final = (buf[0] % TOTAL) + 1;
+  rolling = true; render();
+  choiceRef.set(final).catch(() => {});
+  const rollEl = $("roll");
+  rollEl.classList.remove("done");
+  let delay = 45, last = 0;
+  const tick = () => {
+    if (last) cells[last].classList.remove("flash");
+    if (delay > 420) {
+      rollEl.textContent = final; rollEl.classList.add("done");
+      rolling = false; myChoice = final; render(); return;
+    }
+    last = 1 + Math.floor(Math.random() * TOTAL);
+    rollEl.textContent = last; cells[last].classList.add("flash");
+    delay *= 1.11; setTimeout(tick, delay);
+  };
+  tick();
+}
+
+function render() {
+  if (!meta) return;
+  const phase = meta.phase, mode = meta.mode, done = myChoice && !rolling;
+  $("hRound").textContent = meta.round ? meta.round + "라운드" : "시작 전";
+  $("hMode").textContent = MODE_NAME[mode];
+  board.classList.toggle("open", phase !== "lobby");
+  board.classList.toggle("pickable", phase === "selecting" && mode === "click" && !myChoice);
+
+  let counts = {}, status = "";
+  if (phase === "lobby") {
+    counts = initialCounts(playerCount);
+    status = "칸막이가 있어서 분자 " + playerCount + "개가 모두 왼쪽에 있어요. 선생님이 시작하기를 기다리세요.";
+  } else if (phase === "selecting") {
+    if (done) status = myChoice + "번 칸에 분자를 놓았어요. 결과 공개를 기다리세요.";
+    else if (mode === "click") status = pending ? pending + "번 칸을 골랐어요. 놓으려면 아래 버튼을 누르세요." : "칸막이가 사라졌어요. 분자를 놓을 칸을 누르세요.";
+    else status = rolling ? "번호를 뽑는 중…" : "칸막이가 사라졌어요. 번호를 뽑아 분자의 위치를 정하세요.";
+  } else {
+    counts = countCells(allChoices);
+    status = myChoice ? "결과가 공개됐어요. 내 분자는 " + myChoice + "번 칸(주황 테두리)에 있어요." : "결과가 공개됐어요.";
+  }
+  $("status").textContent = status;
+  setDots(cells, counts);
+  for (let n = 1; n <= TOTAL; n++) {
+    cells[n].classList.toggle("sel", phase === "selecting" && (done ? myChoice === n : pending === n));
+    cells[n].classList.toggle("mine", phase === "revealed" && myChoice === n);
+  }
+
+  const r = results[curKey];
+  const showSplit = phase === "revealed" && r;
+  $("cL").textContent = phase === "lobby" ? playerCount : showSplit ? r.nL : "";
+  $("cR").textContent = phase === "lobby" ? 0 : showSplit ? r.nR : "";
+
+  const acting = phase === "selecting" && !done;
+  $("actions").hidden = !(phase === "selecting" && (acting || mode === "random"));
+  $("roll").hidden = mode !== "random";
+  if (mode === "random" && !rolling) $("roll").textContent = myChoice || "?";
+  const btn = $("btnAct");
+  btn.hidden = !acting;
+  btn.textContent = mode === "click" ? "이 칸에 분자 놓기" : "번호 뽑기";
+  btn.disabled = rolling || (mode === "click" && !pending);
+
+  $("result").hidden = !showSplit;
+  if (showSplit) renderResult(r, results);
+  renderHistory($("hist"), $("histEmpty"), results);
+}
+</script>
+</body>
+</html>
