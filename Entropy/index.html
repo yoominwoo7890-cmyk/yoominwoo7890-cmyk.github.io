@@ -66,7 +66,7 @@
 const $ = (id) => document.getElementById(id);
 const board = $("board");
 let db, uid, code, roomRef, choiceRef;
-let meta = null, results = {}, playerCount = 0;
+let meta = null, results = {}, playerCount = 0, playerIds = [], prevChoices = null;
 let myChoice = null, pending = null, allChoices = null, curKey = null, rolling = false, sendErr = "";
 const cells = buildBoard(board, onCell);
 
@@ -98,7 +98,7 @@ async function join() {
   $("join").hidden = true; $("game").hidden = false; $("hRoom").textContent = c;
   ref.child("meta").on("value", onMeta);
   ref.child("results").on("value", (s) => { results = s.val() || {}; render(); });
-  ref.child("players").on("value", (s) => { playerCount = s.numChildren(); render(); });
+  ref.child("players").on("value", (s) => { playerIds = Object.keys(s.val() || {}).sort(); playerCount = playerIds.length; render(); });
 }
 
 function onMeta(s) {
@@ -106,6 +106,9 @@ function onMeta(s) {
   if (!meta) return;
   if (meta.roundKey !== curKey) {
     if (choiceRef) choiceRef.off();
+    prevChoices = allChoices;   // 지난 라운드의 분자 위치를 이어서 쓴다
+    if (!prevChoices && meta.round > 1)
+      roomRef.child("choices/r" + (meta.round - 1)).get().then((c) => { prevChoices = c.val(); render(); }).catch(() => {});
     curKey = meta.roundKey; myChoice = null; pending = null; allChoices = null; sendErr = "";
     choiceRef = roomRef.child("choices/" + curKey + "/" + uid);
     choiceRef.on("value", (c) => { myChoice = c.val(); render(); }, () => {});
@@ -167,7 +170,7 @@ function roll() {
 function render() {
   if (!meta) return;
   const phase = meta.phase, mode = meta.mode, done = myChoice && !rolling;
-  $("hRound").textContent = phase === "lobby" ? meta.round + 1 + "라운드 준비" : meta.round + "라운드";
+  $("hRound").textContent = meta.round ? meta.round + "라운드" : "시작 전";
   $("hMode").textContent = MODE_NAME[mode];
   const spread = phase === "revealed" && allChoices;
   board.classList.toggle("open", phase !== "lobby");
@@ -175,24 +178,26 @@ function render() {
   board.classList.toggle("pickable", phase === "selecting" && mode === "click" && !myChoice);
 
   let status = "";
+  const lead = meta.round > 1 ? "분자는 계속 움직여요. " : "칸막이가 열렸어요. ";
   if (phase === "lobby") {
     status = "분자 " + playerCount + "개가 칸막이 왼쪽에 모여 있어요. 선생님이 칸막이를 열기를 기다리세요.";
   } else if (phase === "selecting") {
     if (done) status = myChoice + "번 칸을 정했어요. 결과 공개를 기다리세요.";
-    else if (mode === "click") status = pending ? pending + "번 칸을 골랐어요. 정하려면 아래 버튼을 누르세요." : "칸막이가 열렸어요. 내 분자가 갈 칸을 실린더 안에서 누르세요.";
-    else status = rolling ? "번호를 뽑는 중…" : "칸막이가 열렸어요. 번호 뽑기로 내 분자가 갈 칸을 정하세요.";
+    else if (mode === "click") status = pending ? pending + "번 칸을 골랐어요. 정하려면 아래 버튼을 누르세요." : lead + "내 분자(주황색)가 갈 칸을 실린더 안에서 누르세요.";
+    else status = rolling ? "번호를 뽑는 중…" : lead + "번호 뽑기로 내 분자(주황색)가 갈 칸을 정하세요.";
   } else {
     status = myChoice ? "기체가 실린더 전체로 퍼졌어요. 내 분자(주황색)는 " + myChoice + "번 칸에 있어요." : "기체가 실린더 전체로 퍼졌어요.";
   }
   $("status").textContent = status;
-  setGas(board, spread ? revealedList(allChoices, uid) : initialList(playerCount), phase === "revealed");
+  const list = spread ? gasList(allChoices, uid) : meta.round > 1 && prevChoices ? gasList(prevChoices, uid) : initialList(playerIds, uid);
+  setGas(board, list, phase === "revealed");
   for (let n = 1; n <= TOTAL; n++)
     cells[n].classList.toggle("sel", phase === "selecting" && (done ? myChoice === n : pending === n));
 
   const r = results[curKey];
   const showSplit = phase === "revealed" && r;
-  $("cL").textContent = showSplit ? r.nL : playerCount;
-  $("cR").textContent = showSplit ? r.nR : 0;
+  $("cL").textContent = leftCount(list);
+  $("cR").textContent = list.length - leftCount(list);
 
   const acting = phase === "selecting" && !done;
   $("actions").hidden = !(phase === "selecting" && (acting || mode === "random"));
