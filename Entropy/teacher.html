@@ -80,7 +80,7 @@ const $ = (id) => document.getElementById(id);
 const board = $("board");
 const cells = buildBoard(board);
 let db, uid, code, roomRef, choicesRef;
-let meta = null, players = {}, choices = {}, results = {}, curKey = null;
+let meta = null, players = {}, choices = {}, results = {}, curKey = null, prevChoices = null;
 
 if (configReady()) {
   firebase.initializeApp(window.firebaseConfig);
@@ -122,7 +122,6 @@ document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("clic
   if (meta && meta.phase !== "selecting") roomRef.child("meta/mode").set(b.dataset.mode);
 }));
 $("btnStart").addEventListener("click", () => {
-  if (meta.phase === "revealed") return roomRef.child("meta/phase").set("lobby");   // 다음 라운드 준비: 처음 상태로
   const next = meta.round + 1;
   roomRef.child("meta").update({ round: next, roundKey: "r" + next, phase: "selecting" });   // 칸막이 열기
 });
@@ -145,6 +144,10 @@ function open(c) {
     meta = s.val(); if (!meta) return;
     if (meta.roundKey !== curKey) {
       if (choicesRef) choicesRef.off();
+      const had = curKey !== null;
+      prevChoices = had ? choices : null;   // 지난 라운드의 분자 위치를 이어서 쓴다
+      if (!had && meta.round > 1)
+        roomRef.child("choices/r" + (meta.round - 1)).get().then((x) => { prevChoices = x.val(); render(); }).catch(() => {});
       curKey = meta.roundKey; choices = {};
       choicesRef = roomRef.child("choices/" + curKey);
       choicesRef.on("value", (x) => { choices = x.val() || {}; render(); }, (e) => alert("학생 응답을 읽지 못했습니다. 데이터베이스 규칙을 확인하세요: " + (e.code || e.message)));
@@ -159,7 +162,7 @@ function render() {
   if (!meta) return;
   const phase = meta.phase, nAll = Object.keys(players).length, list = Object.values(choices);
   const hidden = $("hide").checked && phase === "selecting";
-  $("hRound").textContent = phase === "lobby" ? meta.round + 1 + "라운드 준비" : meta.round + "라운드";
+  $("hRound").textContent = meta.round ? meta.round + "라운드" : "시작 전";
   $("nDone").textContent = phase === "lobby" ? 0 : list.length;
   if (phase === "lobby") list.length = 0;
   $("nAll").textContent = nAll;
@@ -167,10 +170,12 @@ function render() {
 
   $("status").textContent =
     phase === "lobby" ? "처음 상태입니다. 분자 " + nAll + "개가 칸막이 왼쪽에 모여 있습니다. '칸막이 열기'를 누르세요."
-    : phase === "selecting" ? (hidden ? "칸막이를 열었습니다. 학생들이 위치를 정하는 중이며, 선택한 칸은 숨겨져 있습니다." : "칸막이를 열었습니다. 학생들이 정한 칸이 연두색으로 표시됩니다.")
+    : phase === "selecting" ? (hidden ? "학생들이 다음 위치를 정하는 중이며, 선택한 칸은 숨겨져 있습니다." : "학생들이 다음 위치를 정하는 중입니다. 정한 칸이 연두색으로 표시됩니다.")
     : "결과를 공개했습니다. 학생 화면에도 같은 결과가 보입니다.";
 
-  setGas(board, phase === "revealed" ? revealedList(choices) : initialList(nAll), phase === "revealed");
+  const ids = Object.keys(players).sort();
+  const gas = phase === "revealed" ? gasList(choices) : meta.round > 1 && prevChoices ? gasList(prevChoices) : initialList(ids);
+  setGas(board, gas, phase === "revealed");
   const counts = countCells(choices);
   const names = {};
   Object.entries(choices).forEach(([u, c]) => {
@@ -183,16 +188,15 @@ function render() {
     cells[n].title = show ? names[n].join(", ") : "";
   }
 
-  const nL = list.filter((c) => sideOf(c) === "L").length;
-  $("cL").textContent = phase === "revealed" ? nL : nAll;
-  $("cR").textContent = phase === "revealed" ? list.length - nL : 0;
+  $("cL").textContent = leftCount(gas);
+  $("cR").textContent = gas.length - leftCount(gas);
 
   document.querySelectorAll(".seg button").forEach((b) => {
     b.classList.toggle("on", b.dataset.mode === meta.mode);
     b.disabled = phase === "selecting";
   });
   $("btnStart").hidden = phase === "selecting";
-  $("btnStart").textContent = phase === "revealed" ? "다음 라운드 준비" : "칸막이 열기";
+  $("btnStart").textContent = phase === "revealed" ? "다음 라운드 시작" : "칸막이 열기";
   $("btnReveal").hidden = phase !== "selecting";
 
   const r = results[curKey];
