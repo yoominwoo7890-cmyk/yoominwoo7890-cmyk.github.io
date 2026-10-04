@@ -50,7 +50,7 @@
         </div>
         <p class="count">제출 <b id="nDone">0</b> / 입장 <b id="nAll">0</b>명</p>
         <label class="toggle"><input id="hide" type="checkbox"> 공개 전까지 선택한 칸 숨기기 (화면을 띄워 둘 때)</label>
-        <button id="btnStart" class="primary">라운드 시작</button>
+        <button id="btnStart" class="primary">칸막이 열기</button>
         <button id="btnReveal" class="primary" hidden>결과 보이기</button>
 
         <div>
@@ -80,7 +80,7 @@ const $ = (id) => document.getElementById(id);
 const board = $("board");
 const cells = buildBoard(board);
 let db, uid, code, roomRef, choicesRef;
-let meta = null, players = {}, choices = {}, results = {}, curKey = null, openAt = 0;
+let meta = null, players = {}, choices = {}, results = {}, curKey = null;
 
 if (configReady()) {
   firebase.initializeApp(window.firebaseConfig);
@@ -122,8 +122,9 @@ document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("clic
   if (meta && meta.phase !== "selecting") roomRef.child("meta/mode").set(b.dataset.mode);
 }));
 $("btnStart").addEventListener("click", () => {
+  if (meta.phase === "revealed") return roomRef.child("meta/phase").set("lobby");   // 다음 라운드 준비: 처음 상태로
   const next = meta.round + 1;
-  roomRef.child("meta").update({ round: next, roundKey: "r" + next, phase: "selecting" });
+  roomRef.child("meta").update({ round: next, roundKey: "r" + next, phase: "selecting" });   // 칸막이 열기
 });
 $("btnReveal").addEventListener("click", () => {
   const list = Object.values(choices), n = list.length;
@@ -145,7 +146,6 @@ function open(c) {
     if (meta.roundKey !== curKey) {
       if (choicesRef) choicesRef.off();
       curKey = meta.roundKey; choices = {};
-      if (meta.phase === "selecting") { openAt = Date.now() + 1500; setTimeout(render, 1550); }
       choicesRef = roomRef.child("choices/" + curKey);
       choicesRef.on("value", (x) => { choices = x.val() || {}; render(); }, (e) => alert("학생 응답을 읽지 못했습니다. 데이터베이스 규칙을 확인하세요: " + (e.code || e.message)));
     }
@@ -159,14 +159,15 @@ function render() {
   if (!meta) return;
   const phase = meta.phase, nAll = Object.keys(players).length, list = Object.values(choices);
   const hidden = $("hide").checked && phase === "selecting";
-  $("hRound").textContent = meta.round ? meta.round + "라운드" : "시작 전";
+  $("hRound").textContent = phase === "lobby" ? meta.round + 1 + "라운드 준비" : meta.round + "라운드";
   $("nDone").textContent = phase === "lobby" ? 0 : list.length;
+  if (phase === "lobby") list.length = 0;
   $("nAll").textContent = nAll;
-  board.classList.toggle("open", phase === "revealed" || (phase === "selecting" && Date.now() >= openAt));
+  board.classList.toggle("open", phase !== "lobby");
 
   $("status").textContent =
-    phase === "lobby" ? "처음 상태입니다. 분자 " + nAll + "개가 칸막이 왼쪽에 모여 있습니다."
-    : phase === "selecting" ? (hidden ? "칸막이를 치웠습니다. 학생들이 위치를 정하는 중이며, 선택한 칸은 숨겨져 있습니다." : "칸막이를 치웠습니다. 학생들이 정한 칸이 연두색으로 표시됩니다.")
+    phase === "lobby" ? "처음 상태입니다. 분자 " + nAll + "개가 칸막이 왼쪽에 모여 있습니다. '칸막이 열기'를 누르세요."
+    : phase === "selecting" ? (hidden ? "칸막이를 열었습니다. 학생들이 위치를 정하는 중이며, 선택한 칸은 숨겨져 있습니다." : "칸막이를 열었습니다. 학생들이 정한 칸이 연두색으로 표시됩니다.")
     : "결과를 공개했습니다. 학생 화면에도 같은 결과가 보입니다.";
 
   setGas(board, phase === "revealed" ? revealedList(choices) : initialList(nAll), phase === "revealed");
@@ -191,7 +192,7 @@ function render() {
     b.disabled = phase === "selecting";
   });
   $("btnStart").hidden = phase === "selecting";
-  $("btnStart").textContent = meta.round ? "다음 라운드 시작" : "라운드 시작";
+  $("btnStart").textContent = phase === "revealed" ? "다음 라운드 준비" : "칸막이 열기";
   $("btnReveal").hidden = phase !== "selecting";
 
   const r = results[curKey];
