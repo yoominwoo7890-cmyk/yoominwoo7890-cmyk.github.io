@@ -1,5 +1,6 @@
 // 학생·교사 화면이 함께 쓰는 코드
-const HALF = 36, TOTAL = 72;
+// 격자 크기: 한쪽 영역이 COLS x ROWS 칸. 바꾸면 database.rules.json의 최댓값(450)도 함께 바꾸세요.
+const COLS = 15, ROWS = 15, HALF = COLS * ROWS, TOTAL = HALF * 2;
 const MODE_NAME = { click: "직접 선택", random: "무작위 번호" };
 
 function lnC(n, k) { let s = 0; for (let i = 1; i <= k; i++) s += Math.log(n - k + i) - Math.log(i); return s; }
@@ -21,38 +22,68 @@ function fmtProb(n, k) {
 }
 const sideOf = (cell) => (cell <= HALF ? "L" : "R");
 
-// 격자 만들기: cells[1..72] 반환 (왼쪽 1~36, 오른쪽 37~72)
+// 실린더 만들기: cells[1..TOTAL] 반환 (왼쪽 1~HALF, 오른쪽 HALF+1~TOTAL)
 function buildBoard(board, onClick) {
   const cells = [];
   const make = (start) => {
     const half = document.createElement("div");
     half.className = "half";
+    half.style.gridTemplateColumns = "repeat(" + COLS + ",1fr)";
     for (let i = 0; i < HALF; i++) {
       const n = start + i;
       const c = document.createElement("button");
-      c.type = "button"; c.className = "cell";
-      c.innerHTML = '<span class="num">' + n + '</span><span class="dot"></span>';
+      c.type = "button"; c.className = "cell"; c.tabIndex = -1;
+      c.innerHTML = '<span class="num">' + n + "</span>";
       c.setAttribute("aria-label", n + "번 칸");
       if (onClick) c.addEventListener("click", () => onClick(n));
       cells[n] = c; half.appendChild(c);
     }
     return half;
   };
-  const wall = document.createElement("div"); wall.className = "wall";
-  board.append(make(1), wall, make(HALF + 1));
+  const halves = document.createElement("div"); halves.className = "halves";
+  const gap = document.createElement("div"); gap.className = "gap";
+  gap.innerHTML = '<div class="handle"></div><div class="wall"></div>';   // 칸막이와 손잡이
+  halves.append(make(1), gap, make(HALF + 1));
+  const gas = document.createElement("div"); gas.className = "gas";
+  board.append(halves, gas);
+  board._cells = cells; board._gas = gas; board._mols = new Map(); board._list = [];
+  new ResizeObserver(() => {
+    const w = cells[1].getBoundingClientRect().width;
+    board.style.setProperty("--cs", w + "px");
+    board.classList.toggle("tiny", w < 20);
+    layoutGas(board, false);
+  }).observe(board);
   return cells;
 }
-// counts: {칸 번호: 분자 수}
-function setDots(cells, counts) {
-  for (let n = 1; n <= TOTAL; n++) {
-    const k = (counts && counts[n]) || 0;
-    cells[n].classList.toggle("has", k > 0);
-    cells[n].querySelector(".dot").textContent = k > 1 ? k : "";
-  }
+function rnd(i, k) { const x = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return x - Math.floor(x); }
+// list: [{cell, mine}] — 분자를 칸 위에 그린다. animate가 true면 이전 위치에서 새 위치로 움직인다.
+function setGas(board, list, animate) { board._list = list; layoutGas(board, animate); }
+function layoutGas(board, animate) {
+  const gas = board._gas, mols = board._mols, g = gas.getBoundingClientRect();
+  if (!g.width) return;
+  gas.classList.toggle("noanim", !animate);
+  board._list.forEach((m, i) => {
+    let el = mols.get(i);
+    if (!el) {
+      el = document.createElement("i"); el.className = "mol";
+      el.style.animationDelay = -rnd(i, 3) * 3 + "s";
+      el.style.transitionDelay = 0.3 + rnd(i, 4) * 0.9 + "s";
+      gas.appendChild(el); mols.set(i, el);
+    }
+    const r = board._cells[m.cell].getBoundingClientRect();
+    const size = Math.max(5, Math.min(r.width * 0.55, 16));
+    el.style.width = el.style.height = size + "px";
+    el.style.left = r.left - g.left + r.width * (0.5 + (rnd(i, 1) - 0.5) * 0.5) + "px";
+    el.style.top = r.top - g.top + r.height * (0.5 + (rnd(i, 2) - 0.5) * 0.5) + "px";
+    el.classList.toggle("mine", !!m.mine);
+  });
+  mols.forEach((el, i) => { if (i >= board._list.length) { el.remove(); mols.delete(i); } });
 }
 function countCells(choices) { const m = {}; Object.values(choices || {}).forEach((c) => (m[c] = (m[c] || 0) + 1)); return m; }
-// 처음 상태: 분자 n개가 모두 왼쪽에 있음
-function initialCounts(n) { const m = {}; for (let i = 0; i < n; i++) { const c = ((i * 7) % HALF) + 1; m[c] = (m[c] || 0) + 1; } return m; }
+// 처음 상태: 분자 n개가 모두 왼쪽 영역에 흩어져 있음
+function initialList(n) { return Array.from({ length: n }, (_, i) => ({ cell: ((i * 71) % HALF) + 1 })); }
+// 공개 상태: 학생 순서를 고정해 처음 위치의 분자가 선택한 칸으로 이동하게 함
+function revealedList(choices, myUid) { return Object.keys(choices).sort().map((u) => ({ cell: choices[u], mine: u === myUid })); }
 
 function sortedResults(results) { return Object.values(results || {}).sort((a, b) => a.round - b.round); }
 function totalScore(results) { return sortedResults(results).reduce((s, r) => s + r.score, 0); }
