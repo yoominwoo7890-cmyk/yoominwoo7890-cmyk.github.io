@@ -1,7 +1,7 @@
 window.firebaseConfig = {
   apiKey: "AIzaSyC5vCtRGSBx8GxwUI7V9AlOARLSnkgsrm8",
   authDomain: "entropy-5ea52.firebaseapp.com",
-  databaseURL: "https://entropy-5ea52-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  databaseURL: "https://entropy-5ea52-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "entropy-5ea52",
   storageBucket: "entropy-5ea52.firebasestorage.app",
   messagingSenderId: "648936587693",
