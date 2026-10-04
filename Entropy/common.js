@@ -1,6 +1,6 @@
 // 학생·교사 화면이 함께 쓰는 코드
-// 격자 크기: 한쪽 영역이 COLS x ROWS 칸. 바꾸면 database.rules.json의 최댓값(450)도 함께 바꾸세요.
-const COLS = 15, ROWS = 15, HALF = COLS * ROWS, TOTAL = HALF * 2;
+// 격자 크기: 한쪽 영역이 COLS x ROWS 칸 (전체 칸 수는 2000을 넘지 않게)
+const COLS = 11, ROWS = 10, HALF = COLS * ROWS, TOTAL = HALF * 2;
 const MODE_NAME = { click: "직접 선택", random: "무작위 번호" };
 
 function lnC(n, k) { let s = 0; for (let i = 1; i <= k; i++) s += Math.log(n - k + i) - Math.log(i); return s; }
