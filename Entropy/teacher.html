@@ -80,7 +80,7 @@ const $ = (id) => document.getElementById(id);
 const board = $("board");
 const cells = buildBoard(board);
 let db, uid, code, roomRef, choicesRef;
-let meta = null, players = {}, choices = {}, results = {}, curKey = null;
+let meta = null, players = {}, choices = {}, results = {}, curKey = null, openAt = 0;
 
 if (configReady()) {
   firebase.initializeApp(window.firebaseConfig);
@@ -134,7 +134,7 @@ $("btnReveal").addEventListener("click", () => {
   const upd = {};
   upd["results/" + curKey] = { round: meta.round, mode: meta.mode, n, nL, nR: n - nL, score: calcScore(n, nL) };
   upd["meta/phase"] = "revealed";
-  roomRef.update(upd);
+  roomRef.update(upd).catch((e) => alert("결과를 공개하지 못했습니다: " + (e.code || e.message)));
 });
 
 function open(c) {
@@ -145,8 +145,9 @@ function open(c) {
     if (meta.roundKey !== curKey) {
       if (choicesRef) choicesRef.off();
       curKey = meta.roundKey; choices = {};
+      if (meta.phase === "selecting") { openAt = Date.now() + 1500; setTimeout(render, 1550); }
       choicesRef = roomRef.child("choices/" + curKey);
-      choicesRef.on("value", (x) => { choices = x.val() || {}; render(); });
+      choicesRef.on("value", (x) => { choices = x.val() || {}; render(); }, (e) => alert("학생 응답을 읽지 못했습니다. 데이터베이스 규칙을 확인하세요: " + (e.code || e.message)));
     }
     render();
   });
@@ -161,12 +162,12 @@ function render() {
   $("hRound").textContent = meta.round ? meta.round + "라운드" : "시작 전";
   $("nDone").textContent = phase === "lobby" ? 0 : list.length;
   $("nAll").textContent = nAll;
-  board.classList.toggle("open", phase === "revealed");
+  board.classList.toggle("open", phase === "revealed" || (phase === "selecting" && Date.now() >= openAt));
 
   $("status").textContent =
     phase === "lobby" ? "처음 상태입니다. 분자 " + nAll + "개가 칸막이 왼쪽에 모여 있습니다."
-    : phase === "selecting" ? (hidden ? "학생들이 위치를 정하는 중입니다. 선택한 칸은 숨겨져 있습니다." : "학생들이 위치를 정하는 중입니다. 선택된 칸이 연두색으로 표시됩니다.")
-    : "칸막이를 열어 결과를 공개했습니다. 학생 화면에도 같은 결과가 보입니다.";
+    : phase === "selecting" ? (hidden ? "칸막이를 치웠습니다. 학생들이 위치를 정하는 중이며, 선택한 칸은 숨겨져 있습니다." : "칸막이를 치웠습니다. 학생들이 정한 칸이 연두색으로 표시됩니다.")
+    : "결과를 공개했습니다. 학생 화면에도 같은 결과가 보입니다.";
 
   setGas(board, phase === "revealed" ? revealedList(choices) : initialList(nAll), phase === "revealed");
   const counts = countCells(choices);
