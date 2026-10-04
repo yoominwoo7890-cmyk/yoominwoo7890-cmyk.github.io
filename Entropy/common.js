@@ -56,34 +56,39 @@ function buildBoard(board, onClick) {
   return cells;
 }
 function rnd(i, k) { const x = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return x - Math.floor(x); }
-// list: [{cell, mine}] — 분자를 칸 위에 그린다. animate가 true면 이전 위치에서 새 위치로 움직인다.
+function hashNum(str) { let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return Math.abs(h) % 100000; }
+// list: [{id, cell, mine}] — 분자를 칸 위에 그린다. 같은 id의 분자는 animate가 true면 이전 위치에서 새 위치로 움직인다.
 function setGas(board, list, animate) { board._list = list; layoutGas(board, animate); }
 function layoutGas(board, animate) {
   const gas = board._gas, mols = board._mols, g = gas.getBoundingClientRect();
   if (!g.width) return;
   gas.classList.toggle("noanim", !animate);
-  board._list.forEach((m, i) => {
-    let el = mols.get(i);
+  const seen = new Set();
+  board._list.forEach((m) => {
+    const h = hashNum(m.id);
+    let el = mols.get(m.id);
     if (!el) {
       el = document.createElement("i"); el.className = "mol";
-      el.style.animationDelay = -rnd(i, 3) * 3 + "s";
-      el.style.transitionDelay = 0.3 + rnd(i, 4) * 0.9 + "s";
-      gas.appendChild(el); mols.set(i, el);
+      el.style.animationDelay = -rnd(h, 3) * 3 + "s";
+      el.style.transitionDelay = 0.3 + rnd(h, 4) * 0.9 + "s";
+      gas.appendChild(el); mols.set(m.id, el);
     }
     const r = board._cells[m.cell].getBoundingClientRect();
     const size = Math.max(5, Math.min(r.width * 0.55, 16));
     el.style.width = el.style.height = size + "px";
-    el.style.left = r.left - g.left + r.width * (0.5 + (rnd(i, 1) - 0.5) * 0.5) + "px";
-    el.style.top = r.top - g.top + r.height * (0.5 + (rnd(i, 2) - 0.5) * 0.5) + "px";
+    el.style.left = r.left - g.left + r.width * (0.5 + (rnd(h, 1) - 0.5) * 0.5) + "px";
+    el.style.top = r.top - g.top + r.height * (0.5 + (rnd(h, 2) - 0.5) * 0.5) + "px";
     el.classList.toggle("mine", !!m.mine);
+    seen.add(m.id);
   });
-  mols.forEach((el, i) => { if (i >= board._list.length) { el.remove(); mols.delete(i); } });
+  mols.forEach((el, id) => { if (!seen.has(id)) { el.remove(); mols.delete(id); } });
 }
 function countCells(choices) { const m = {}; Object.values(choices || {}).forEach((c) => (m[c] = (m[c] || 0) + 1)); return m; }
-// 처음 상태: 분자 n개가 모두 왼쪽 영역에 흩어져 있음
-function initialList(n) { return Array.from({ length: n }, (_, i) => ({ cell: ((i * 71) % HALF) + 1 })); }
-// 공개 상태: 학생 순서를 고정해 처음 위치의 분자가 선택한 칸으로 이동하게 함
-function revealedList(choices, myUid) { return Object.keys(choices).sort().map((u) => ({ cell: choices[u], mine: u === myUid })); }
+// 처음 상태: 모든 분자가 왼쪽 영역에 흩어져 있음 (ids: 학생 uid를 정렬한 배열)
+function initialList(ids, myUid) { return ids.map((u, i) => ({ id: u, cell: ((i * 71) % HALF) + 1, mine: u === myUid })); }
+// 학생들이 정한 위치 (학생 uid가 분자의 id라서 라운드가 바뀌어도 같은 분자가 이어서 움직임)
+function gasList(choices, myUid) { return Object.keys(choices).sort().map((u) => ({ id: u, cell: choices[u], mine: u === myUid })); }
+function leftCount(list) { return list.filter((m) => m.cell <= HALF).length; }
 
 function sortedResults(results) { return Object.values(results || {}).sort((a, b) => a.round - b.round); }
 function totalScore(results) { return sortedResults(results).reduce((s, r) => s + r.score, 0); }
