@@ -29,6 +29,7 @@
       <div><span id="hMode" class="chip"></span> <button id="btnLeave" class="ghost">나가기</button></div>
     </header>
     <p id="status" class="status"></p>
+    <p id="sendErr" class="notice" hidden></p>
     <div class="sides"><span>왼쪽<b id="cL"></b></span><span></span><span>오른쪽<b id="cR"></b></span></div>
     <div id="board" class="board"></div>
     <div id="actions" class="actions" hidden>
@@ -66,7 +67,7 @@ const $ = (id) => document.getElementById(id);
 const board = $("board");
 let db, uid, code, roomRef, choiceRef;
 let meta = null, results = {}, playerCount = 0;
-let myChoice = null, pending = null, allChoices = null, curKey = null, rolling = false;
+let myChoice = null, pending = null, allChoices = null, curKey = null, rolling = false, sendErr = "", openAt = 0;
 const cells = buildBoard(board, onCell);
 
 if (configReady()) {
@@ -105,9 +106,11 @@ function onMeta(s) {
   if (!meta) return;
   if (meta.roundKey !== curKey) {
     if (choiceRef) choiceRef.off();
-    curKey = meta.roundKey; myChoice = null; pending = null; allChoices = null;
+    curKey = meta.roundKey; myChoice = null; pending = null; allChoices = null; sendErr = "";
+    // 새 라운드: 칸막이가 닫힌 처음 상태를 잠깐 보여 준 뒤 치운다
+    if (meta.phase === "selecting") { openAt = Date.now() + 1500; setTimeout(render, 1550); }
     choiceRef = roomRef.child("choices/" + curKey + "/" + uid);
-    choiceRef.on("value", (c) => { myChoice = c.val(); render(); });
+    choiceRef.on("value", (c) => { myChoice = c.val(); render(); }, () => {});
   }
   if (meta.phase === "revealed" && !allChoices) {
     roomRef.child("choices/" + curKey).get().then((c) => { allChoices = c.val() || {}; render(); }).catch(() => {});
@@ -120,10 +123,18 @@ function onCell(n) {
   pending = n; render();
 }
 
+// 제출: 실패하면 화면에 이유를 보여 준다
+function submit(n) {
+  return choiceRef.set(n).then(() => { sendErr = ""; return true; }).catch((e) => {
+    sendErr = "제출하지 못했어요. 선생님께 이 문구를 보여 주세요: " + (e.code || e.message);
+    render(); return false;
+  });
+}
+
 function onAct() {
   if (!meta || meta.phase !== "selecting" || myChoice || rolling) return;
   if (meta.mode === "click") {
-    if (pending) choiceRef.set(pending).catch(() => {});
+    if (pending) submit(pending);
   } else {
     roll();
   }
@@ -134,15 +145,19 @@ function roll() {
   const buf = new Uint32Array(1); crypto.getRandomValues(buf);
   const final = (buf[0] % TOTAL) + 1;
   rolling = true; render();
-  choiceRef.set(final).catch(() => {});
+  const sent = submit(final);
   const rollEl = $("roll");
   rollEl.classList.remove("done");
   let delay = 45, last = 0;
   const tick = () => {
     if (last) cells[last].classList.remove("flash");
     if (delay > 420) {
-      rollEl.textContent = final; rollEl.classList.add("done");
-      rolling = false; myChoice = final; render(); return;
+      sent.then((ok) => {
+        rolling = false;
+        if (ok) { rollEl.textContent = final; rollEl.classList.add("done"); myChoice = final; }
+        render();
+      });
+      return;
     }
     last = 1 + Math.floor(Math.random() * TOTAL);
     rollEl.textContent = last; cells[last].classList.add("flash");
@@ -157,18 +172,19 @@ function render() {
   $("hRound").textContent = meta.round ? meta.round + "라운드" : "시작 전";
   $("hMode").textContent = MODE_NAME[mode];
   const spread = phase === "revealed" && allChoices;
-  board.classList.toggle("open", !!spread);
+  board.classList.toggle("open", phase === "revealed" || (phase === "selecting" && Date.now() >= openAt));
+  $("sendErr").hidden = !sendErr; $("sendErr").textContent = sendErr;
   board.classList.toggle("pickable", phase === "selecting" && mode === "click" && !myChoice);
 
   let status = "";
   if (phase === "lobby") {
     status = "분자 " + playerCount + "개가 칸막이 왼쪽에 모여 있어요. 선생님이 시작하기를 기다리세요.";
   } else if (phase === "selecting") {
-    if (done) status = myChoice + "번 칸을 정했어요. 칸막이가 열리기를 기다리세요.";
-    else if (mode === "click") status = pending ? pending + "번 칸을 골랐어요. 정하려면 아래 버튼을 누르세요." : "칸막이가 열리면 내 분자는 어디로 갈까요? 실린더 안의 칸을 누르세요.";
-    else status = rolling ? "번호를 뽑는 중…" : "칸막이가 열리면 내 분자가 갈 칸을 번호 뽑기로 정하세요.";
+    if (done) status = myChoice + "번 칸을 정했어요. 결과 공개를 기다리세요.";
+    else if (mode === "click") status = pending ? pending + "번 칸을 골랐어요. 정하려면 아래 버튼을 누르세요." : "칸막이를 치웠어요. 내 분자가 갈 칸을 실린더 안에서 누르세요.";
+    else status = rolling ? "번호를 뽑는 중…" : "칸막이를 치웠어요. 번호 뽑기로 내 분자가 갈 칸을 정하세요.";
   } else {
-    status = myChoice ? "칸막이가 열리고 기체가 퍼졌어요. 내 분자(주황색)는 " + myChoice + "번 칸에 있어요." : "칸막이가 열리고 기체가 퍼졌어요.";
+    status = myChoice ? "기체가 실린더 전체로 퍼졌어요. 내 분자(주황색)는 " + myChoice + "번 칸에 있어요." : "기체가 실린더 전체로 퍼졌어요.";
   }
   $("status").textContent = status;
   setGas(board, spread ? revealedList(allChoices, uid) : initialList(playerCount), phase === "revealed");
