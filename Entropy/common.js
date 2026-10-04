@@ -88,6 +88,8 @@ function countCells(choices) { const m = {}; Object.values(choices || {}).forEac
 function initialList(ids, myUid) { return ids.map((u, i) => ({ id: u, cell: ((i * 71) % HALF) + 1, mine: u === myUid })); }
 // 학생들이 정한 위치 (학생 uid가 분자의 id라서 라운드가 바뀌어도 같은 분자가 이어서 움직임)
 function gasList(choices, myUid) { return Object.keys(choices).sort().map((u) => ({ id: u, cell: choices[u], mine: u === myUid })); }
+// 라운드 저장 이름. 초기화할 때마다 game 번호가 올라가서 이전 기록과 섞이지 않는다.
+function keyOf(meta, round) { return (meta.game ? "g" + meta.game : "") + "r" + round; }
 function leftCount(list) { return list.filter((m) => m.cell <= HALF).length; }
 
 function sortedResults(results) { return Object.values(results || {}).sort((a, b) => a.round - b.round); }
