@@ -52,6 +52,7 @@
         <label class="toggle"><input id="hide" type="checkbox"> 공개 전까지 선택한 칸 숨기기 (화면을 띄워 둘 때)</label>
         <button id="btnStart" class="primary">칸막이 열기</button>
         <button id="btnReveal" class="primary" hidden>결과 보이기</button>
+        <button id="btnReset" class="ghost">처음 상태로 초기화</button>
 
         <div>
           <h2>점수 기록</h2>
@@ -118,12 +119,19 @@ $("btnNew").addEventListener("click", () => {
   if (confirm("지금 방을 닫고 새 방을 만들까요? 점수 기록은 이 화면에서 더 볼 수 없습니다.")) { localStorage.removeItem("entropy_teacher"); location.reload(); }
 });
 $("hide").addEventListener("change", render);
+// 초기화: 칸막이를 닫고 분자를 왼쪽으로 되돌리며 라운드와 점수 기록을 지운다. 입장한 학생은 그대로 남는다.
+$("btnReset").addEventListener("click", () => {
+  if (!meta || !confirm("처음 상태로 초기화할까요?\n칸막이가 닫히고 분자가 왼쪽으로 돌아가며, 라운드와 점수 기록이 모두 지워집니다. 입장한 학생은 그대로 남습니다.")) return;
+  const game = (meta.game || 0) + 1;
+  roomRef.update({ "meta/game": game, "meta/round": 0, "meta/roundKey": "g" + game + "r0", "meta/phase": "lobby", results: null })
+    .catch((e) => alert("초기화하지 못했습니다: " + (e.code || e.message)));
+});
 document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => {
   if (meta && meta.phase !== "selecting") roomRef.child("meta/mode").set(b.dataset.mode);
 }));
 $("btnStart").addEventListener("click", () => {
   const next = meta.round + 1;
-  roomRef.child("meta").update({ round: next, roundKey: "r" + next, phase: "selecting" });   // 칸막이 열기
+  roomRef.child("meta").update({ round: next, roundKey: keyOf(meta, next), phase: "selecting" });   // 칸막이 열기
 });
 $("btnReveal").addEventListener("click", () => {
   const list = Object.values(choices), n = list.length;
@@ -147,7 +155,7 @@ function open(c) {
       const had = curKey !== null;
       prevChoices = had ? choices : null;   // 지난 라운드의 분자 위치를 이어서 쓴다
       if (!had && meta.round > 1)
-        roomRef.child("choices/r" + (meta.round - 1)).get().then((x) => { prevChoices = x.val(); render(); }).catch(() => {});
+        roomRef.child("choices/" + keyOf(meta, meta.round - 1)).get().then((x) => { prevChoices = x.val(); render(); }).catch(() => {});
       curKey = meta.roundKey; choices = {};
       choicesRef = roomRef.child("choices/" + curKey);
       choicesRef.on("value", (x) => { choices = x.val() || {}; render(); }, (e) => alert("학생 응답을 읽지 못했습니다. 데이터베이스 규칙을 확인하세요: " + (e.code || e.message)));
