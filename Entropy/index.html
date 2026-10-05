@@ -10,23 +10,45 @@
 <main class="wrap">
   <p id="notice" class="notice" hidden>firebase-config.js에 Firebase 설정값을 넣어야 앱이 동작합니다.</p>
 
+  <!-- 1단계: 방 코드 -->
   <section id="join" class="join">
     <h1>기체 확산과 엔트로피</h1>
     <p class="sub">선생님이 알려 준 방 코드로 들어가세요.</p>
     <label for="inCode">방 코드</label>
     <input id="inCode" type="text" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="숫자 4자리">
-    <label for="inSid">학번</label>
-    <input id="inSid" type="text" inputmode="numeric" maxlength="10" autocomplete="off" placeholder="예: 20315">
-    <label for="inName">이름</label>
-    <input id="inName" type="text" maxlength="12" autocomplete="off" placeholder="예: 김하늘">
     <p id="joinErr" class="err"></p>
+    <button id="btnFind" class="primary">다음</button>
+  </section>
+
+  <!-- 2단계: 별명, 팀, 예상 점수 -->
+  <section id="setup" class="join" hidden>
+    <h1>방 <span id="sRoom"></span></h1>
+    <p id="sInfo" class="sub"></p>
+    <label for="inName">별명</label>
+    <input id="inName" type="text" maxlength="10" autocomplete="off" placeholder="예: 멘델레예프">
+    <div id="teamBox" hidden>
+      <label>팀 색깔 고르기</label>
+      <div id="teamPick" class="teampick"></div>
+      <p class="hint">같은 색을 고른 친구들이 한 팀이 돼요. 누가 같은 팀인지는 선생님이 색깔을 공개할 때 알 수 있어요.</p>
+    </div>
+    <div id="predictBox">
+      <p id="sQuestion" class="question"></p>
+      <input id="inPredict" type="number" inputmode="numeric" min="0" step="1" placeholder="예상 점수">
+      <p id="sHint" class="hint"></p>
+    </div>
+    <p id="setupErr" class="err"></p>
     <button id="btnJoin" class="primary">입장하기</button>
   </section>
 
   <section id="game" hidden>
     <header class="bar">
       <div><span class="room">방 <span id="hRoom"></span></span> <span id="hRound" class="sub"></span></div>
-      <div><span id="hMode" class="chip"></span> <button id="btnLeave" class="ghost">나가기</button></div>
+      <div class="chips">
+        <span id="hMode" class="chip"></span>
+        <span id="hTeam" class="chip plain" hidden></span>
+        <span id="hPredict" class="chip plain" hidden></span>
+        <button id="btnLeave" class="ghost">나가기</button>
+      </div>
     </header>
     <p id="status" class="status"></p>
     <p id="sendErr" class="notice" hidden></p>
@@ -37,22 +59,12 @@
       <button id="btnAct" class="primary"></button>
     </div>
 
-    <section id="result" class="result" hidden>
-      <div class="scores">
-        <div class="now">이번 점수<span id="rScore" class="n"></span></div>
-        <div>누적 총점<span id="rTotal" class="n"></span></div>
-      </div>
-      <dl class="facts">
-        <dt>분포</dt><dd id="rSplit"></dd>
-        <dt>이 분포가 되는 경우의 수</dt><dd id="rWays"></dd>
-        <dt>무작위로 이 분포가 나올 확률</dt><dd id="rProb"></dd>
-      </dl>
-    </section>
+    <section id="final" class="final" hidden></section>
+    <section id="result" class="result" hidden></section>
 
     <section class="history">
-      <h2>우리 반 점수 기록</h2>
-      <p id="histEmpty" class="empty">아직 공개된 라운드가 없어요.</p>
-      <table hidden><thead><tr><th>라운드</th><th>방식</th><th>왼쪽 : 오른쪽</th><th>점수</th><th>누적</th></tr></thead><tbody id="hist"></tbody></table>
+      <h2 id="histTitle"></h2>
+      <div id="hist"></div>
     </section>
   </section>
 </main>
@@ -66,8 +78,9 @@
 const $ = (id) => document.getElementById(id);
 const board = $("board");
 let db, uid, code, roomRef, choiceRef;
-let meta = null, results = {}, playerCount = 0, playerIds = [], prevChoices = null;
+let meta = null, results = {}, playerCount = 0, playerIds = [], prevChoices = null, my = null, pub = {};
 let myChoice = null, pending = null, allChoices = null, curKey = null, rolling = false, sendErr = "";
+let joinMeta = null, hasPriv = false, pickedTeam = "";
 const cells = buildBoard(board, onCell);
 
 if (configReady()) {
@@ -76,29 +89,81 @@ if (configReady()) {
   firebase.auth().signInAnonymously().then((c) => {
     uid = c.user.uid;
     const saved = JSON.parse(localStorage.getItem("entropy_student") || "null");
-    if (saved) { $("inCode").value = saved.code; $("inSid").value = saved.sid || ""; $("inName").value = saved.name; if (saved.sid) join(); }
+    if (saved && saved.code) { $("inCode").value = saved.code; findRoom(); }
   }).catch(() => { $("joinErr").textContent = "로그인에 실패했어요. Firebase 콘솔에서 익명 로그인을 켰는지 확인하세요."; });
 }
+$("btnFind").addEventListener("click", findRoom);
 $("btnJoin").addEventListener("click", join);
 $("btnLeave").addEventListener("click", () => { localStorage.removeItem("entropy_student"); location.reload(); });
 $("btnAct").addEventListener("click", onAct);
+TEAMS.forEach((t) => {
+  const b = document.createElement("button");
+  b.type = "button"; b.innerHTML = teamTag(t);
+  b.addEventListener("click", () => { pickedTeam = t; [...$("teamPick").children].forEach((x) => x.classList.toggle("on", x === b)); });
+  $("teamPick").appendChild(b);
+});
 
-async function join() {
-  const c = $("inCode").value.trim(), sid = $("inSid").value.trim(), name = $("inName").value.trim();
+// 1단계: 방을 찾는다. 이미 입장했던 방이면 바로 들어간다.
+async function findRoom() {
+  const c = $("inCode").value.trim();
   if (!uid) return;
   if (!/^\d{4}$/.test(c)) return ($("joinErr").textContent = "방 코드는 숫자 4자리예요.");
-  if (!/^\d{1,10}$/.test(sid)) return ($("joinErr").textContent = "학번을 숫자로 입력하세요.");
-  if (!name) return ($("joinErr").textContent = "이름을 입력하세요.");
-  const ref = db.ref("rooms/" + c);
-  const snap = await ref.child("meta").get();
-  if (!snap.exists()) { localStorage.removeItem("entropy_student"); return ($("joinErr").textContent = c + " 방을 찾을 수 없어요. 코드를 다시 확인하세요."); }
-  code = c; roomRef = ref;
-  await ref.child("players/" + uid).set({ sid, name });
-  localStorage.setItem("entropy_student", JSON.stringify({ code: c, sid, name }));
-  $("join").hidden = true; $("game").hidden = false; $("hRoom").textContent = c;
-  ref.child("meta").on("value", onMeta);
-  ref.child("results").on("value", (s) => { results = s.val() || {}; render(); });
-  ref.child("players").on("value", (s) => { playerIds = Object.keys(s.val() || {}).sort(); playerCount = playerIds.length; render(); });
+  try {
+    const ref = db.ref("rooms/" + c);
+    const snap = await ref.child("meta").get();
+    if (!snap.exists()) { localStorage.removeItem("entropy_student"); return ($("joinErr").textContent = c + " 방을 찾을 수 없어요. 코드를 다시 확인하세요."); }
+    code = c; roomRef = ref; joinMeta = snap.val();
+    const [priv, pl] = await Promise.all([ref.child("private/" + uid).get(), ref.child("players/" + uid).get()]);
+    hasPriv = priv.exists();
+    if (hasPriv && pl.exists()) return enter();
+    showSetup();
+  } catch (e) {
+    $("joinErr").textContent = "방에 연결하지 못했어요. 선생님께 이 문구를 보여 주세요: " + (e.code || e.message);
+  }
+}
+
+function maxPredict() { return (joinMeta.teams ? 100 + JACKPOT_BONUS : 100) * (joinMeta.totalRounds || 1); }
+function showSetup() {
+  const n = joinMeta.totalRounds || 1, teams = !!joinMeta.teams;
+  $("join").hidden = true; $("setup").hidden = false; $("sRoom").textContent = code;
+  $("sInfo").textContent = "총 " + n + "라운드" + (teams ? " · 모둠 대항전" : "");
+  $("teamBox").hidden = !teams || hasPriv;
+  $("predictBox").hidden = hasPriv;
+  $("sQuestion").textContent = n + "라운드까지 모두 마쳤을 때, " + (teams ? "우리 팀" : "우리 반") + "의 누적 점수는 몇 점일까요?";
+  $("inPredict").max = maxPredict();
+  $("sHint").textContent = "라운드마다 분자가 양쪽에 고르게 퍼지면 0점, 한쪽에 모두 몰리면 100점을 받아요. " +
+    (teams ? "점수는 같은 색 팀의 분자끼리만 따져요. 팀 분자가 " + JACKPOT_MIN + "개 이상이고 모두 한쪽에 모이면 잭팟으로 " + JACKPOT_BONUS + "점을 더 받고, 분자가 1개뿐인 팀은 0점이에요. " : "") +
+    "0점부터 " + maxPredict() + "점 사이로 적으세요. 마지막에 예상과 실제의 차이가 가장 작은 사람이 1등이에요. 한 번 정하면 바꿀 수 없어요.";
+}
+
+// 2단계: 별명, 팀, 예상 점수를 저장하고 입장한다.
+async function join() {
+  const name = $("inName").value.trim(), teams = !!joinMeta.teams, raw = $("inPredict").value.trim(), predict = Number(raw);
+  const err = (m) => ($("setupErr").textContent = m);
+  if (!name) return err("별명을 입력하세요.");
+  if (!hasPriv) {
+    if (teams && !pickedTeam) return err("팀 색깔을 고르세요.");
+    if (raw === "" || !Number.isInteger(predict) || predict < 0 || predict > maxPredict()) return err("예상 점수를 0부터 " + maxPredict() + " 사이의 정수로 적으세요.");
+  }
+  $("btnJoin").disabled = true;
+  try {
+    await roomRef.child("players/" + uid).set({ name });
+    if (!hasPriv) await roomRef.child("private/" + uid).set(teams ? { team: pickedTeam, predict } : { predict });
+    enter();
+  } catch (e) {
+    $("btnJoin").disabled = false;
+    err("입장하지 못했어요. 선생님께 이 문구를 보여 주세요: " + (e.code || e.message));
+  }
+}
+
+function enter() {
+  localStorage.setItem("entropy_student", JSON.stringify({ code }));
+  $("join").hidden = true; $("setup").hidden = true; $("game").hidden = false; $("hRoom").textContent = code;
+  roomRef.child("private/" + uid).on("value", (s) => { my = s.val(); render(); }, () => {});
+  roomRef.child("meta").on("value", onMeta);
+  roomRef.child("results").on("value", (s) => { results = s.val() || {}; render(); });
+  roomRef.child("players").on("value", (s) => { playerIds = Object.keys(s.val() || {}).sort(); playerCount = playerIds.length; render(); });
+  roomRef.child("pub").on("value", (s) => { pub = s.val() || {}; render(); }, () => {});
 }
 
 function onMeta(s) {
@@ -113,7 +178,7 @@ function onMeta(s) {
     choiceRef = roomRef.child("choices/" + curKey + "/" + uid);
     choiceRef.on("value", (c) => { myChoice = c.val(); render(); }, () => {});
   }
-  if (meta.phase === "revealed" && !allChoices) {
+  if ((meta.phase === "revealed" || meta.phase === "final") && !allChoices) {
     roomRef.child("choices/" + curKey).get().then((c) => { allChoices = c.val() || {}; render(); }).catch(() => {});
   }
   render();
@@ -169,13 +234,29 @@ function roll() {
 
 function render() {
   if (!meta) return;
-  const phase = meta.phase, mode = meta.mode, done = myChoice && !rolling;
-  $("hRound").textContent = meta.round ? meta.round + "라운드" : "시작 전";
+  const phase = meta.phase, mode = meta.mode, done = myChoice && !rolling, teams = !!meta.teams;
+  const shown = phase === "revealed" || phase === "final";
+  const total = meta.totalRounds || 0;
+  $("hRound").textContent = meta.round ? meta.round + (total ? " / " + total : "") + "라운드" : "시작 전" + (total ? " · 총 " + total + "라운드" : "");
   $("hMode").textContent = MODE_NAME[mode];
-  const spread = phase === "revealed" && allChoices;
+  $("hTeam").hidden = !(teams && my && my.team);
+  if (teams && my && my.team) $("hTeam").innerHTML = "내 팀 " + teamTag(my.team);
+  $("hPredict").hidden = !(my && typeof my.predict === "number");
+  if (my && typeof my.predict === "number") $("hPredict").textContent = "내 예상 " + my.predict + "점";
+
+  const spread = shown && allChoices;
   board.classList.toggle("open", phase !== "lobby");
-  $("sendErr").hidden = !sendErr; $("sendErr").textContent = sendErr;
+  board.classList.toggle("teams", teams);
   board.classList.toggle("pickable", phase === "selecting" && mode === "click" && !myChoice);
+  $("sendErr").hidden = !sendErr; $("sendErr").textContent = sendErr;
+
+  // 화면에 보이는 분자 위치와, 그 라운드에 공개된 팀 색깔
+  const prev = meta.round > 1 && prevChoices;
+  const shownKey = spread ? curKey : prev ? keyOf(meta, meta.round - 1) : null;
+  const colors = (teams && shownKey && pub.colors && pub.colors[shownKey]) || null;
+  const list = (spread ? gasList(allChoices, uid) : prev ? gasList(prevChoices, uid) : initialList(playerIds, uid))
+    .map((m) => Object.assign(m, { team: colors ? colors[m.id] || "" : "" }));
+  setGas(board, list, shown);
 
   let status = "";
   const lead = meta.round > 1 ? "분자는 계속 움직여요. " : "칸막이가 열렸어요. ";
@@ -183,19 +264,17 @@ function render() {
     status = "분자 " + playerCount + "개가 칸막이 왼쪽에 모여 있어요. 선생님이 칸막이를 열기를 기다리세요.";
   } else if (phase === "selecting") {
     if (done) status = myChoice + "번 칸을 정했어요. 결과 공개를 기다리세요.";
-    else if (mode === "click") status = pending ? pending + "번 칸을 골랐어요. 정하려면 아래 버튼을 누르세요." : lead + "내 분자(주황색)가 갈 칸을 실린더 안에서 누르세요.";
-    else status = rolling ? "번호를 뽑는 중…" : lead + "번호 뽑기로 내 분자(주황색)가 갈 칸을 정하세요.";
+    else if (mode === "click") status = pending ? pending + "번 칸을 골랐어요. 정하려면 아래 버튼을 누르세요." : lead + "내 분자(검은 테두리)가 갈 칸을 실린더 안에서 누르세요.";
+    else status = rolling ? "번호를 뽑는 중…" : lead + "번호 뽑기로 내 분자(검은 테두리)가 갈 칸을 정하세요.";
+  } else if (phase === "final") {
+    status = "게임이 끝났어요. 아래에서 최종 순위를 확인하세요.";
   } else {
-    status = myChoice ? "기체가 실린더 전체로 퍼졌어요. 내 분자(주황색)는 " + myChoice + "번 칸에 있어요." : "기체가 실린더 전체로 퍼졌어요.";
+    status = (myChoice ? "내 분자(검은 테두리)는 " + myChoice + "번 칸으로 갔어요." : "기체가 움직였어요.") + (colors ? " 팀 색깔이 공개됐어요." : "");
   }
   $("status").textContent = status;
-  const list = spread ? gasList(allChoices, uid) : meta.round > 1 && prevChoices ? gasList(prevChoices, uid) : initialList(playerIds, uid);
-  setGas(board, list, phase === "revealed");
   for (let n = 1; n <= TOTAL; n++)
     cells[n].classList.toggle("sel", phase === "selecting" && (done ? myChoice === n : pending === n));
 
-  const r = results[curKey];
-  const showSplit = phase === "revealed" && r;
   $("cL").textContent = leftCount(list);
   $("cR").textContent = list.length - leftCount(list);
 
@@ -208,9 +287,14 @@ function render() {
   btn.textContent = mode === "click" ? "이 칸으로 정하기" : "번호 뽑기";
   btn.disabled = rolling || (mode === "click" && !pending);
 
-  $("result").hidden = !showSplit;
-  if (showSplit) renderResult(r, results);
-  renderHistory($("hist"), $("histEmpty"), results);
+  const fin = phase === "final" && pub.final;
+  $("final").hidden = !fin;
+  if (fin) $("final").innerHTML = finalHTML(pub.final, meta, uid);
+  const r = results[curKey], showR = shown && r;
+  $("result").hidden = !showR;
+  if (showR) $("result").innerHTML = resultHTML(meta, r, results, my && my.team);
+  $("histTitle").textContent = teams ? "팀별 점수 기록" : "우리 반 점수 기록";
+  $("hist").innerHTML = historyHTML(meta, results, "아직 공개된 라운드가 없어요.");
 }
 </script>
 </body>
