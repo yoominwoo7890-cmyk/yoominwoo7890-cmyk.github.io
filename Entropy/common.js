@@ -2,6 +2,10 @@
 // 격자 크기: 한쪽 영역이 COLS x ROWS 칸 (전체 칸 수는 2000을 넘지 않게)
 const COLS = 11, ROWS = 10, HALF = COLS * ROWS, TOTAL = HALF * 2;
 const MODE_NAME = { click: "직접 선택", random: "무작위 번호" };
+// 모둠 대항전
+const TEAMS = ["red", "blue", "green", "yellow"];
+const TEAM_NAME = { red: "빨강", blue: "파랑", green: "초록", yellow: "노랑" };
+const JACKPOT_MIN = 4, JACKPOT_BONUS = 100;   // 팀 분자가 4개 이상이고 모두 한쪽에 모이면 +100점
 
 function lnC(n, k) { let s = 0; for (let i = 1; i <= k; i++) s += Math.log(n - k + i) - Math.log(i); return s; }
 // 고르게 퍼지면 0점, 한쪽에 모두 몰리면 100점
@@ -79,6 +83,7 @@ function layoutGas(board, animate) {
     el.style.left = r.left - g.left + r.width * (0.5 + (rnd(h, 1) - 0.5) * 0.5) + "px";
     el.style.top = r.top - g.top + r.height * (0.5 + (rnd(h, 2) - 0.5) * 0.5) + "px";
     el.classList.toggle("mine", !!m.mine);
+    el.dataset.team = m.team || "";
     seen.add(m.id);
   });
   mols.forEach((el, id) => { if (!seen.has(id)) { el.remove(); mols.delete(id); } });
@@ -92,27 +97,97 @@ function gasList(choices, myUid) { return Object.keys(choices).sort().map((u) =>
 function keyOf(meta, round) { return (meta.game ? "g" + meta.game : "") + "r" + round; }
 function leftCount(list) { return list.filter((m) => m.cell <= HALF).length; }
 
+function esc(s) { return String(s).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch])); }
 function sortedResults(results) { return Object.values(results || {}).sort((a, b) => a.round - b.round); }
-function totalScore(results) { return sortedResults(results).reduce((s, r) => s + r.score, 0); }
+function totalScore(results) { return sortedResults(results).reduce((s, r) => s + (r.score || 0), 0); }
 
-function renderResult(r, results) {
-  const $ = (id) => document.getElementById(id);
-  $("rScore").textContent = r.score;
-  $("rTotal").textContent = totalScore(results);
-  $("rSplit").textContent = "왼쪽 " + r.nL + "개, 오른쪽 " + r.nR + "개";
-  $("rWays").textContent = fmtWays(r.n, r.nL);
-  $("rProb").textContent = fmtProb(r.n, r.nL);
+// 팀별 결과: 반 전체에 쓰던 점수 규칙을 같은 색 분자끼리 적용한다. choices {uid: 칸}, teamOf {uid: 팀}
+function teamResults(choices, teamOf) {
+  const out = {};
+  TEAMS.forEach((t) => {
+    const cs = Object.keys(choices).filter((u) => teamOf[u] === t).map((u) => choices[u]);
+    const n = cs.length;
+    if (!n) return;
+    const nL = cs.filter((x) => x <= HALF).length;
+    const base = n < 2 ? 0 : calcScore(n, nL);   // 분자가 1개뿐인 팀은 0점
+    const jackpot = n >= JACKPOT_MIN && (nL === 0 || nL === n);
+    out[t] = { n, nL, base, jackpot, score: base + (jackpot ? JACKPOT_BONUS : 0) };
+  });
+  return out;
 }
-function renderHistory(tbody, emptyEl, results) {
+function teamTotals(results) {
+  const tot = {};
+  sortedResults(results).forEach((r) => TEAMS.forEach((t) => { if (r.teams && r.teams[t]) tot[t] = (tot[t] || 0) + r.teams[t].score; }));
+  return tot;
+}
+const teamTag = (t) => (TEAM_NAME[t] ? '<span class="tdot" data-team="' + t + '"></span>' + TEAM_NAME[t] : "");
+
+function bigHTML(a, av, b, bv) {
+  return '<div class="scores"><div class="now">' + a + '<span class="n">' + av + "</span></div><div>" + b + '<span class="n">' + bv + "</span></div></div>";
+}
+function factsHTML(n, nL) {
+  return '<dl class="facts"><dt>분포</dt><dd>왼쪽 ' + nL + "개, 오른쪽 " + (n - nL) + "개</dd><dt>이 분포가 되는 경우의 수</dt><dd>" +
+    fmtWays(n, nL) + "</dd><dt>무작위로 이 분포가 나올 확률</dt><dd>" + fmtProb(n, nL) + "</dd></dl>";
+}
+// 이번 라운드 결과 카드. myTeam은 학생 화면에서만 넘긴다.
+function resultHTML(meta, r, results, myTeam) {
+  if (!meta.teams) return bigHTML("이번 점수", r.score, "누적 총점", totalScore(results)) + factsHTML(r.n, r.nL);
+  const tot = teamTotals(results), ts = r.teams || {}, mine = myTeam && ts[myTeam];
+  let h = "";
+  if (mine) h += bigHTML("우리 팀(" + TEAM_NAME[myTeam] + ") 이번 점수", mine.score, "우리 팀 누적", tot[myTeam] || 0);
+  else if (myTeam) h += '<p class="sub">이번 라운드에는 우리 팀이 제출한 분자가 없어요.</p>';
+  TEAMS.forEach((t) => {
+    if (ts[t] && ts[t].jackpot) h += '<p class="jackpot">잭팟! ' + TEAM_NAME[t] + " 팀의 분자 " + ts[t].n + "개가 모두 한쪽에 모였어요. 무작위로는 " +
+      Math.pow(2, ts[t].n - 1) + "번에 한 번 나오는 일이에요. 보너스 +" + JACKPOT_BONUS + "점</p>";
+  });
+  h += "<table><thead><tr><th>팀</th><th>왼쪽 : 오른쪽</th><th>이번 점수</th><th>누적</th></tr></thead><tbody>";
+  TEAMS.forEach((t) => {
+    const x = ts[t];
+    if (!x && tot[t] === undefined) return;
+    h += "<tr" + (t === myTeam ? ' class="me"' : "") + "><td>" + teamTag(t) + "</td><td>" + (x ? x.nL + " : " + (x.n - x.nL) : "–") +
+      "</td><td><b>" + (x ? x.score : "–") + "</b></td><td>" + (tot[t] || 0) + "</td></tr>";
+  });
+  h += "</tbody></table>";
+  if (mine) h += factsHTML(mine.n, mine.nL);
+  return h;
+}
+// 라운드별 점수 기록 표
+function historyHTML(meta, results, emptyText) {
   const list = sortedResults(results);
-  emptyEl.hidden = list.length > 0;
-  tbody.parentElement.hidden = list.length === 0;
-  let sum = 0;
-  tbody.innerHTML = list.map((r) => {
-    sum += r.score;
-    return "<tr><td>" + r.round + "</td><td>" + MODE_NAME[r.mode] + "</td><td>" + r.nL + " : " + r.nR +
-      "</td><td><b>" + r.score + "</b></td><td>" + sum + "</td></tr>";
-  }).join("");
+  if (!list.length) return '<p class="empty">' + emptyText + "</p>";
+  if (!meta.teams) {
+    let sum = 0;
+    return "<table><thead><tr><th>라운드</th><th>방식</th><th>왼쪽 : 오른쪽</th><th>점수</th><th>누적</th></tr></thead><tbody>" +
+      list.map((r) => { sum += r.score || 0; return "<tr><td>" + r.round + "</td><td>" + MODE_NAME[r.mode] + "</td><td>" + r.nL + " : " + r.nR + "</td><td><b>" + (r.score || 0) + "</b></td><td>" + sum + "</td></tr>"; }).join("") +
+      "</tbody></table>";
+  }
+  const tot = teamTotals(results);
+  return "<table><thead><tr><th>라운드</th><th>방식</th>" + TEAMS.map((t) => "<th>" + teamTag(t) + "</th>").join("") + "</tr></thead><tbody>" +
+    list.map((r) => "<tr><td>" + r.round + "</td><td>" + MODE_NAME[r.mode] + "</td>" +
+      TEAMS.map((t) => "<td>" + (r.teams && r.teams[t] ? r.teams[t].score + (r.teams[t].jackpot ? " ★" : "") : "–") + "</td>").join("") + "</tr>").join("") +
+    '<tr class="sum"><td colspan="2">누적</td>' + TEAMS.map((t) => "<td><b>" + (tot[t] === undefined ? "–" : tot[t]) + "</b></td>").join("") + "</tr></tbody></table>" +
+    '<p class="sub small">★은 잭팟(+' + JACKPOT_BONUS + "점)이에요.</p>";
+}
+// 최종 순위: 예상 점수와 실제 점수의 차이가 작은 순서
+function buildFinal(meta, players, priv, results) {
+  const tot = teamTotals(results), classTotal = totalScore(results);
+  const list = Object.keys(players).filter((u) => priv[u] && typeof priv[u].predict === "number").map((u) => {
+    const team = priv[u].team || "", actual = meta.teams ? tot[team] || 0 : classTotal;
+    return { uid: u, name: players[u].name || "", team, predict: priv[u].predict, actual, diff: Math.abs(priv[u].predict - actual) };
+  }).sort((a, b) => a.diff - b.diff || a.name.localeCompare(b.name));
+  list.forEach((x, i) => { x.rank = i > 0 && list[i - 1].diff === x.diff ? list[i - 1].rank : i + 1; });
+  return { list };
+}
+function finalHTML(final, meta, myUid) {
+  const list = Object.values((final && final.list) || {});
+  let h = "<h2>최종 순위: 예상과 실제의 차이가 작은 순서</h2>";
+  if (!list.length) return h + '<p class="empty">예상 점수를 낸 학생이 없어요.</p>';
+  h += "<table><thead><tr><th>순위</th><th>별명</th>" + (meta.teams ? "<th>팀</th>" : "") + "<th>예상</th><th>실제</th><th>차이</th></tr></thead><tbody>";
+  list.forEach((x) => {
+    h += "<tr" + (x.uid === myUid ? ' class="me"' : "") + "><td><b>" + x.rank + "</b></td><td>" + esc(x.name) + "</td>" +
+      (meta.teams ? "<td>" + teamTag(x.team) + "</td>" : "") + "<td>" + x.predict + "</td><td>" + x.actual + "</td><td><b>" + x.diff + "</b></td></tr>";
+  });
+  return h + "</tbody></table>";
 }
 
 function configReady() {
