@@ -1,11 +1,13 @@
 // 학생·교사 화면이 함께 쓰는 코드
-// 격자 크기: 한쪽 영역이 COLS x ROWS 칸 (전체 칸 수는 2000을 넘지 않게)
-const COLS = 11, ROWS = 10, HALF = COLS * ROWS, TOTAL = HALF * 2;
+// 격자 크기: 한쪽 영역이 가로 x 세로 칸 (전체 칸 수는 2000을 넘지 않게)
+// 열의 이동은 칸(입자)을 적게 두어 한 칸에 에너지가 여러 개 쌓이고, 온도(입자당 평균 에너지)가 읽기 쉬운 값이 되게 한다.
+const GRID = { gas: [11, 10], heat: [4, 3] };
+let COLS = GRID.gas[0], ROWS = GRID.gas[1], HALF = COLS * ROWS, TOTAL = HALF * 2;
 const MODE_NAME = { click: "직접 선택", random: "무작위 번호" };
 // 주제: 기체 확산(분자가 퍼짐) 또는 열의 이동(에너지가 두 물체에 나뉨)
 const TOPIC = {
   gas: { name: "기체 확산", unit: "분자", open: "칸막이 열기" },
-  heat: { name: "열의 이동", unit: "에너지", open: "열 접촉시키기" }
+  heat: { name: "열의 이동", unit: "에너지", open: "접촉시키기" }
 };
 const topicOf = (meta) => (meta && meta.topic === "heat" ? "heat" : "gas");
 // 모둠 대항전
@@ -57,13 +59,24 @@ function buildBoard(board, onClick) {
   const gas = document.createElement("div"); gas.className = "gas";
   board.append(halves, gas);
   board._cells = cells; board._gas = gas; board._mols = new Map(); board._list = [];
-  new ResizeObserver(() => {
+  board._ro = new ResizeObserver(() => {
     const w = cells[1].getBoundingClientRect().width;
     board.style.setProperty("--cs", w + "px");
     board.classList.toggle("tiny", w < 20);
     layoutGas(board, false);
-  }).observe(board);
+  });
+  board._ro.observe(board);
   return cells;
+}
+// 주제에 맞는 격자인지 확인하고, 다르면 실린더를 다시 만든다. 현재 칸 배열을 돌려준다.
+function ensureGrid(board, meta, onClick) {
+  const t = topicOf(meta), g = GRID[t];
+  board.classList.toggle("heat", t === "heat");
+  if (g[0] === COLS && g[1] === ROWS) return board._cells;
+  COLS = g[0]; ROWS = g[1]; HALF = COLS * ROWS; TOTAL = HALF * 2;
+  if (board._ro) board._ro.disconnect();
+  board.innerHTML = "";
+  return buildBoard(board, onClick);
 }
 function rnd(i, k) { const x = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453; return x - Math.floor(x); }
 function hashNum(str) { let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return Math.abs(h) % 100000; }
@@ -83,11 +96,12 @@ function layoutGas(board, animate) {
       el.style.transitionDelay = 0.3 + rnd(h, 4) * 0.9 + "s";
       gas.appendChild(el); mols.set(m.id, el);
     }
-    const r = board._cells[m.cell].getBoundingClientRect();
+    if (!board._cells[m.cell]) return;
+    const r = board._cells[m.cell].getBoundingClientRect(), j = board.classList.contains("heat") ? 0.7 : 0.5;
     const size = Math.max(5, Math.min(r.width * 0.55, 16));
     el.style.width = el.style.height = size + "px";
-    el.style.left = r.left - g.left + r.width * (0.5 + (rnd(h, 1) - 0.5) * 0.5) + "px";
-    el.style.top = r.top - g.top + r.height * (0.5 + (rnd(h, 2) - 0.5) * 0.5) + "px";
+    el.style.left = r.left - g.left + r.width * (0.5 + (rnd(h, 1) - 0.5) * j) + "px";
+    el.style.top = r.top - g.top + r.height * (0.5 + (rnd(h, 2) - 0.5) * j) + "px";
     el.classList.toggle("mine", !!m.mine);
     el.dataset.team = m.team || "";
     seen.add(m.id);
@@ -110,7 +124,9 @@ function renderTopic(board, meta, list) {
   if (heat) list.forEach((m) => (cnt[m.cell] = (cnt[m.cell] || 0) + 1));
   for (let n = 1; n <= TOTAL; n++) {
     const k = cnt[n] || 0, cl = board._cells[n].classList;
-    cl.toggle("h1", k === 1); cl.toggle("h2", k === 2); cl.toggle("h3", k >= 3);
+    cl.toggle("hot", k > 0);   // 에너지가 많은 입자일수록 더 붉고 더 크게 떨린다
+    board._cells[n].style.setProperty("--heat", Math.min(0.16 * k, 0.9));
+    board._cells[n].style.setProperty("--v", Math.min(0.5 * k, 3) + "px");
   }
   const nL = leftCount(list), nR = list.length - nL, halves = board.querySelectorAll(".half");
   $("lblL").textContent = heat ? "왼쪽 물체의 에너지" : "왼쪽";
@@ -119,6 +135,8 @@ function renderTopic(board, meta, list) {
   [[nL, "tL", halves[0]], [nR, "tR", halves[1]]].forEach(([k, id, half]) => {
     const share = list.length ? k / list.length : 0, hue = Math.round(220 + 140 * share);   // 파랑(저온)에서 빨강(고온)으로
     const el = $(id), bar = el.querySelector("i");
+    const val = el.querySelector("em") || el.appendChild(document.createElement("em"));
+    val.textContent = (k / HALF).toFixed(1);   // 온도 = 에너지 수 ÷ 입자 수
     el.hidden = !heat;
     bar.style.width = Math.round(share * 100) + "%";
     bar.style.background = "hsl(" + hue + ",75%,50%)";
@@ -155,7 +173,7 @@ function bigHTML(a, av, b, bv) {
   return '<div class="scores"><div class="now">' + a + '<span class="n">' + av + "</span></div><div>" + b + '<span class="n">' + bv + "</span></div></div>";
 }
 function factsHTML(n, nL, heat) {
-  const temp = heat ? "<dt>두 물체의 온도</dt><dd>" + (nL * 2 === n ? "같아요" : nL * 2 > n ? "왼쪽이 더 높아요" : "오른쪽이 더 높아요") + "</dd>" : "";
+  const temp = heat ? "<dt>온도(입자 하나당 평균 에너지)</dt><dd>왼쪽 " + (nL / HALF).toFixed(1) + ", 오른쪽 " + ((n - nL) / HALF).toFixed(1) + "</dd><dt>두 물체의 온도</dt><dd>" + (nL * 2 === n ? "같아요" : nL * 2 > n ? "왼쪽이 더 높아요" : "오른쪽이 더 높아요") + "</dd>" : "";
   return '<dl class="facts"><dt>분포</dt><dd>왼쪽 ' + nL + "개, 오른쪽 " + (n - nL) + "개</dd>" + temp + "<dt>이 분포가 되는 경우의 수</dt><dd>" +
     fmtWays(n, nL) + "</dd><dt>무작위로 이 분포가 나올 확률</dt><dd>" + fmtProb(n, nL) + "</dd></dl>";
 }
@@ -202,7 +220,7 @@ function historyHTML(meta, results, emptyText) {
 // 최종 순위: 예상 점수와 실제 점수의 차이가 작은 순서
 function buildFinal(meta, players, priv, results) {
   const tot = teamTotals(results), classTotal = totalScore(results);
-  const list = Object.keys(players).filter((u) => priv[u] && typeof priv[u].predict === "number").map((u) => {
+  const list = Object.keys(players).filter((u) => priv[u] && typeof priv[u].predict === "number" && priv[u].predict >= 0).map((u) => {
     const team = priv[u].team || "", actual = meta.teams ? tot[team] || 0 : classTotal;
     return { uid: u, name: players[u].name || "", team, predict: priv[u].predict, actual, diff: Math.abs(priv[u].predict - actual) };
   }).sort((a, b) => a.diff - b.diff || a.name.localeCompare(b.name));
