@@ -53,9 +53,9 @@
     <p id="status" class="status"></p>
     <p id="sendErr" class="notice" hidden></p>
     <div class="sides">
-      <span><span id="lblL">왼쪽</span><b id="cL"></b><span id="tL" class="thermo" title="온도 = 그 물체의 에너지 수 ÷ 입자(칸) 수" hidden><span class="track"><i></i></span></span></span>
+      <span><span id="lblL">왼쪽</span><b id="cL"></b><span id="tL" class="thermo" title="토큰 1개는 100 J이고, 토큰이 하나 들어오면 그 물체의 온도가 2 ℃ 올라요. 토큰이 없을 때는 20 ℃예요." hidden><span class="track"><i></i></span></span></span>
       <span></span>
-      <span><span id="lblR">오른쪽</span><b id="cR"></b><span id="tR" class="thermo" title="온도 = 그 물체의 에너지 수 ÷ 입자(칸) 수" hidden><span class="track"><i></i></span></span></span>
+      <span><span id="lblR">오른쪽</span><b id="cR"></b><span id="tR" class="thermo" title="토큰 1개는 100 J이고, 토큰이 하나 들어오면 그 물체의 온도가 2 ℃ 올라요. 토큰이 없을 때는 20 ℃예요." hidden><span class="track"><i></i></span></span></span>
     </div>
     <div id="board" class="board"></div>
     <div id="actions" class="actions" hidden>
@@ -273,7 +273,7 @@ function render() {
   const lead = heat ? (meta.round > 1 ? "에너지는 계속 옮겨 다녀요. " : "단열벽이 열이 통하는 벽으로 바뀌었어요. ")
                     : (meta.round > 1 ? "분자는 계속 움직여요. " : "칸막이가 열렸어요. ");
   if (phase === "lobby") {
-    status = heat ? "에너지 " + playerCount + "개가 모두 왼쪽 물체에 있어서 왼쪽은 뜨겁고 오른쪽은 차가워요. 선생님이 두 물체를 접촉시키기를 기다리세요."
+    status = heat ? "에너지 " + playerCount + "개가 모두 왼쪽 물체에 있어서 왼쪽은 " + tempOf(playerCount) + " ℃, 오른쪽은 " + tempOf(0) + " ℃예요. 토큰 1개는 " + HEAT.joule + " J이고 물체의 온도를 " + (HEAT.joule / HEAT.capacity) + " ℃ 올려요. 선생님이 두 물체를 접촉시키기를 기다리세요."
                   : "분자 " + playerCount + "개가 칸막이 왼쪽에 모여 있어요. 선생님이 칸막이를 열기를 기다리세요.";
   } else if (phase === "selecting") {
     if (done) status = myChoice + "번 칸을 정했어요. 결과 공개를 기다리세요.";
