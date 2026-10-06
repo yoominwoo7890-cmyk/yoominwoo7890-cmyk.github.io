@@ -2,6 +2,12 @@
 // 격자 크기: 한쪽 영역이 COLS x ROWS 칸 (전체 칸 수는 2000을 넘지 않게)
 const COLS = 11, ROWS = 10, HALF = COLS * ROWS, TOTAL = HALF * 2;
 const MODE_NAME = { click: "직접 선택", random: "무작위 번호" };
+// 주제: 기체 확산(분자가 퍼짐) 또는 열의 이동(에너지가 두 물체에 나뉨)
+const TOPIC = {
+  gas: { name: "기체 확산", unit: "분자", open: "칸막이 열기" },
+  heat: { name: "열의 이동", unit: "에너지", open: "열 접촉시키기" }
+};
+const topicOf = (meta) => (meta && meta.topic === "heat" ? "heat" : "gas");
 // 모둠 대항전
 const TEAMS = ["red", "blue", "green", "yellow"];
 const TEAM_NAME = { red: "빨강", blue: "파랑", green: "초록", yellow: "노랑" };
@@ -97,6 +103,29 @@ function gasList(choices, myUid) { return Object.keys(choices).sort().map((u) =>
 function keyOf(meta, round) { return (meta.game ? "g" + meta.game : "") + "r" + round; }
 function leftCount(list) { return list.filter((m) => m.cell <= HALF).length; }
 
+// 주제에 맞춰 양쪽 표시를 그린다. 열의 이동에서는 칸(입자)의 에너지 수만큼 붉게 칠하고 떨리게 하며, 양쪽 온도 막대를 보여 준다.
+function renderTopic(board, meta, list) {
+  const heat = topicOf(meta) === "heat", cnt = {}, $ = (id) => document.getElementById(id);
+  board.classList.toggle("heat", heat);
+  if (heat) list.forEach((m) => (cnt[m.cell] = (cnt[m.cell] || 0) + 1));
+  for (let n = 1; n <= TOTAL; n++) {
+    const k = cnt[n] || 0, cl = board._cells[n].classList;
+    cl.toggle("h1", k === 1); cl.toggle("h2", k === 2); cl.toggle("h3", k >= 3);
+  }
+  const nL = leftCount(list), nR = list.length - nL, halves = board.querySelectorAll(".half");
+  $("lblL").textContent = heat ? "왼쪽 물체의 에너지" : "왼쪽";
+  $("lblR").textContent = heat ? "오른쪽 물체의 에너지" : "오른쪽";
+  $("cL").textContent = nL; $("cR").textContent = nR;
+  [[nL, "tL", halves[0]], [nR, "tR", halves[1]]].forEach(([k, id, half]) => {
+    const share = list.length ? k / list.length : 0, hue = Math.round(220 + 140 * share);   // 파랑(저온)에서 빨강(고온)으로
+    const el = $(id), bar = el.querySelector("i");
+    el.hidden = !heat;
+    bar.style.width = Math.round(share * 100) + "%";
+    bar.style.background = "hsl(" + hue + ",75%,50%)";
+    half.style.backgroundColor = heat ? "hsla(" + hue + ",80%,55%,.10)" : "";
+  });
+}
+
 function esc(s) { return String(s).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch])); }
 function sortedResults(results) { return Object.values(results || {}).sort((a, b) => a.round - b.round); }
 function totalScore(results) { return sortedResults(results).reduce((s, r) => s + (r.score || 0), 0); }
@@ -125,19 +154,21 @@ const teamTag = (t) => (TEAM_NAME[t] ? '<span class="tdot" data-team="' + t + '"
 function bigHTML(a, av, b, bv) {
   return '<div class="scores"><div class="now">' + a + '<span class="n">' + av + "</span></div><div>" + b + '<span class="n">' + bv + "</span></div></div>";
 }
-function factsHTML(n, nL) {
-  return '<dl class="facts"><dt>분포</dt><dd>왼쪽 ' + nL + "개, 오른쪽 " + (n - nL) + "개</dd><dt>이 분포가 되는 경우의 수</dt><dd>" +
+function factsHTML(n, nL, heat) {
+  const temp = heat ? "<dt>두 물체의 온도</dt><dd>" + (nL * 2 === n ? "같아요" : nL * 2 > n ? "왼쪽이 더 높아요" : "오른쪽이 더 높아요") + "</dd>" : "";
+  return '<dl class="facts"><dt>분포</dt><dd>왼쪽 ' + nL + "개, 오른쪽 " + (n - nL) + "개</dd>" + temp + "<dt>이 분포가 되는 경우의 수</dt><dd>" +
     fmtWays(n, nL) + "</dd><dt>무작위로 이 분포가 나올 확률</dt><dd>" + fmtProb(n, nL) + "</dd></dl>";
 }
 // 이번 라운드 결과 카드. myTeam은 학생 화면에서만 넘긴다.
 function resultHTML(meta, r, results, myTeam) {
-  if (!meta.teams) return bigHTML("이번 점수", r.score, "누적 총점", totalScore(results)) + factsHTML(r.n, r.nL);
+  const U = TOPIC[topicOf(meta)].unit;
+  if (!meta.teams) return bigHTML("이번 점수", r.score, "누적 총점", totalScore(results)) + factsHTML(r.n, r.nL, topicOf(meta) === "heat");
   const tot = teamTotals(results), ts = r.teams || {}, mine = myTeam && ts[myTeam];
   let h = "";
   if (mine) h += bigHTML("우리 팀(" + TEAM_NAME[myTeam] + ") 이번 점수", mine.score, "우리 팀 누적", tot[myTeam] || 0);
-  else if (myTeam) h += '<p class="sub">이번 라운드에는 우리 팀이 제출한 분자가 없어요.</p>';
+  else if (myTeam) h += '<p class="sub">이번 라운드에는 우리 팀이 제출한 ' + U + "가 없어요.</p>";
   TEAMS.forEach((t) => {
-    if (ts[t] && ts[t].jackpot) h += '<p class="jackpot">잭팟! ' + TEAM_NAME[t] + " 팀의 분자 " + ts[t].n + "개가 모두 한쪽에 모였어요. 무작위로는 " +
+    if (ts[t] && ts[t].jackpot) h += '<p class="jackpot">잭팟! ' + TEAM_NAME[t] + " 팀의 " + U + " " + ts[t].n + "개가 모두 한쪽에 모였어요. 무작위로는 " +
       Math.pow(2, ts[t].n - 1) + "번에 한 번 나오는 일이에요. 보너스 +" + JACKPOT_BONUS + "점</p>";
   });
   h += "<table><thead><tr><th>팀</th><th>왼쪽 : 오른쪽</th><th>이번 점수</th><th>누적</th></tr></thead><tbody>";
