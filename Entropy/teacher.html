@@ -54,10 +54,9 @@
           </div>
         </div>
         <div>
-          <p class="count">제출 <b id="nDone">0</b> / 입장 <b id="nAll">0</b>명</p>
+          <p class="count">선택 완료 <b id="nDone">0</b> / 전체 <b id="nAll">0</b>명</p>
           <p id="teamSizes" class="sub" hidden></p>
         </div>
-        <label class="toggle"><input id="hide" type="checkbox"> 공개 전까지 선택한 칸 숨기기 (화면을 띄워 둘 때)</label>
         <button id="btnStart" class="primary">칸막이 열기</button>
         <button id="btnReveal" class="primary" hidden>결과 보이기</button>
         <button id="btnColors" class="secondary" hidden>팀 색깔 공개</button>
@@ -138,7 +137,6 @@ $("btnCreate").addEventListener("click", async () => {
 $("btnNew").addEventListener("click", () => {
   if (confirm("지금 방을 닫고 새 방을 만들까요? 점수 기록은 이 화면에서 더 볼 수 없습니다.")) { localStorage.removeItem("entropy_teacher"); location.reload(); }
 });
-$("hide").addEventListener("change", render);
 // 초기화: 칸막이를 닫고 분자를 왼쪽으로 되돌리며 라운드와 점수 기록을 지운다. 입장한 학생, 팀, 예상 점수는 그대로 남는다.
 $("btnReset").addEventListener("click", () => {
   if (!meta || !confirm("처음 상태로 초기화할까요?\n" + TOPIC[topicOf(meta)].unit + "가 모두 왼쪽으로 돌아가고, 라운드와 점수 기록이 모두 지워집니다. 입장한 학생과 팀, 예상 점수는 그대로 남습니다.")) return;
@@ -206,7 +204,6 @@ function render() {
   const phase = meta.phase, teams = !!meta.teams, total = meta.totalRounds || 0;
   const nAll = Object.keys(players).length, list = phase === "lobby" ? [] : Object.values(choices);
   const shown = phase === "revealed" || phase === "final", last = total > 0 && meta.round >= total;
-  const hidden = $("hide").checked && phase === "selecting";
   $("hRound").textContent = meta.round ? meta.round + (total ? " / " + total : "") + "라운드" : "시작 전" + (total ? " · 총 " + total + "라운드" : "");
   const heat = topicOf(meta) === "heat", T = TOPIC[topicOf(meta)];
   $("hKind").textContent = T.name + " · " + (teams ? "모둠 대항전" : "반 전체 점수");
@@ -224,7 +221,7 @@ function render() {
   $("status").textContent =
     phase === "lobby" ? (heat ? "처음 상태입니다. 에너지 " + nAll + "개가 모두 왼쪽 물체에 있어 왼쪽은 " + tempOf(nAll) + " ℃, 오른쪽은 " + tempOf(0) + " ℃입니다. '접촉시키기'를 누르세요."
                            : "처음 상태입니다. 분자 " + nAll + "개가 칸막이 왼쪽에 모여 있습니다. '칸막이 열기'를 누르세요.")
-    : phase === "selecting" ? (hidden ? "학생들이 다음 위치를 정하는 중이며, 선택한 칸은 숨겨져 있습니다." : "학생들이 다음 위치를 정하는 중입니다. 정한 칸이 연두색으로 표시됩니다.")
+    : phase === "selecting" ? "학생들이 위치를 정하는 중입니다. " + nAll + "명 중 " + list.length + "명이 선택을 마쳤습니다."
     : phase === "final" ? "최종 순위를 공개했습니다. 학생 화면에도 같은 순위가 보입니다."
     : "결과를 공개했습니다." + (teams && !colorsOut ? " '팀 색깔 공개'를 누르면 " + T.unit + "가 팀 색으로 바뀝니다." : "") + (last ? (usePredict ? " 마지막 라운드입니다. '최종 순위 공개'를 누르세요." : " 마지막 라운드까지 마쳤습니다.") : "");
 
@@ -237,13 +234,6 @@ function render() {
     .map((m) => Object.assign(m, { team: colors ? colors[m.id] || "" : "" }));
   setGas(board, gas, shown);
 
-  const counts = countCells(choices), names = {};
-  Object.entries(choices).forEach(([u, c]) => (names[c] = names[c] || []).push((players[u] && players[u].name) || "별명 없음"));
-  for (let n = 1; n <= TOTAL; n++) {
-    const show = phase !== "lobby" && !hidden && counts[n] > 0;
-    cells[n].classList.toggle("picked", show);
-    cells[n].title = show ? names[n].join(", ") : "";
-  }
   renderTopic(board, meta, gas);
 
   document.querySelectorAll("[data-mode]").forEach((b) => {
