@@ -25,7 +25,7 @@
     <h1>방 <span id="sRoom"></span></h1>
     <p id="sInfo" class="sub"></p>
     <label for="inName">별명</label>
-    <input id="inName" type="text" maxlength="10" autocomplete="off" placeholder="예: 멘델레예프">
+    <input id="inName" type="text" maxlength="10" autocomplete="off">
     <div id="teamBox" hidden>
       <label>팀 색깔 고르기</label>
       <div id="teamPick" class="teampick"></div>
@@ -53,9 +53,9 @@
     <p id="status" class="status"></p>
     <p id="sendErr" class="notice" hidden></p>
     <div class="sides">
-      <span><span id="lblL">왼쪽</span><b id="cL"></b><span id="tL" class="thermo" hidden><span class="track"><i></i></span></span></span>
+      <span><span id="lblL">왼쪽</span><b id="cL"></b><span id="tL" class="thermo" title="온도 = 그 물체의 에너지 수 ÷ 입자(칸) 수" hidden><span class="track"><i></i></span></span></span>
       <span></span>
-      <span><span id="lblR">오른쪽</span><b id="cR"></b><span id="tR" class="thermo" hidden><span class="track"><i></i></span></span></span>
+      <span><span id="lblR">오른쪽</span><b id="cR"></b><span id="tR" class="thermo" title="온도 = 그 물체의 에너지 수 ÷ 입자(칸) 수" hidden><span class="track"><i></i></span></span></span>
     </div>
     <div id="board" class="board"></div>
     <div id="actions" class="actions" hidden>
@@ -85,7 +85,7 @@ let db, uid, code, roomRef, choiceRef;
 let meta = null, results = {}, playerCount = 0, playerIds = [], prevChoices = null, my = null, pub = {};
 let myChoice = null, pending = null, allChoices = null, curKey = null, rolling = false, sendErr = "";
 let joinMeta = null, hasPriv = false, pickedTeam = "";
-const cells = buildBoard(board, onCell);
+let cells = buildBoard(board, onCell);
 
 if (configReady()) {
   firebase.initializeApp(window.firebaseConfig);
@@ -126,6 +126,8 @@ async function findRoom() {
   }
 }
 
+// 교사가 방을 만들 때 예상 점수 맞히기를 껐으면 예상 점수를 묻지 않는다 (저장값 -1은 "예상 없음")
+function usePredict() { return joinMeta.predict !== false; }
 function maxPredict() { return (joinMeta.teams ? 100 + JACKPOT_BONUS : 100) * (joinMeta.totalRounds || 1); }
 function showSetup() {
   const n = joinMeta.totalRounds || 1, teams = !!joinMeta.teams;
@@ -133,7 +135,7 @@ function showSetup() {
   const heat = topicOf(joinMeta) === "heat", U = TOPIC[topicOf(joinMeta)].unit;
   $("sInfo").textContent = "주제: " + TOPIC[topicOf(joinMeta)].name + " · 총 " + n + "라운드" + (teams ? " · 모둠 대항전" : "");
   $("teamBox").hidden = !teams || hasPriv;
-  $("predictBox").hidden = hasPriv;
+  $("predictBox").hidden = hasPriv || !usePredict();
   $("sQuestion").textContent = n + "라운드까지 모두 마쳤을 때, " + (teams ? "우리 팀" : "우리 반") + "의 누적 점수는 몇 점일까요?";
   $("inPredict").max = maxPredict();
   $("sHint").textContent = (heat ? "라운드마다 에너지가 양쪽에 똑같이 나뉘어 두 물체의 온도가 같아지면 0점, 한쪽에 모두 몰리면 100점을 받아요. "
@@ -144,12 +146,12 @@ function showSetup() {
 
 // 2단계: 별명, 팀, 예상 점수를 저장하고 입장한다.
 async function join() {
-  const name = $("inName").value.trim(), teams = !!joinMeta.teams, raw = $("inPredict").value.trim(), predict = Number(raw);
+  const name = $("inName").value.trim(), teams = !!joinMeta.teams, raw = $("inPredict").value.trim(), predict = usePredict() ? Number(raw) : -1;
   const err = (m) => ($("setupErr").textContent = m);
   if (!name) return err("별명을 입력하세요.");
   if (!hasPriv) {
     if (teams && !pickedTeam) return err("팀 색깔을 고르세요.");
-    if (raw === "" || !Number.isInteger(predict) || predict < 0 || predict > maxPredict()) return err("예상 점수를 0부터 " + maxPredict() + " 사이의 정수로 적으세요.");
+    if (usePredict() && (raw === "" || !Number.isInteger(predict) || predict < 0 || predict > maxPredict())) return err("예상 점수를 0부터 " + maxPredict() + " 사이의 정수로 적으세요.");
   }
   $("btnJoin").disabled = true;
   try {
@@ -240,6 +242,7 @@ function roll() {
 
 function render() {
   if (!meta) return;
+  cells = ensureGrid(board, meta, onCell);
   const phase = meta.phase, mode = meta.mode, done = myChoice && !rolling, teams = !!meta.teams;
   const shown = phase === "revealed" || phase === "final";
   const total = meta.totalRounds || 0;
@@ -247,8 +250,9 @@ function render() {
   $("hMode").textContent = MODE_NAME[mode];
   $("hTeam").hidden = !(teams && my && my.team);
   if (teams && my && my.team) $("hTeam").innerHTML = "내 팀 " + teamTag(my.team);
-  $("hPredict").hidden = !(my && typeof my.predict === "number");
-  if (my && typeof my.predict === "number") $("hPredict").textContent = "내 예상 " + my.predict + "점";
+  const hasP = meta.predict !== false && my && typeof my.predict === "number" && my.predict >= 0;
+  $("hPredict").hidden = !hasP;
+  if (hasP) $("hPredict").textContent = "내 예상 " + my.predict + "점";
 
   const spread = shown && allChoices;
   board.classList.toggle("open", phase !== "lobby");
