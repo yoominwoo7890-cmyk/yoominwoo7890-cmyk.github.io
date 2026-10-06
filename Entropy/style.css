@@ -151,6 +151,6 @@ tr.sum td{border-top:2px solid var(--line)}
 .cell.hot{background:rgba(255,105,45,var(--heat,.2));animation:vib .16s linear infinite alternate;z-index:1}
 .cell.picked{background:var(--pick)}
 .cell.sel,.cell.flash{background:var(--gas-soft)}
-.thermo em{font-style:normal;font-weight:700;color:var(--ink);font-size:1rem;min-width:2em;text-align:left}
+.thermo em{font-style:normal;font-weight:700;color:var(--ink);font-size:1rem;min-width:3.2em;text-align:left;white-space:nowrap}
 .thermo{cursor:help}
 @media (prefers-reduced-motion:reduce){.cell.hot{animation:none}}
