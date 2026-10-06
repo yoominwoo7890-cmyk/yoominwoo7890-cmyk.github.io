@@ -9,6 +9,10 @@ const TOPIC = {
   gas: { name: "기체 확산", unit: "분자", open: "칸막이 열기" },
   heat: { name: "열의 이동", unit: "에너지", open: "접촉시키기" }
 };
+// 열의 이동의 온도 환산: 두 물체는 열용량이 50 J/℃로 같고, 에너지 토큰이 하나도 없을 때 20 ℃이다.
+// 토큰 1개 = 100 J 이므로 토큰 하나가 들어오면 그 물체의 온도가 2 ℃ 오른다.
+const HEAT = { base: 20, joule: 100, capacity: 50 };
+const tempOf = (tokens) => HEAT.base + tokens * HEAT.joule / HEAT.capacity;
 const topicOf = (meta) => (meta && meta.topic === "heat" ? "heat" : "gas");
 // 모둠 대항전
 const TEAMS = ["red", "blue", "green", "yellow"];
@@ -129,14 +133,14 @@ function renderTopic(board, meta, list) {
     board._cells[n].style.setProperty("--v", Math.min(0.5 * k, 3) + "px");
   }
   const nL = leftCount(list), nR = list.length - nL, halves = board.querySelectorAll(".half");
-  $("lblL").textContent = heat ? "왼쪽 물체의 에너지" : "왼쪽";
-  $("lblR").textContent = heat ? "오른쪽 물체의 에너지" : "오른쪽";
+  $("lblL").textContent = heat ? "왼쪽 물체의 에너지 토큰" : "왼쪽";
+  $("lblR").textContent = heat ? "오른쪽 물체의 에너지 토큰" : "오른쪽";
   $("cL").textContent = nL; $("cR").textContent = nR;
   [[nL, "tL", halves[0]], [nR, "tR", halves[1]]].forEach(([k, id, half]) => {
     const share = list.length ? k / list.length : 0, hue = Math.round(220 + 140 * share);   // 파랑(저온)에서 빨강(고온)으로
     const el = $(id), bar = el.querySelector("i");
     const val = el.querySelector("em") || el.appendChild(document.createElement("em"));
-    val.textContent = (k / HALF).toFixed(1);   // 온도 = 에너지 수 ÷ 입자 수
+    val.textContent = tempOf(k) + " ℃";
     el.hidden = !heat;
     bar.style.width = Math.round(share * 100) + "%";
     bar.style.background = "hsl(" + hue + ",75%,50%)";
@@ -173,7 +177,7 @@ function bigHTML(a, av, b, bv) {
   return '<div class="scores"><div class="now">' + a + '<span class="n">' + av + "</span></div><div>" + b + '<span class="n">' + bv + "</span></div></div>";
 }
 function factsHTML(n, nL, heat) {
-  const temp = heat ? "<dt>온도(입자 하나당 평균 에너지)</dt><dd>왼쪽 " + (nL / HALF).toFixed(1) + ", 오른쪽 " + ((n - nL) / HALF).toFixed(1) + "</dd><dt>두 물체의 온도</dt><dd>" + (nL * 2 === n ? "같아요" : nL * 2 > n ? "왼쪽이 더 높아요" : "오른쪽이 더 높아요") + "</dd>" : "";
+  const temp = heat ? "<dt>온도</dt><dd>왼쪽 " + tempOf(nL) + " ℃, 오른쪽 " + tempOf(n - nL) + " ℃</dd><dt>두 물체의 온도</dt><dd>" + (nL * 2 === n ? "같아요" : nL * 2 > n ? "왼쪽이 더 높아요" : "오른쪽이 더 높아요") + "</dd>" : "";
   return '<dl class="facts"><dt>분포</dt><dd>왼쪽 ' + nL + "개, 오른쪽 " + (n - nL) + "개</dd>" + temp + "<dt>이 분포가 되는 경우의 수</dt><dd>" +
     fmtWays(n, nL) + "</dd><dt>무작위로 이 분포가 나올 확률</dt><dd>" + fmtProb(n, nL) + "</dd></dl>";
 }
