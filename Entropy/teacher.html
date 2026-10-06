@@ -20,8 +20,8 @@
     </div>
     <p id="topicHint" class="hint">칸막이를 열면 한쪽에 모여 있던 기체 분자가 퍼집니다.</p>
     <label for="inRounds">진행할 라운드 수</label>
-    <input id="inRounds" type="number" inputmode="numeric" min="1" max="20" step="1" value="5">
-    <p class="hint">학생은 입장할 때 이 라운드까지의 누적 점수를 예상해서 적습니다.</p>
+    <input id="inRounds" type="number" inputmode="numeric" min="1" max="20" step="1" value="10">
+    <label class="check"><input id="inPredict" type="checkbox" checked> <span>예상 점수 맞히기<br><span class="hint">학생이 입장할 때 마지막 라운드까지의 누적 점수를 예상해서 적고, 끝난 뒤 실제 점수와 가장 가까운 순서로 최종 순위를 공개합니다.</span></span></label>
     <label class="check"><input id="inTeams" type="checkbox"> <span>모둠 대항전으로 진행<br><span class="hint">학생이 빨강·파랑·초록·노랑 중 하나를 골라 팀이 되고, 점수를 팀별로 계산합니다.</span></span></label>
     <p id="startErr" class="err"></p>
     <button id="btnCreate" class="primary" disabled>방 만들기</button>
@@ -36,9 +36,9 @@
       <div>
         <p id="status" class="status"></p>
         <div class="sides">
-          <span><span id="lblL">왼쪽</span><b id="cL"></b><span id="tL" class="thermo" hidden><span class="track"><i></i></span></span></span>
+          <span><span id="lblL">왼쪽</span><b id="cL"></b><span id="tL" class="thermo" title="온도 = 그 물체의 에너지 수 ÷ 입자(칸) 수" hidden><span class="track"><i></i></span></span></span>
           <span></span>
-          <span><span id="lblR">오른쪽</span><b id="cR"></b><span id="tR" class="thermo" hidden><span class="track"><i></i></span></span></span>
+          <span><span id="lblR">오른쪽</span><b id="cR"></b><span id="tR" class="thermo" title="온도 = 그 물체의 에너지 수 ÷ 입자(칸) 수" hidden><span class="track"><i></i></span></span></span>
         </div>
         <div id="board" class="board"></div>
         <section id="final" class="final" hidden></section>
@@ -88,7 +88,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const board = $("board");
-const cells = buildBoard(board);
+let cells = buildBoard(board);
 let db, uid, code, roomRef, choicesRef;
 let meta = null, players = {}, priv = {}, pub = {}, choices = {}, results = {}, curKey = null, prevChoices = null;
 let topic = "gas";
@@ -96,7 +96,7 @@ document.querySelectorAll("[data-topic]").forEach((b) => b.addEventListener("cli
   topic = b.dataset.topic;
   document.querySelectorAll("[data-topic]").forEach((o) => o.classList.toggle("on", o === b));
   $("topicHint").textContent = topic === "heat"
-    ? "뜨거운 물체(왼쪽)와 차가운 물체(오른쪽)를 접촉시키면 에너지가 나뉘어 온도가 같아집니다. 칸은 입자, 학생의 알갱이는 에너지 한 단위입니다."
+    ? "뜨거운 물체(왼쪽)와 차가운 물체(오른쪽)를 접촉시키면 에너지가 나뉘어 온도가 같아집니다. 칸은 입자(한쪽에 12개), 학생의 알갱이는 에너지 한 단위이고, 온도는 입자 하나당 평균 에너지로 표시됩니다."
     : "칸막이를 열면 한쪽에 모여 있던 기체 분자가 퍼집니다.";
 }));
 const fail = (what) => (e) => alert(what + ": " + (e.code || e.message));
@@ -125,7 +125,7 @@ $("btnCreate").addEventListener("click", async () => {
       const c = String(1000 + Math.floor(Math.random() * 9000));
       const ref = db.ref("rooms/" + c + "/meta");
       if ((await ref.get()).exists()) continue;
-      await ref.set({ teacherUid: uid, mode: "click", round: 0, roundKey: "r0", phase: "lobby", createdAt: Date.now(), totalRounds: rounds, teams: $("inTeams").checked, topic });
+      await ref.set({ teacherUid: uid, mode: "click", round: 0, roundKey: "r0", phase: "lobby", createdAt: Date.now(), totalRounds: rounds, teams: $("inTeams").checked, predict: $("inPredict").checked, topic });
       localStorage.setItem("entropy_teacher", c);
       return open(c);
     }
@@ -202,6 +202,7 @@ function open(c) {
 
 function render() {
   if (!meta) return;
+  cells = ensureGrid(board, meta);
   const phase = meta.phase, teams = !!meta.teams, total = meta.totalRounds || 0;
   const nAll = Object.keys(players).length, list = phase === "lobby" ? [] : Object.values(choices);
   const shown = phase === "revealed" || phase === "final", last = total > 0 && meta.round >= total;
@@ -219,13 +220,13 @@ function render() {
   board.classList.toggle("open", phase !== "lobby");
   board.classList.toggle("teams", teams);
 
-  const colorsOut = !!(pub.colors && pub.colors[curKey]);
+  const colorsOut = !!(pub.colors && pub.colors[curKey]), usePredict = meta.predict !== false;
   $("status").textContent =
-    phase === "lobby" ? (heat ? "처음 상태입니다. 에너지 " + nAll + "개가 모두 왼쪽 물체에 있어 왼쪽이 고온, 오른쪽이 저온입니다. '열 접촉시키기'를 누르세요."
+    phase === "lobby" ? (heat ? "처음 상태입니다. 에너지 " + nAll + "개가 모두 왼쪽 물체에 있어 왼쪽이 고온, 오른쪽이 저온입니다. '접촉시키기'를 누르세요."
                            : "처음 상태입니다. 분자 " + nAll + "개가 칸막이 왼쪽에 모여 있습니다. '칸막이 열기'를 누르세요.")
     : phase === "selecting" ? (hidden ? "학생들이 다음 위치를 정하는 중이며, 선택한 칸은 숨겨져 있습니다." : "학생들이 다음 위치를 정하는 중입니다. 정한 칸이 연두색으로 표시됩니다.")
     : phase === "final" ? "최종 순위를 공개했습니다. 학생 화면에도 같은 순위가 보입니다."
-    : "결과를 공개했습니다." + (teams && !colorsOut ? " '팀 색깔 공개'를 누르면 " + T.unit + "가 팀 색으로 바뀝니다." : "") + (last ? " 마지막 라운드입니다. '최종 순위 공개'를 누르세요." : "");
+    : "결과를 공개했습니다." + (teams && !colorsOut ? " '팀 색깔 공개'를 누르면 " + T.unit + "가 팀 색으로 바뀝니다." : "") + (last ? (usePredict ? " 마지막 라운드입니다. '최종 순위 공개'를 누르세요." : " 마지막 라운드까지 마쳤습니다.") : "");
 
   // 화면에 보이는 분자 위치와, 그 라운드에 공개된 팀 색깔 (학생 화면과 같은 기준)
   const ids = Object.keys(players).sort();
@@ -255,7 +256,7 @@ function render() {
   $("btnColors").hidden = !(teams && shown);
   $("btnColors").disabled = colorsOut;
   $("btnColors").textContent = colorsOut ? "팀 색깔 공개됨" : "팀 색깔 공개";
-  $("btnFinal").hidden = !(phase === "revealed" && last);
+  $("btnFinal").hidden = !(phase === "revealed" && last && usePredict);
 
   const fin = phase === "final" && pub.final;
   $("final").hidden = !fin;
