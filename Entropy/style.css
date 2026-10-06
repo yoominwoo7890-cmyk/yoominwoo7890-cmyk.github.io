@@ -52,16 +52,17 @@ button:focus-visible{outline:3px solid var(--gas);outline-offset:2px}
 .cell.sel,.cell.flash{background:var(--gas-soft);box-shadow:inset 0 0 0 2px var(--gas)}
 .cell.picked{background:var(--pick);box-shadow:inset 0 0 0 1px var(--pick-line)}
 .cell.picked .num{color:#4d7a12}
-.gas{position:absolute;inset:0;pointer-events:none}
+.gas{position:absolute;inset:0;pointer-events:none;z-index:2}
 .mol{position:absolute;border-radius:50%;background:radial-gradient(circle at 35% 30%,#8fb4ff,var(--gas) 65%);
   transform:translate(-50%,-50%);transition:left 2.2s cubic-bezier(.3,.1,.2,1),top 2.2s cubic-bezier(.3,.1,.2,1);
   animation:jig 2.6s ease-in-out infinite alternate}
-.board.teams .mol{background:radial-gradient(circle at 35% 30%,#c9d0d9,#8a94a3 65%)}
+.board.heat .mol{background:radial-gradient(circle at 40% 35%,#fff6c2,#f59300 60%);box-shadow:0 0 7px 1px rgba(245,147,0,.55)}
+.board.teams .mol{background:radial-gradient(circle at 35% 30%,#c9d0d9,#8a94a3 65%);box-shadow:none}
 .board .mol[data-team="red"]{background:radial-gradient(circle at 35% 30%,#ff9c9f,var(--t-red) 65%)}
 .board .mol[data-team="blue"]{background:radial-gradient(circle at 35% 30%,#8fb4ff,var(--t-blue) 65%)}
 .board .mol[data-team="green"]{background:radial-gradient(circle at 35% 30%,#8fdcae,var(--t-green) 65%)}
 .board .mol[data-team="yellow"]{background:radial-gradient(circle at 35% 30%,#ffe58a,var(--t-yellow) 65%)}
-.mol.mine{box-shadow:0 0 0 2px #fff,0 0 0 4.5px var(--ink);z-index:1}
+.board .mol.mine{box-shadow:0 0 0 2px #fff,0 0 0 4.5px var(--ink);z-index:1}
 .gas.noanim .mol{transition:none}
 @keyframes jig{
   0%{transform:translate(calc(-50% - 2px),calc(-50% + 1px))}
@@ -126,3 +127,22 @@ tr.sum td{border-top:2px solid var(--line)}
 .final{margin-top:20px;border:2px solid var(--ink);border-radius:14px;padding:16px}
 .secondary{width:100%;padding:12px 18px;border:1.5px solid var(--gas);border-radius:12px;background:#fff;color:var(--gas);font-weight:700;font-size:1.05rem}
 .secondary:disabled{border-color:var(--line);color:var(--faint);cursor:not-allowed}
+
+/* 열의 이동: 단열벽이 열이 통하는 얇은 금속벽으로 바뀌고, 에너지를 가진 입자(칸)는 붉어지며 떨린다 */
+.half{transition:background-color 1.5s}
+.board.heat .handle{display:none}
+.board.heat .wall{width:14px;margin-left:-7px;border-radius:3px;
+  background:repeating-linear-gradient(45deg,var(--metal) 0 4px,#8793a1 4px 8px);transition:transform 1.8s ease-in-out,filter 1.8s}
+.board.heat.open .wall{transform:scaleX(.3);background:#c8763a}
+.cell.h1{background:#ffe3c2}
+.cell.h2{background:#ffbf8f}
+.cell.h3{background:#ff9670}
+.cell.h1,.cell.h2,.cell.h3{animation:vib .16s linear infinite alternate;z-index:1}
+.cell.h1{--v:.6px} .cell.h2{--v:1.3px} .cell.h3{--v:2.2px}
+@keyframes vib{from{transform:translate(calc(var(--v)*-1),var(--v))}to{transform:translate(var(--v),calc(var(--v)*-1))}}
+.cell.picked{background:var(--pick)}
+.thermo{display:flex;align-items:center;justify-content:center;gap:6px;font-size:.85rem;margin-top:2px}
+.thermo::before{content:"온도"}
+.thermo .track{width:min(140px,50%);height:8px;border-radius:4px;background:#eef1f4;overflow:hidden}
+.thermo i{display:block;height:100%;border-radius:4px;transition:width 1.5s,background 1.5s}
+@media (prefers-reduced-motion:reduce){.cell.h1,.cell.h2,.cell.h3{animation:none}}
