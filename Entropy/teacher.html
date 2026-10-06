@@ -36,9 +36,9 @@
       <div>
         <p id="status" class="status"></p>
         <div class="sides">
-          <span><span id="lblL">왼쪽</span><b id="cL"></b><span id="tL" class="thermo" title="온도 = 그 물체의 에너지 수 ÷ 입자(칸) 수" hidden><span class="track"><i></i></span></span></span>
+          <span><span id="lblL">왼쪽</span><b id="cL"></b><span id="tL" class="thermo" title="토큰 1개는 100 J이고, 토큰이 하나 들어오면 그 물체의 온도가 2 ℃ 올라요. 토큰이 없을 때는 20 ℃예요." hidden><span class="track"><i></i></span></span></span>
           <span></span>
-          <span><span id="lblR">오른쪽</span><b id="cR"></b><span id="tR" class="thermo" title="온도 = 그 물체의 에너지 수 ÷ 입자(칸) 수" hidden><span class="track"><i></i></span></span></span>
+          <span><span id="lblR">오른쪽</span><b id="cR"></b><span id="tR" class="thermo" title="토큰 1개는 100 J이고, 토큰이 하나 들어오면 그 물체의 온도가 2 ℃ 올라요. 토큰이 없을 때는 20 ℃예요." hidden><span class="track"><i></i></span></span></span>
         </div>
         <div id="board" class="board"></div>
         <section id="final" class="final" hidden></section>
@@ -96,7 +96,7 @@ document.querySelectorAll("[data-topic]").forEach((b) => b.addEventListener("cli
   topic = b.dataset.topic;
   document.querySelectorAll("[data-topic]").forEach((o) => o.classList.toggle("on", o === b));
   $("topicHint").textContent = topic === "heat"
-    ? "뜨거운 물체(왼쪽)와 차가운 물체(오른쪽)를 접촉시키면 에너지가 나뉘어 온도가 같아집니다. 칸은 입자(한쪽에 12개), 학생의 알갱이는 에너지 한 단위이고, 온도는 입자 하나당 평균 에너지로 표시됩니다."
+    ? "뜨거운 물체(왼쪽)와 차가운 물체(오른쪽)를 접촉시키면 에너지가 나뉘어 온도가 같아집니다. 칸은 입자(한쪽에 12개)이고, 학생의 토큰 1개는 에너지 100 J로 물체의 온도를 2 ℃ 올립니다. 토큰이 없는 물체는 20 ℃입니다."
     : "칸막이를 열면 한쪽에 모여 있던 기체 분자가 퍼집니다.";
 }));
 const fail = (what) => (e) => alert(what + ": " + (e.code || e.message));
@@ -222,7 +222,7 @@ function render() {
 
   const colorsOut = !!(pub.colors && pub.colors[curKey]), usePredict = meta.predict !== false;
   $("status").textContent =
-    phase === "lobby" ? (heat ? "처음 상태입니다. 에너지 " + nAll + "개가 모두 왼쪽 물체에 있어 왼쪽이 고온, 오른쪽이 저온입니다. '접촉시키기'를 누르세요."
+    phase === "lobby" ? (heat ? "처음 상태입니다. 에너지 " + nAll + "개가 모두 왼쪽 물체에 있어 왼쪽은 " + tempOf(nAll) + " ℃, 오른쪽은 " + tempOf(0) + " ℃입니다. '접촉시키기'를 누르세요."
                            : "처음 상태입니다. 분자 " + nAll + "개가 칸막이 왼쪽에 모여 있습니다. '칸막이 열기'를 누르세요.")
     : phase === "selecting" ? (hidden ? "학생들이 다음 위치를 정하는 중이며, 선택한 칸은 숨겨져 있습니다." : "학생들이 다음 위치를 정하는 중입니다. 정한 칸이 연두색으로 표시됩니다.")
     : phase === "final" ? "최종 순위를 공개했습니다. 학생 화면에도 같은 순위가 보입니다."
