@@ -1,1 +1,235 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>입자에서 압력과 온도로</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one big control (particle count) on top, gas box left, two readout+chart blocks right, details folded away. Single white theme by request. */
+:root{
+  color-scheme: light;
+  --bg:#ffffff; --ink:#14181f; --muted:#6b7280; --line:#e6e8ee; --soft:#f6f7fa;
+  --gas:#2f5bea; --press:#c2410c;
+  --sans:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6}
+.wrap{max-width:1000px;margin:0 auto;padding-inline:20px;padding-block:36px 48px;display:flex;flex-direction:column;gap:28px}
+h1{font-size:26px;font-weight:600;margin:0 0 6px;letter-spacing:-.01em;text-wrap:balance}
+h2{font-size:15px;font-weight:600;margin:0}
+p{margin:0}
+.lede{color:var(--muted);max-width:56ch}
 
+.count{display:flex;flex-direction:column;gap:10px}
+.count-top{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.count-top label{font-size:14px;color:var(--muted)}
+.count-top output{font-family:var(--mono);font-size:34px;font-weight:500;line-height:1;font-variant-numeric:tabular-nums}
+.count-top output small{font-family:var(--sans);font-size:14px;color:var(--muted);font-weight:400;margin-left:4px}
+input[type=range]{width:100%;accent-color:var(--gas);margin:0;height:24px}
+.ends{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.verdict{font-size:15px;font-weight:500}
+
+.main{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:32px;align-items:start}
+@media (max-width:800px){.main{grid-template-columns:minmax(0,1fr);gap:24px}}
+.col{display:flex;flex-direction:column;gap:28px;min-width:0}
+.panel{display:flex;flex-direction:column;gap:10px;min-width:0}
+canvas{display:block;width:100%;max-width:100%}
+#box{aspect-ratio:3/2;border:2px solid var(--ink);border-radius:2px}
+.caption{font-size:12px;color:var(--muted)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--press);margin-right:5px;vertical-align:1px}
+
+.read{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.read .val{font-family:var(--mono);font-size:26px;font-weight:500;line-height:1.1;font-variant-numeric:tabular-nums}
+.read .val small{font-family:var(--sans);font-size:12px;color:var(--muted);font-weight:400;margin-left:6px}
+.p .val{color:var(--press)} .t .val{color:var(--gas)}
+.strip{height:120px}
+.sub{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.sub b{color:var(--ink);font-weight:500;font-family:var(--mono)}
+
+.tools{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center}
+.tools .temp{display:flex;align-items:center;gap:12px;flex:1 1 280px;min-width:0;font-size:13px;color:var(--muted)}
+.tools .temp input{flex:1;min-width:0}
+.tools output{font-family:var(--mono);color:var(--ink);min-width:5ch;text-align:right}
+button{font:inherit;font-size:13px;padding:7px 16px;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;cursor:pointer}
+button:hover{background:var(--soft)}
+:focus-visible{outline:2px solid var(--gas);outline-offset:2px}
+
+details{border-top:1px solid var(--line);padding-top:16px}
+summary{cursor:pointer;font-weight:500;font-size:14px}
+.more{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px 32px;margin-top:16px;color:var(--muted);font-size:14px}
+.more>*{min-width:0}
+.more strong{color:var(--ink);font-weight:600}
+#hist{height:150px;margin-bottom:6px}
+</style>
+</head>
+<body style="margin:0">
+
+<div class="wrap">
+  <header>
+    <h1>입자에서 압력과 온도로</h1>
+    <p class="lede">입자 수를 늘려 보세요. 압력과 온도는 입자가 많을 때에만 하나의 값으로 정해집니다.</p>
+  </header>
+
+  <div class="count">
+    <div class="count-top">
+      <label for="nSlider">입자 수</label>
+      <output id="nOut">1<small>개</small></output>
+    </div>
+    <input type="range" id="nSlider" min="0" max="11" step="1" value="0">
+    <div class="ends"><span>1개</span><span>2,000개</span></div>
+    <p class="verdict" id="verdict"></p>
+  </div>
+
+  <div class="main">
+    <div class="panel">
+      <canvas id="box"></canvas>
+      <div class="tools">
+        <span class="caption"><span class="dot"></span>벽에 부딪힌 순간</span>
+        <div class="temp">
+          <label for="tSlider">벽 온도</label>
+          <input type="range" id="tSlider" min="150" max="900" step="10" value="300">
+          <output id="tOut">300 K</output>
+        </div>
+        <button id="pause" type="button">일시정지</button>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="panel p">
+        <div class="read"><h2>압력</h2><span class="val"><span id="pNow">–</span><small>기대값 대비</small></span></div>
+        <canvas id="pChart" class="strip"></canvas>
+        <p class="sub">흔들림 <b id="pFluc">–</b></p>
+      </div>
+      <div class="panel t">
+        <div class="read"><h2>온도</h2><span class="val"><span id="tNow">–</span><small>측정값</small></span></div>
+        <canvas id="tChart" class="strip"></canvas>
+        <p class="sub">흔들림 <b id="tFluc">–</b> · 이론값 1/√N = <b id="tTheory">–</b></p>
+      </div>
+    </div>
+  </div>
+
+  <details>
+    <summary>자세히 보기: 속력 분포와 계산 방법</summary>
+    <div class="more">
+      <div>
+        <canvas id="hist"></canvas>
+        <p><strong>속력 분포.</strong> 막대는 지금 입자들의 속력, 곡선은 벽 온도에서의 맥스웰–볼츠만 분포입니다. 입자가 많아야 막대가 곡선을 닮습니다.</p>
+      </div>
+      <p><strong>압력</strong>은 0.25초 동안 벽이 받은 충격량을 벽 길이와 시간으로 나눈 값입니다. 기대값은 이상기체 법칙 P = NkT/A(2차원)입니다. 입자 하나일 때는 가끔 오는 충격뿐이고 그 사이는 0입니다.</p>
+      <p><strong>온도</strong>는 그 순간 입자들의 평균 운동에너지를 k로 나눈 값입니다. 입자 하나의 에너지는 벽에 닿을 때마다 크게 바뀌지만, N개의 평균은 1/√N 크기로만 흔들립니다.</p>
+      <p><strong>모형.</strong> 서로 충돌하지 않는 2차원 이상기체입니다. 벽은 정해진 온도의 열원이라, 입자가 닿으면 그 온도에 맞는 무작위 속도로 다시 튀어나옵니다.</p>
+    </div>
+  </details>
+</div>
+
+<script>
+(function(){
+const NS=[1,2,3,5,10,20,50,100,200,500,1000,2000];
+const W=6,H=4,A=W*H,PERIM=2*(W+H),WIN=0.25,HLEN=120,YMAX=3,T0=300;
+const C={ink:'#14181f',muted:'#6b7280',line:'#e6e8ee',gas:'#2f5bea',press:'#c2410c'};
+const $=id=>document.getElementById(id);
+let N=1,T=1,ps=[],flashes=[],pH=[],tH=[],imp=0,acc=0,running=true,quiet=false;
+
+function gauss(){let u=1-Math.random(),v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(6.283185307*v)}
+function emit(){return Math.sqrt(-2*T*Math.log(1-Math.random()))} // flux-weighted normal speed leaving a thermal wall
+function newP(){const s=Math.sqrt(T);return{x:Math.random()*W,y:Math.random()*H,vx:gauss()*s,vy:gauss()*s}}
+function kinT(){let s=0;for(const p of ps)s+=p.vx*p.vx+p.vy*p.vy;return s/(2*ps.length)}
+
+function step(dt){
+  const s=Math.sqrt(T);
+  for(const p of ps){
+    p.x+=p.vx*dt;p.y+=p.vy*dt;
+    let hit=false;
+    if(p.x<0){imp-=p.vx;p.vx=emit();p.vy=gauss()*s;imp+=p.vx;p.x=0;hit=true}
+    else if(p.x>W){imp+=p.vx;p.vx=-emit();p.vy=gauss()*s;imp-=p.vx;p.x=W;hit=true}
+    if(p.y<0){imp-=p.vy;p.vy=emit();p.vx=gauss()*s;imp+=p.vy;p.y=0;hit=true}
+    else if(p.y>H){imp+=p.vy;p.vy=-emit();p.vx=gauss()*s;imp-=p.vy;p.y=H;hit=true}
+    if(hit&&!quiet&&flashes.length<400)flashes.push({x:p.x,y:p.y,a:1});
+  }
+  acc+=dt;
+  if(acc>=WIN){
+    pH.push(imp/(PERIM*acc)/(N*T/A)); tH.push(kinT()/T);
+    if(pH.length>HLEN){pH.shift();tH.shift()}
+    imp=0;acc=0;
+  }
+}
+function setN(n){
+  N=n;while(ps.length<N)ps.push(newP());ps.length=N;
+  pH=[];tH=[];imp=0;acc=0;flashes=[];
+  quiet=true;for(let i=0;i<1800;i++)step(1/60);quiet=false; // fill 30 s of history
+  $('nOut').innerHTML=N.toLocaleString()+'<small>개</small>';
+  $('tTheory').textContent='±'+(100/Math.sqrt(N)).toFixed(1)+'%';
+  $('verdict').textContent= N<10 ? '값이 측정할 때마다 달라서 압력과 온도를 말할 수 없습니다.'
+    : N<200 ? '평균이 보이기 시작하지만 아직 눈에 띄게 흔들립니다.'
+    : '거의 흔들리지 않습니다. 이제 압력과 온도라고 부를 수 있습니다.';
+}
+
+function fit(c){
+  const d=window.devicePixelRatio||1,w=c.clientWidth,h=c.clientHeight;
+  if(c.width!==Math.round(w*d)||c.height!==Math.round(h*d)){c.width=Math.round(w*d);c.height=Math.round(h*d)}
+  const g=c.getContext('2d');g.setTransform(d,0,0,d,0,0);g.clearRect(0,0,w,h);return[g,w,h];
+}
+function drawBox(){
+  const[g,w,h]=fit($('box')),sx=w/W,sy=h/H,r=N<=10?6:N<=200?3.5:2;
+  g.fillStyle=C.press;
+  for(const f of flashes){g.globalAlpha=f.a;g.beginPath();g.arc(f.x*sx,f.y*sy,4+10*(1-f.a),0,6.2832);g.fill()}
+  g.globalAlpha=N>500?0.7:1;g.fillStyle=C.gas;g.beginPath();
+  for(const p of ps){const x=Math.min(Math.max(p.x*sx,r),w-r),y=Math.min(Math.max(p.y*sy,r),h-r);g.moveTo(x+r,y);g.arc(x,y,r,0,6.2832)}
+  g.fill();g.globalAlpha=1;
+}
+function drawStrip(id,data,color){
+  const[g,w,h]=fit($(id));if(!w)return;
+  const L=0,R=6,Tp=6,B=6,pw=w-L-R,ph=h-Tp-B;
+  const Y=v=>Tp+ph*(1-Math.min(v,YMAX)/YMAX);
+  g.strokeStyle=C.line;g.lineWidth=1;g.beginPath();g.moveTo(L,Y(0)+.5);g.lineTo(w,Y(0)+.5);g.stroke();
+  g.strokeStyle=C.muted;g.setLineDash([4,4]);g.beginPath();g.moveTo(L,Y(1)+.5);g.lineTo(w,Y(1)+.5);g.stroke();g.setLineDash([]);
+  g.font='11px "IBM Plex Sans KR",sans-serif';g.fillStyle=C.muted;g.textAlign='left';g.textBaseline='bottom';g.fillText('기대값',L+2,Y(1)-3);
+  if(!data.length)return;
+  g.strokeStyle=color;g.lineWidth=1.6;g.lineJoin='round';g.beginPath();
+  const off=HLEN-data.length;
+  data.forEach((v,i)=>{const x=L+pw*(i+off)/(HLEN-1);i?g.lineTo(x,Y(v)):g.moveTo(x,Y(v))});
+  g.stroke();
+  g.fillStyle=color;g.beginPath();g.arc(L+pw,Y(data[data.length-1]),3.5,0,6.2832);g.fill();
+}
+function drawHist(){
+  const[g,w,h]=fit($('hist'));if(!w)return;
+  const L=0,R=0,Tp=6,B=4,pw=w-L-R,ph=h-Tp-B,VM=5,NB=25,bw=VM/NB,YM=1;
+  const bins=new Array(NB).fill(0);
+  for(const p of ps){const b=Math.floor(Math.hypot(p.vx,p.vy)/bw);if(b<NB)bins[b]++}
+  g.fillStyle=C.gas;g.globalAlpha=.5;
+  bins.forEach((c,i)=>{const d=Math.min(c/(N*bw),YM),bh=ph*d/YM;g.fillRect(L+pw*i/NB+1,Tp+ph-bh,pw/NB-2,bh)});
+  g.globalAlpha=1;g.strokeStyle=C.ink;g.lineWidth=1.5;g.beginPath();
+  for(let i=0;i<=100;i++){const v=VM*i/100,f=v/T*Math.exp(-v*v/(2*T)),x=L+pw*i/100,y=Tp+ph*(1-Math.min(f,YM)/YM);i?g.lineTo(x,y):g.moveTo(x,y)}
+  g.stroke();
+  g.strokeStyle=C.line;g.beginPath();g.moveTo(L,Tp+ph+.5);g.lineTo(w,Tp+ph+.5);g.stroke();
+}
+function ms(a){const m=a.reduce((s,v)=>s+v,0)/a.length;return[m,Math.sqrt(a.reduce((s,v)=>s+(v-m)*(v-m),0)/a.length)]}
+function readouts(){
+  if(!pH.length){for(const id of['pNow','tNow','pFluc','tFluc'])$(id).textContent='–';return}
+  const[pm,psd]=ms(pH),[tm,tsd]=ms(tH);
+  $('pNow').textContent=Math.round(pH[pH.length-1]*100)+'%';
+  $('tNow').textContent=Math.round(tH[tH.length-1]*T*T0)+' K';
+  $('pFluc').textContent=pm>0?'±'+(100*psd/pm).toFixed(0)+'%':'–';
+  $('tFluc').textContent='±'+(100*tsd/tm).toFixed(1)+'%';
+}
+function charts(){drawStrip('pChart',pH,C.press);drawStrip('tChart',tH,C.gas);readouts()}
+
+let last=0,rc=0;
+function frame(t){
+  const dt=Math.min((t-last)/1000||0,1/30);last=t;
+  if(running){step(dt);for(const f of flashes)f.a-=dt*3;flashes=flashes.filter(f=>f.a>0)}
+  drawBox();drawHist();
+  if(++rc%6===0)charts();
+  requestAnimationFrame(frame);
+}
+$('nSlider').addEventListener('input',e=>{setN(NS[+e.target.value]);charts()});
+$('tSlider').addEventListener('input',e=>{T=+e.target.value/T0;$('tOut').textContent=e.target.value+' K';pH=[];tH=[];imp=0;acc=0});
+$('pause').addEventListener('click',()=>{running=!running;$('pause').textContent=running?'일시정지':'재생'});
+if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){running=false;$('pause').textContent='재생'}
+setN(NS[+$('nSlider').value]);charts();requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
