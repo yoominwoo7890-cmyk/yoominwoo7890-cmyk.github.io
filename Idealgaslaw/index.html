@@ -1,1 +1,952 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>기체 법칙 실험실</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* 수업용 시뮬레이션: 회색 실험판 하나에 장치(왼쪽)와 그래프(오른쪽). 카드·배지 없이 평평하게. */
+:root{
+  --bg:#ffffff;
+  --board:#f2f2f2;
+  --ink:#222222;
+  --muted:#777777;
+  --rule:#d6d6d6;
+  --red:#d33a2c;
+  --blue:#2f5fc4;
+  --green:#2a7d4f;
+  --font:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  color-scheme: light;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5}
+.app{max-width:1240px;margin:0 auto;padding-inline:16px;padding-block:14px 32px}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 
+header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 22px;border-bottom:1px solid var(--rule);padding-bottom:0}
+h1{margin:0 0 8px;font-size:1.25rem;font-weight:700}
+.tabs{display:flex;flex-wrap:wrap;gap:0 18px}
+.tabs button{border:0;background:none;padding:6px 0 8px;font-size:.98rem;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px}
+.tabs button:hover{color:var(--ink)}
+.tabs button[aria-selected="true"]{color:var(--ink);font-weight:700;border-bottom-color:var(--ink)}
+.law{margin:10px 0 12px;font-size:.95rem;color:#444}
+.law b{font-weight:700;margin-left:6px;white-space:nowrap}
+
+.sim{background:var(--board);display:grid;grid-template-columns:minmax(0,1fr);gap:8px 24px;padding:14px 14px 16px}
+@media (min-width:940px){.sim{grid-template-columns:minmax(0,1.05fr) minmax(0,1fr)}}
+.left,.right{min-width:0;display:flex;flex-direction:column;gap:8px}
+
+#stage{display:block;width:100%;touch-action:none;user-select:none;-webkit-user-select:none}
+.hint{margin:0;font-size:.88rem;color:#555}
+.meters{display:flex;flex-direction:column;gap:5px;font-size:.88rem;border-top:1px solid var(--rule);padding-top:10px}
+.bar{display:grid;grid-template-columns:120px minmax(0,1fr) 88px;gap:10px;align-items:center}
+.bar .t{height:9px;background:#e0e0e0}
+.bar .t i{display:block;height:100%;width:0}
+#barExt{background:var(--red)} #barGas{background:var(--blue)}
+.bar output{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+#valExt{color:var(--red)} #valGas{color:var(--blue)}
+.status{margin:2px 0 0;color:#555}
+.pill{font-weight:700;margin-right:6px}
+.pill.ok{color:var(--green)} .pill.moving{color:#b06a10}
+
+.readout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 20px;font-size:1.25rem;color:#666;font-variant-numeric:tabular-nums}
+.readout div{white-space:nowrap}
+.readout b{font-weight:500;color:#444}
+.readout em{font-style:normal;font-size:.8rem;color:var(--green);margin-left:4px;visibility:hidden}
+.readout .const em{visibility:visible}
+.gtitle{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:6px}
+.gtitle h2{margin:0;font-size:1rem;font-weight:700}
+.gtitle span{font-size:.82rem;color:var(--muted)}
+#chart{display:block;width:100%;aspect-ratio:4/3.3}
+.foot{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:.8rem;color:var(--muted)}
+.foot .key{flex:1;min-width:0}
+.foot .key i{display:inline-block;width:8px;height:8px;border-radius:50%;margin:0 4px 0 10px;vertical-align:1px}
+.foot .key i:first-child{margin-left:0}
+.btn{border:1px solid #bdbdbd;background:#fff;padding:4px 12px;font-size:.85rem;border-radius:3px}
+.btn:hover{background:#fafafa;border-color:#999}
+body{margin:0}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <h1>기체 법칙 실험실</h1>
+    <nav class="tabs" role="tablist" aria-label="실험 모드">
+      <button role="tab" data-mode="boyle" aria-selected="true">보일 법칙</button>
+      <button role="tab" data-mode="charles" aria-selected="false">샤를 법칙</button>
+      <button role="tab" data-mode="gay" aria-selected="false">게이뤼삭 법칙</button>
+      <button role="tab" data-mode="avog" aria-selected="false">아보가드로 법칙</button>
+    </nav>
+  </header>
+  <p class="law"><span id="lawText"></span><b id="lawEq">PV = 일정</b></p>
+
+  <main class="sim">
+    <section class="left">
+      <canvas id="stage" aria-label="수조에 담긴 실린더와 피스톤. 손바닥, 모닥불, 얼음, 펌프를 끌어서 조작합니다."></canvas>
+      <p class="hint" id="hint"></p>
+      <div class="meters">
+        <div class="bar" id="mExt"><span>누르는 압력</span><div class="t"><i id="barExt"></i></div><output id="valExt">0</output></div>
+        <div class="bar"><span>기체 압력</span><div class="t"><i id="barGas"></i></div><output id="valGas">0</output></div>
+        <p class="status"><span class="pill ok" id="pill">평형</span><span id="status"></span></p>
+      </div>
+    </section>
+
+    <section class="right">
+      <div class="readout">
+        <div id="tP">P = <b id="rP">0</b> kPa<em>일정</em></div>
+        <div id="tV">V = <b id="rV">0</b> L<em>일정</em></div>
+        <div id="tT">T = <b id="rT">0</b> K<em>일정</em></div>
+        <div id="tN">N = <b id="rN">0</b> 개<em>일정</em></div>
+      </div>
+      <div class="gtitle"><h2 id="gTitle">P–V 그래프</h2><span id="gSub"></span></div>
+      <canvas id="chart" aria-label="측정 그래프"></canvas>
+      <div class="foot">
+        <span class="key"><i style="background:#222"></i>측정값<i style="background:var(--red)"></i>현재 상태<span style="margin-left:10px">- - -</span> <span id="guideName">추세선</span></span>
+        <button class="btn" id="viewBtn" hidden>0 K까지 보기</button>
+        <button class="btn" id="clearBtn">점 지우기</button>
+        <button class="btn" id="resetBtn">처음으로</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+(() => {
+const R = 8.314, PATM = 101.3, AREA = 0.01, G = 9.8, NM = 0.002, TROOM = 298.15;
+const LW = 600, LH = 660;
+const CL = 170, CR = 350, BOT = 530, HMAX = 420, PR = 4.5, S0 = 150;
+const WATER_TOP = 200, BEAKER_BOT = 557;
+const FMAX = 2000;           // 손바닥 최대 힘 (N)
+const MAXN = 70, MINN = 5;   // 아보가드로 모드 분자 수 한계
+const HEAT_RATE = 6;         // 모닥불/얼음이 바꾸는 물 온도 속도 (°C/s)
+const HOLD = 0.5;            // 점을 찍기 위해 상태가 유지돼야 하는 시간(초)
+const FIT_MIN = 3;           // 추세선을 그리기 위한 최소 점 개수
+const VFIX = 0.8;            // 게이뤼삭 모드: 고정 핀으로 묶인 부피 (L)
+const HOLE_TOP = 468;        // 실린더 오른쪽 아래 배출구 윗끝 (넓을수록 빨리 빠져나감)
+const PUMP_TRAVEL = 120, PUMP_PER = 24;   // 펌프 손잡이 이동 거리, 분자 1개당 이동 거리
+
+// 펌프 → 실린더 호스 경로, 배출 밸브 위치
+const HOSE = [[495,530],[470,530],[470,150],[425,150],[425,515],[352,515]];
+const VALVE = [447.5, 150], VALVE_D = 25 + 380 + 22.5;
+const HOSE_SEG = []; let HOSE_LEN = 0;
+for (let i = 1; i < HOSE.length; i++) {
+  const [x0,y0] = HOSE[i-1], [x1,y1] = HOSE[i];
+  const l = Math.hypot(x1-x0, y1-y0); HOSE_SEG.push({x0,y0,x1,y1,l,s:HOSE_LEN}); HOSE_LEN += l;
+}
+// 도구 상자 속 기본 위치
+const HOME = { ice:[544, 548], fire:[544, 622] };
+const SPOT_Y = { fire:622, ice:588 };   // 수조 바로 아래 한 자리 (모닥불·얼음 공용)
+
+const MODES = {
+  boyle:  { eq:'PV = 일정', text:'온도와 기체의 양이 일정할 때, 압력과 부피는 반비례해요.', Vmax:1.2, vTick:0.2, mass:0, N0:20,
+            title:'P–V 그래프', guide:'추세선', span:0.3, spanTxt:'부피 차이 0.3 L', consts:['tT','tN'],
+            hint:'<b>손바닥</b>을 잡고 아래로 끌면 더 세게, 위로 끌면 약하게 눌러요.' },
+  charles:{ eq:'V / T = 일정', text:'압력과 기체의 양이 일정할 때, 부피는 절대 온도에 비례해요.', Vmax:1.2, vTick:0.2, mass:20, N0:20,
+            title:'V–T 그래프', guide:'추세선', span:30, spanTxt:'온도 차이 30 K', consts:['tP','tN'],
+            hint:'<b>모닥불</b>이나 <b>얼음</b>을 수조 바로 아래로 끌어다 놓으면 물 온도가 변해요. 원하는 온도에서 다시 빼내세요.' },
+  gay:    { eq:'P / T = 일정', text:'부피와 분자 수가 일정할 때, 압력은 절대 온도에 비례해요.', Vmax:1.2, vTick:0.2, mass:0, N0:20,
+            title:'P–T 그래프', guide:'추세선', span:30, spanTxt:'온도 차이 30 K', consts:['tV','tN'],
+            hint:'<b>모닥불</b>이나 <b>얼음</b>을 수조 바로 아래로 끌어다 놓으면 물 온도가 변해요. 원하는 온도에서 다시 빼내세요.' },
+  avog:   { eq:'V / N = 일정', text:'온도와 압력이 일정할 때, 부피는 분자 수(기체의 양)에 비례해요.', Vmax:3.2, vTick:0.5, mass:20, N0:10,
+            title:'V–N 그래프', guide:'추세선', span:15, spanTxt:'분자 수 차이 15개', consts:['tP','tT'],
+            hint:'<b>펌프 손잡이</b>를 아래로 끌어 기체를 넣어요. <b>배출 밸브</b>를 누르면 열려서 기체가 빠져나가요.' }
+};
+
+const S = {
+  mode:'boyle', F:0, Tw:25, TwShown:25, Tg:TROOM, V:1, parts:[], transit:[], puffs:[],
+  pumpOff:0, pumpAcc:0, valveOpen:false, fullAt:-10, closedAt:-10,
+  items:{ ice:{x:HOME.ice[0],y:HOME.ice[1],tx:HOME.ice[0],ty:HOME.ice[1],placed:false},
+          fire:{x:HOME.fire[0],y:HOME.fire[1],tx:HOME.fire[0],ty:HOME.fire[1],placed:false} },
+  drag:null, ratio:1, Pmeas:PATM, flashes:[], vtFull:false,
+  rec:{boyle:[],charles:[],gay:[],avog:[]}, trail:{boyle:[],charles:[],gay:[],avog:[]}, trailT:0, stable:0,
+  skip:false, time:0, settled:true
+};
+
+/* ---------- physics ---------- */
+const lerp = (a,b,t) => a+(b-a)*t;
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const heatMode = () => S.mode === 'charles' || S.mode === 'gay';
+const nMol = () => S.parts.length * NM;
+const inbound = () => S.transit.reduce((a,t) => a + (t.dir > 0), 0);
+// 화면 속 분자 속력 배율: 온도 차이가 눈에 잘 띄도록 T²에 비례하게 과장 (실제는 √T)
+const vf = T => Math.pow(T / TROOM, 2);
+const Pgas = () => nMol() * R * S.Tg / S.V;
+const Pext = () => S.mode === 'gay' ? Pgas() : PATM + (MODES[S.mode].mass*G + (S.mode==='boyle' ? S.F : 0)) / AREA / 1000;
+const Veq = () => S.mode === 'gay' ? VFIX : nMol() * R * S.Tg / Pext();
+const pistonY = () => BOT - HMAX * S.V / MODES[S.mode].Vmax;
+function rayleigh(){ const f = 0.798*Math.sqrt(-2*Math.log(1-Math.random())); return Math.min(2.4, Math.max(0.3, f)); }
+function addParticle(x, y, angle){
+  const s = S0 * rayleigh() * vf(S.Tg);
+  const a = angle ?? Math.random()*Math.PI*2;
+  S.parts.push({x, y, vx:s*Math.cos(a), vy:s*Math.sin(a)});
+}
+function sendHome(id){ const it = S.items[id]; it.placed = false; [it.tx, it.ty] = HOME[id]; }
+
+function resetApparatus(){
+  const m = MODES[S.mode];
+  S.F = 0; S.Tw = 25; S.TwShown = 25; S.Tg = TROOM;
+  S.parts = []; S.transit = []; S.puffs = []; S.pumpOff = 0; S.pumpAcc = 0; S.valveOpen = false;
+  for (const id of ['ice','fire']) { sendHome(id); const it = S.items[id]; it.x = it.tx; it.y = it.ty; }
+  S.drag = null;
+  S.V = S.mode === 'gay' ? VFIX : m.N0 * NM * R * S.Tg / Pext();
+  const py = pistonY();
+  for (let i = 0; i < m.N0; i++) addParticle(CL+PR+Math.random()*(CR-CL-2*PR), py+PR+Math.random()*(BOT-py-2*PR));
+  S.ratio = 1; S.flashes = []; S.skip = false; S.stable = 0;
+}
+
+function hosePoint(d){
+  for (const g of HOSE_SEG) if (d <= g.s + g.l) { const k=(d-g.s)/g.l; return [g.x0+(g.x1-g.x0)*k, g.y0+(g.y1-g.y0)*k]; }
+  const L = HOSE[HOSE.length-1]; return [L[0], L[1]];
+}
+
+function update(dt){
+  S.time += dt;
+  // 도구(모닥불·얼음) 위치 보간과 물 온도 변화
+  for (const id of ['ice','fire']) {
+    const it = S.items[id];
+    if (!(S.drag && S.drag.id === id)) { const k = 1-Math.exp(-dt*12); it.x += (it.tx-it.x)*k; it.y += (it.ty-it.y)*k; }
+  }
+  if (heatMode()) {
+    if (S.items.fire.placed) S.Tw += HEAT_RATE*dt;
+    if (S.items.ice.placed) S.Tw -= HEAT_RATE*dt;
+    S.Tw = clamp(S.Tw, 0, 100);
+  }
+  S.TwShown += (S.Tw - S.TwShown) * (1-Math.exp(-dt*8));
+  const target = S.Tw + 273.15;
+  if (Math.abs(S.Tg - target) > 1e-4) {
+    const newT = S.Tg + (target - S.Tg) * (1-Math.exp(-dt*2.2));
+    const k = vf(newT) / vf(S.Tg);
+    for (const p of S.parts) { p.vx *= k; p.vy *= k; }
+    S.Tg = newT;
+  }
+  // 펌프 손잡이: 놓으면 위로 되돌아감
+  if (S.mode === 'avog') {
+    if (!(S.drag && S.drag.id === 'pump')) { S.pumpOff = Math.max(0, S.pumpOff - 260*dt); if (S.pumpOff === 0) S.pumpAcc = 0; }
+    for (let i = S.transit.length-1; i >= 0; i--) {
+      const tr = S.transit[i]; tr.d += tr.dir * 820 * dt;
+      if (tr.dir > 0 && tr.d >= HOSE_LEN) { S.transit.splice(i,1); addParticle(CR-PR-1, 515, Math.PI + (Math.random()-0.5)*1.9); }
+      else if (tr.dir < 0 && tr.d <= VALVE_D) {
+        S.transit.splice(i,1);
+        S.puffs.push({x:VALVE[0], y:VALVE[1]-8, vx:(Math.random()-0.5)*60, vy:-70-Math.random()*50, life:1});
+      }
+    }
+    for (let i = S.puffs.length-1; i >= 0; i--) {
+      const f = S.puffs[i]; f.x += f.vx*dt; f.y += f.vy*dt; f.life -= dt*0.8;
+      if (f.life <= 0) S.puffs.splice(i,1);
+    }
+  }
+  // 피스톤
+  const ve = Veq();
+  S.V += (ve - S.V) * (1-Math.exp(-dt*2.6));
+  const py = pistonY();
+  // 분자 운동
+  let imp = 0, escaped = false;
+  const steps = Math.max(1, Math.ceil(dt*240)), h = dt/steps;
+  for (let s = 0; s < steps; s++) {
+    for (const p of S.parts) {
+      if (p.dead) continue;
+      p.x += p.vx*h; p.y += p.vy*h;
+      if (p.x < CL+PR) { p.x = CL+PR; p.vx = Math.abs(p.vx); }
+      else if (p.x > CR-PR) {
+        // 배출 밸브가 열려 있으면 호스 입구로 들어간 분자는 빠져나감
+        if (S.mode === 'avog' && S.valveOpen && p.y > HOLE_TOP && S.parts.length > MINN) {
+          p.dead = true; escaped = true; S.transit.push({d:HOSE_LEN, dir:-1}); continue;
+        }
+        p.x = CR-PR; p.vx = -Math.abs(p.vx);
+      }
+      if (p.y > BOT-PR) { p.y = BOT-PR; p.vy = -Math.abs(p.vy); }
+      if (p.y < py+PR) {
+        p.y = py+PR;
+        if (p.vy < 0) { imp += 2*Math.abs(p.vy); p.vy = -p.vy; if (S.flashes.length < 40) S.flashes.push({x:p.x, a:1}); }
+      }
+    }
+    if (escaped) { S.parts = S.parts.filter(p => !p.dead); escaped = false; }
+  }
+  if (S.mode === 'avog' && S.valveOpen && S.parts.length <= MINN) { S.valveOpen = false; S.closedAt = S.time; }
+  let sumS2 = 0; for (const p of S.parts) sumS2 += p.vx*p.vx + p.vy*p.vy;
+  const expected = sumS2 / (2*Math.max(10, BOT - py - 2*PR));
+  if (expected > 0) S.ratio += (imp/dt/expected - S.ratio) * (1-Math.exp(-dt/1.8));
+  S.Pmeas = Pgas() * clamp(S.ratio, 0.92, 1.08);
+  for (let i = S.flashes.length-1; i >= 0; i--) { S.flashes[i].a -= dt*6; if (S.flashes[i].a <= 0) S.flashes.splice(i,1); }
+
+  // 평형 판정과 자동 기록
+  S.settled = Math.abs(S.V - ve)/ve < 0.004 && Math.abs(S.Tg - target) < 0.5 && !S.transit.length && !S.valveOpen;
+  S.stable = S.settled ? S.stable + dt : 0;
+  if (S.stable >= HOLD && !S.skip) {
+    const P = Pext(), n = nMol(), recs = S.rec[S.mode];
+    const near = recs.some(r => S.mode === 'boyle' ? Math.abs(r.P-P) < 2 : heatMode() ? Math.abs(r.T-S.Tg) < 1.5 : Math.abs(r.n-n) < 1e-6);
+    if (!near) recs.push({P, V:ve, T:S.Tg, n});
+  }
+  // 현재 상태의 궤적
+  S.trailT += dt;
+  if (S.trailT > 0.06) {
+    S.trailT = 0;
+    const tr = S.trail[S.mode], pt = dataXY(S.V, Pgas(), S.Tg, nMol()), lp = tr[tr.length-1];
+    if (!lp || Math.abs(lp[0]-pt[0]) + Math.abs(lp[1]-pt[1]) > 1e-4) { tr.push(pt); if (tr.length > 4000) tr.shift(); }
+  }
+}
+function fitReady(){
+  const m = MODES[S.mode], recs = S.rec[S.mode];
+  const xs = recs.map(r => dataXY(r.V, r.P, r.T, r.n)[0]);
+  const span = xs.length ? Math.max(...xs) - Math.min(...xs) : 0;
+  return { ok: recs.length >= FIT_MIN, count: recs.length, span };
+}
+function dataXY(V, P, T, n){
+  if (S.mode === 'boyle') return [V, P];
+  if (S.mode === 'charles') return [T, V];
+  if (S.mode === 'gay') return [T, P];
+  return [n/NM, V];
+}
+
+/* ---------- drawing helpers ---------- */
+const stage = document.getElementById('stage'), sctx = stage.getContext('2d');
+const chart = document.getElementById('chart');
+let dpr = 1, stageScale = 1;
+function resize(){
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = stage.clientWidth || 600;
+  stage.style.height = (w*LH/LW) + 'px';
+  stage.width = Math.round(w*dpr); stage.height = Math.round(w*LH/LW*dpr);
+  stageScale = w/LW*dpr;
+  chart.width = Math.round(chart.clientWidth*dpr); chart.height = Math.round(chart.clientHeight*dpr);
+}
+new ResizeObserver(resize).observe(stage);
+new ResizeObserver(resize).observe(chart);
+
+const mix = (a,b,t) => `rgb(${Math.round(lerp(a[0],b[0],t))},${Math.round(lerp(a[1],b[1],t))},${Math.round(lerp(a[2],b[2],t))})`;
+function waterRGB(t){
+  const st = [[0,[176,218,244]],[25,[205,232,243]],[50,[247,221,198]],[100,[243,170,138]]];
+  for (let i = 1; i < st.length; i++) if (t <= st[i][0]) return mix(st[i-1][1], st[i][1], (t-st[i-1][0])/(st[i][0]-st[i-1][0]));
+  return mix(st[3][1], st[3][1], 0);
+}
+const gasColor = () => mix([42,99,212],[219,84,40], clamp((S.Tg-273.15)/100,0,1));
+function rrect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x,y,w,h,r) : ctx.rect(x,y,w,h); }
+function arrow(ctx,x0,y0,x1,y1,color,w=3){
+  const a = Math.atan2(y1-y0,x1-x0), hl = 9;
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = w; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1-Math.cos(a)*hl*0.6, y1-Math.sin(a)*hl*0.6); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x1-hl*Math.cos(a-0.45), y1-hl*Math.sin(a-0.45)); ctx.lineTo(x1-hl*Math.cos(a+0.45), y1-hl*Math.sin(a+0.45)); ctx.closePath(); ctx.fill();
+}
+const FONT = '"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif';
+const MONO = FONT;
+
+/* ---------- stage ---------- */
+function drawStage(){
+  const ctx = sctx, m = MODES[S.mode], py = pistonY(), t = S.time;
+  ctx.setTransform(stageScale,0,0,stageScale,0,0);
+  ctx.fillStyle = '#f2f2f2'; ctx.fillRect(0,0,LW,LH);
+  ctx.textBaseline = 'alphabetic';
+
+  // 도구 상자 (샤를·게이뤼삭)
+  if (heatMode()) {
+    ctx.strokeStyle = '#d3dae2'; ctx.lineWidth = 1.5; ctx.setLineDash([5,4]);
+    rrect(ctx, 498, 500, 94, 156, 12); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#5d6977'; ctx.font = `600 11px ${FONT}`; ctx.textAlign = 'center';
+    ctx.fillText('끌어서 쓰기', 545, 518);
+  }
+  // 놓을 자리 안내 (끄는 중일 때)
+  if (S.drag && (S.drag.id === 'fire' || S.drag.id === 'ice')) {
+    ctx.save(); ctx.strokeStyle = '#888'; ctx.fillStyle = 'rgba(0,0,0,0.03)'; ctx.lineWidth = 2; ctx.setLineDash([6,5]);
+    rrect(ctx, 90, 563, 350, 90, 12); ctx.fill(); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = '#555'; ctx.font = `500 12px ${FONT}`; ctx.textAlign = 'center';
+    ctx.fillText(S.drag.id === 'fire' ? '여기에 놓으면 물을 데워요' : '여기에 놓으면 물을 식혀요', 265, 648);
+  }
+
+  // 모닥불 열기
+  const fire = S.items.fire;
+  if (heatMode() && fire.placed) {
+    const g = ctx.createRadialGradient(fire.x, BEAKER_BOT, 4, fire.x, BEAKER_BOT, 120);
+    g.addColorStop(0, 'rgba(255,150,40,0.45)'); g.addColorStop(1, 'rgba(255,150,40,0)');
+    ctx.fillStyle = g; ctx.fillRect(fire.x-130, BEAKER_BOT-120, 260, 200);
+  }
+  const ice = S.items.ice;
+  if (heatMode() && ice.placed) {
+    const g = ctx.createRadialGradient(ice.x, BEAKER_BOT, 4, ice.x, BEAKER_BOT, 110);
+    g.addColorStop(0, 'rgba(90,170,235,0.4)'); g.addColorStop(1, 'rgba(90,170,235,0)');
+    ctx.fillStyle = g; ctx.fillRect(ice.x-120, BEAKER_BOT-110, 240, 180);
+  }
+
+  // 물
+  ctx.fillStyle = waterRGB(S.TwShown); ctx.globalAlpha = 0.9;
+  ctx.beginPath(); ctx.moveTo(70,556);
+  for (let x = 70; x <= 450; x += 10) ctx.lineTo(x, WATER_TOP + Math.sin(x*0.05 + t*2)*1.6);
+  ctx.lineTo(450,556); ctx.closePath(); ctx.fill(); ctx.globalAlpha = 1;
+
+  // 끓는 물 기포
+  if (S.TwShown > 85) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1.5;
+    for (let i = 0; i < 10; i++) {
+      const ph = (t*0.6 + i*0.137) % 1, x = [90,128,142,380,400,418,436,96,410,134][i];
+      ctx.globalAlpha = clamp((S.TwShown-85)/10,0,1) * (1-ph*0.5);
+      ctx.beginPath(); ctx.arc(x + Math.sin(t*4+i)*3, 550 - ph*(550-WATER_TOP-6), 2.5+ph*2, 0, Math.PI*2); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+  // 김
+  if (S.TwShown > 40) {
+    const base = clamp((S.TwShown-40)/50,0,0.8);
+    ctx.strokeStyle = '#b9c3cd'; ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+    [125, 395].forEach((x0,i) => {
+      for (let k = 0; k < 2; k++) {
+        const ph = (t*0.5 + i*0.33 + k*0.5) % 1;
+        ctx.globalAlpha = base*(1-ph); ctx.beginPath();
+        for (let y = 0; y <= 40; y += 4) {
+          const yy = WATER_TOP - 8 - ph*40 - y, xx = x0 + Math.sin(y*0.18 + t*3 + i)*4;
+          y ? ctx.lineTo(xx,yy) : ctx.moveTo(xx,yy);
+        }
+        ctx.stroke();
+      }
+    });
+    ctx.globalAlpha = 1;
+  }
+
+  // 수조
+  ctx.strokeStyle = '#9aabbb'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(64,160); ctx.lineTo(68,163); ctx.lineTo(68,BEAKER_BOT); ctx.lineTo(452,BEAKER_BOT); ctx.lineTo(452,163); ctx.lineTo(456,160); ctx.stroke();
+  ctx.textAlign = 'left'; ctx.font = `700 15px ${FONT}`; ctx.fillStyle = '#18212b';
+  ctx.fillText(heatMode() ? `물 ${S.TwShown.toFixed(1)} °C` : `항온 수조 25 °C`, 68, 150);
+
+  // 열 흐름 화살표
+  const dT = S.Tw + 273.15 - S.Tg;
+  if (heatMode() && Math.abs(dT) > 0.3) {
+    ctx.globalAlpha = clamp(Math.abs(dT)/15, 0.25, 1);
+    const col = dT > 0 ? '#d9622b' : '#2f7fc9';
+    [400, 470].forEach(y => {
+      if (dT > 0) { arrow(ctx,122,y,154,y,col); arrow(ctx,404,y+25,368,y+25,col); }
+      else { arrow(ctx,154,y,122,y,col); arrow(ctx,368,y+25,404,y+25,col); }
+    });
+    ctx.globalAlpha = 1;
+  }
+
+  // 실린더 내부와 기체
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(CL,66,CR-CL,BOT-66);
+  const gc = gasColor();
+  ctx.fillStyle = gc; ctx.globalAlpha = 0.07; ctx.fillRect(CL,py,CR-CL,BOT-py); ctx.globalAlpha = 1;
+  ctx.save(); ctx.beginPath(); ctx.rect(CL, py, CR-CL, BOT-py); ctx.clip();
+  ctx.strokeStyle = gc; ctx.globalAlpha = 0.3; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
+  for (const p of S.parts) { ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx*0.07, p.y - p.vy*0.07); ctx.stroke(); }
+  ctx.restore(); ctx.globalAlpha = 1;
+  ctx.fillStyle = gc; ctx.strokeStyle = 'rgba(15,25,40,0.55)'; ctx.lineWidth = 1;
+  for (const p of S.parts) { ctx.beginPath(); ctx.arc(p.x,p.y,PR,0,Math.PI*2); ctx.fill(); ctx.stroke(); }
+  for (const f of S.flashes) {
+    ctx.globalAlpha = f.a; ctx.strokeStyle = '#f2a53a'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(f.x-6, py+2); ctx.lineTo(f.x+6, py+2); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // 실린더 벽
+  ctx.fillStyle = '#7f8c99';
+  ctx.fillRect(CL-10,62,10,BOT+10-62);
+  if (S.mode === 'avog') {
+    ctx.fillRect(CR,62,10,HOLE_TOP-62);
+    // 넓은 배출구 → 호스로 좁아지는 연결부
+    ctx.fillStyle = '#eef2f6'; ctx.strokeStyle = '#7d8996'; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.moveTo(CR, HOLE_TOP); ctx.lineTo(CR+12, 509); ctx.lineTo(CR+12, 521); ctx.lineTo(CR, BOT); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(CR, HOLE_TOP); ctx.lineTo(CR+12, 509); ctx.moveTo(CR, BOT); ctx.lineTo(CR+12, 521); ctx.stroke();
+    ctx.fillStyle = '#7f8c99';
+  }
+  else ctx.fillRect(CR,62,10,BOT+10-62);
+  ctx.fillRect(CL-10,BOT,CR-CL+20,10);
+  ctx.fillStyle = '#a3afbb'; ctx.fillRect(CL-12,58,14,5); ctx.fillRect(CR-2,58,14,5);
+
+  // 부피 눈금
+  ctx.strokeStyle = '#3d4854'; ctx.fillStyle = '#3d4854'; ctx.lineWidth = 1.2;
+  ctx.font = `500 11px ${MONO}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  const half = m.vTick/2;
+  for (let i = 0; i*half <= m.Vmax + 1e-9; i++) {
+    const v = i*half, y = BOT - HMAX*v/m.Vmax, major = i % 2 === 0;
+    ctx.beginPath(); ctx.moveTo(CR+10,y); ctx.lineTo(CR+10+(major?9:5),y); ctx.stroke();
+    if (major) ctx.fillText(`${v.toFixed(1)} L`, CR+22, y);
+  }
+  ctx.fillStyle = '#d4462f';
+  ctx.beginPath(); ctx.moveTo(CR+11,py); ctx.lineTo(CR+19,py-5); ctx.lineTo(CR+19,py+5); ctx.closePath(); ctx.fill();
+
+  // 피스톤
+  const capTop = py - 58;
+  ctx.fillStyle = '#56626f'; ctx.fillRect(CL+1,py-16,CR-CL-2,16);
+  ctx.fillStyle = '#8b98a5'; ctx.fillRect(CL+1,py-16,CR-CL-2,3);
+  ctx.fillStyle = '#6b7784'; ctx.fillRect(253,capTop+8,14,34);
+  ctx.fillStyle = '#4a5562'; rrect(ctx,226,capTop,68,9,2); ctx.fill();
+  ctx.textBaseline = 'alphabetic';
+
+  if (S.mode === 'boyle') drawHand(ctx, capTop);
+  else if (S.mode === 'gay') { drawPins(ctx, py); drawGauge(ctx); }
+  else drawWeight(ctx, capTop, m.mass);
+  drawThermo(ctx);
+  if (S.mode === 'avog') drawPump(ctx);
+  if (heatMode()) { drawFire(ctx, fire); drawIce(ctx, S.items.ice); }
+}
+
+function drawHand(ctx, capTop){
+  // 손바닥을 펴서 피스톤 손잡이를 위에서 누르는 옆모습. 힘이 클수록 피가 쏠려 붉어짐.
+  const k = clamp(S.F/FMAX, 0, 1);
+  const base = [241,199,166], flush = [222,104,96];
+  const skin = mix(base, flush, k*0.85);
+  const skinTip = mix(base, [214,84,82], Math.min(1, k*1.05));
+  const arm = mix(base, flush, k*0.35);
+  const edge = mix([196,142,107],[160,64,60], k);
+  const y = capTop + 1, sq = k*3;
+  const s = 1.2;
+  ctx.save(); ctx.translate(255*(1-s), y*(1-s)); ctx.scale(s, s);
+  const topY = (-20 - y*(1-s)) / s;
+  const wrist = [292, y-30+sq*0.5], up = [298, topY];
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = edge; ctx.lineWidth = 34; ctx.beginPath(); ctx.moveTo(...wrist); ctx.lineTo(...up); ctx.stroke();
+  ctx.strokeStyle = arm; ctx.lineWidth = 31; ctx.beginPath(); ctx.moveTo(...wrist); ctx.lineTo(...up); ctx.stroke();
+  const cuff = wrist[1] - 70;
+  if (cuff > topY) {
+    ctx.lineCap = 'butt';
+    ctx.strokeStyle = '#3f5f8f'; ctx.lineWidth = 42; ctx.beginPath(); ctx.moveTo(lerp(292,298,0.1), cuff); ctx.lineTo(...up); ctx.stroke();
+    ctx.strokeStyle = '#2f4a73'; ctx.beginPath(); ctx.moveTo(lerp(292,298,0.1), cuff); ctx.lineTo(lerp(292,298,0.12), cuff-8); ctx.stroke();
+  }
+  const grad = ctx.createLinearGradient(196, 0, 312, 0);
+  grad.addColorStop(0, skinTip); grad.addColorStop(0.45, skin); grad.addColorStop(1, mix(base, flush, k*0.6));
+  ctx.fillStyle = grad; ctx.strokeStyle = edge; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(206, y); ctx.lineTo(304, y);
+  ctx.quadraticCurveTo(318, y-2, 316, y-20+sq);
+  ctx.lineTo(288, y-40+sq);
+  ctx.quadraticCurveTo(262, y-36+sq, 240, y-22+sq);
+  ctx.lineTo(206, y-17+sq);
+  ctx.quadraticCurveTo(194, y-15+sq, 194, y-8);
+  ctx.quadraticCurveTo(194, y, 206, y);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle = edge; ctx.lineWidth = 1.1; ctx.globalAlpha = 0.55;
+  ctx.beginPath(); ctx.moveTo(204, y-8); ctx.lineTo(236, y-10+sq*0.5); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(222, y-15+sq); ctx.quadraticCurveTo(224, y-11, 222, y-6); ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = skin; ctx.strokeStyle = edge; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.ellipse(262, y-14+sq*0.5, 20, 7, -0.25, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = mix([250,228,214],[244,170,160],k); ctx.strokeStyle = edge; ctx.lineWidth = 0.8;
+  rrect(ctx, 196, y-14+sq*0.8, 9, 6, 3); ctx.fill(); ctx.stroke();
+  ctx.restore();
+  // 아직 안 눌렀으면 끌 수 있다는 표시
+  if (S.F < 1 && !S.drag) {
+    arrow(ctx, 352, y-96, 352, y-62, '#888', 2);
+    ctx.fillStyle = '#666'; ctx.font = `500 12px ${FONT}`; ctx.textAlign = 'left';
+    ctx.fillText('끌어 내리기', 362, y-74);
+    ctx.globalAlpha = 1;
+  }
+  if (S.F > 5) arrow(ctx, 210, y-34-(14+k*70), 210, y-28, '#d4462f', 4);
+  const lab1 = `F = ${Math.round(S.F)} N`, lab2 = `+${(S.F/AREA/1000).toFixed(1)} kPa`;
+  ctx.font = `700 14px ${FONT}`;
+  const tw = Math.max(ctx.measureText(lab1).width, 80);
+  ctx.fillStyle = 'rgba(255,255,255,0.9)'; rrect(ctx, 196-tw-8, y-84, tw+12, 40, 6); ctx.fill();
+  ctx.textAlign = 'right'; ctx.fillStyle = '#d4462f'; ctx.fillText(lab1, 196, y-67);
+  ctx.font = `500 12px ${FONT}`; ctx.fillStyle = '#9a3a28'; ctx.fillText(lab2, 196, y-50);
+}
+function drawPins(ctx, py){
+  const y = py - 26;
+  ctx.fillStyle = '#c8372d';
+  [[CL-22, CL+16], [CR-16, CR+22]].forEach(([a,b], i) => {
+    rrect(ctx, a, y, b-a, 8, 3); ctx.fill();
+    const hx = i ? b : a;
+    ctx.beginPath(); ctx.arc(hx, y+4, 7, 0, Math.PI*2); ctx.fill();
+  });
+  ctx.fillStyle = '#c8372d'; ctx.font = `700 12px ${FONT}`; ctx.textAlign = 'left';
+  ctx.fillText('고정 핀', CL+6, y-5);
+}
+function drawGauge(ctx){
+  const cx = 525, cy = 112, r = 52, maxP = 200;
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  const tube = () => { ctx.beginPath(); ctx.moveTo(cx, cy+r); ctx.lineTo(cx, 490); ctx.lineTo(CR+10, 490); ctx.stroke(); };
+  ctx.strokeStyle = '#7d8996'; ctx.lineWidth = 9; tube();
+  ctx.strokeStyle = '#eef2f6'; ctx.lineWidth = 5; tube();
+  ctx.fillStyle = '#ffffff'; ctx.strokeStyle = '#4a5562'; ctx.lineWidth = 5;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  const ang = p => Math.PI*0.75 + clamp(p/maxP,0,1)*Math.PI*1.5;
+  ctx.strokeStyle = '#3d4854'; ctx.fillStyle = '#3d4854'; ctx.font = `500 9px ${MONO}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (let p = 0; p <= maxP; p += 10) {
+    const a = ang(p), major = p % 50 === 0, r1 = r-6, r2 = r - (major ? 14 : 10);
+    ctx.lineWidth = major ? 1.6 : 1;
+    ctx.beginPath(); ctx.moveTo(cx+Math.cos(a)*r1, cy+Math.sin(a)*r1); ctx.lineTo(cx+Math.cos(a)*r2, cy+Math.sin(a)*r2); ctx.stroke();
+    if (major) ctx.fillText(String(p), cx+Math.cos(a)*(r-24), cy+Math.sin(a)*(r-24));
+  }
+  const a = ang(S.Pmeas);
+  ctx.strokeStyle = '#d4462f'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx+Math.cos(a)*(r-12), cy+Math.sin(a)*(r-12)); ctx.stroke();
+  ctx.fillStyle = '#2d3540'; ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI*2); ctx.fill();
+  ctx.font = `600 9px ${FONT}`; ctx.fillStyle = '#5d6977'; ctx.fillText('kPa', cx, cy+20);
+  ctx.textBaseline = 'alphabetic';
+  ctx.font = `700 14px ${MONO}`; ctx.fillStyle = '#18212b'; ctx.fillText(`${Pgas().toFixed(1)} kPa`, cx, cy+r+20);
+  ctx.font = `600 12px ${FONT}`; ctx.fillStyle = '#5d6977'; ctx.fillText('압력계', cx, cy-r-8);
+}
+function drawWeight(ctx, y, mass){
+  ctx.fillStyle = '#2d3540';
+  rrect(ctx,252,y-56,16,14,4); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(220,y); ctx.lineTo(300,y); ctx.lineTo(290,y-44); ctx.lineTo(230,y-44); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#ffffff'; ctx.font = `700 15px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText(`${mass} kg`, 260, y-16);
+  ctx.fillStyle = '#d4462f'; ctx.font = `600 12px ${FONT}`; ctx.textAlign = 'left';
+  ctx.fillText(`+${(mass*G/AREA/1000).toFixed(1)} kPa`, 308, y-18);
+}
+function drawThermo(ctx){
+  const x = 106, top = 178, base = 452, bulbY = 486;
+  const yOf = c => base - clamp(c,0,100)/100*250;
+  ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.strokeStyle = '#8796a5'; ctx.lineWidth = 1.5;
+  rrect(ctx,x-6,top,12,bulbY-top,6); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(x,bulbY,11,0,Math.PI*2); ctx.fillStyle = '#d9412b'; ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#d9412b'; ctx.fillRect(x-2.5, yOf(S.TwShown), 5, bulbY-yOf(S.TwShown));
+  ctx.strokeStyle = '#3d4854'; ctx.fillStyle = '#3d4854'; ctx.lineWidth = 1;
+  ctx.font = `500 10px ${MONO}`; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (let c = 0; c <= 100; c += 10) {
+    const y = yOf(c); ctx.beginPath(); ctx.moveTo(x+6,y); ctx.lineTo(x+(c%50===0?13:10),y); ctx.stroke();
+    if (c % 50 === 0) ctx.fillText(String(c), x-9, y);
+  }
+  ctx.textBaseline = 'alphabetic';
+}
+function flame(ctx, cx, by, w, h, col){
+  ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(cx-w/2, by);
+  ctx.bezierCurveTo(cx-w/2, by-h*0.55, cx-w*0.12, by-h*0.7, cx, by-h);
+  ctx.bezierCurveTo(cx+w*0.12, by-h*0.7, cx+w/2, by-h*0.55, cx+w/2, by);
+  ctx.closePath(); ctx.fill();
+}
+function drawFire(ctx, it){
+  const { x, y } = it, t = S.time, f = i => 1 + 0.13*Math.sin(t*13 + i*2.1) + 0.06*Math.sin(t*23 + i);
+  ctx.save();
+  if (S.drag && S.drag.id === 'fire') { ctx.shadowColor = 'rgba(20,30,45,0.25)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 4; }
+  // 장작
+  ctx.fillStyle = '#7a4a2a';
+  ctx.save(); ctx.translate(x, y+12); ctx.rotate(0.22); rrect(ctx,-30,-5,60,10,5); ctx.fill(); ctx.restore();
+  ctx.save(); ctx.translate(x, y+12); ctx.rotate(-0.22); rrect(ctx,-30,-5,60,10,5); ctx.fill(); ctx.restore();
+  ctx.shadowColor = 'transparent';
+  ctx.fillStyle = '#5c361d'; ctx.beginPath(); ctx.arc(x-27, y+6, 4, 0, Math.PI*2); ctx.arc(x+27, y+6, 4, 0, Math.PI*2); ctx.fill();
+  // 불꽃
+  flame(ctx, x-13, y+8, 22, 30*f(1), '#f08a24');
+  flame(ctx, x+13, y+8, 22, 32*f(2), '#f08a24');
+  flame(ctx, x, y+8, 40, 50*f(0), '#f39a2b');
+  flame(ctx, x, y+8, 26, 36*f(3), '#f7c341');
+  flame(ctx, x, y+8, 12, 18*f(4), '#fff1b8');
+  ctx.restore();
+  if (!it.placed && !(S.drag && S.drag.id === 'fire')) {
+    ctx.fillStyle = '#5d6977'; ctx.font = `600 11px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('모닥불', x, y+34);
+  }
+}
+function drawIce(ctx, it){
+  let { x, y } = it;
+  const cubes = [[-18,-6,18],[0,-8,18],[-9,-22,17]];
+  ctx.save();
+  if (S.drag && S.drag.id === 'ice') { ctx.shadowColor = 'rgba(20,30,45,0.25)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 4; }
+  for (const [dx,dy,s] of cubes) {
+    rrect(ctx, x+dx, y+dy, s, s, 3); ctx.fillStyle = 'rgba(236,247,255,0.97)'; ctx.fill();
+  }
+  ctx.restore();
+  ctx.strokeStyle = '#7fb5dc'; ctx.lineWidth = 1.5;
+  for (const [dx,dy,s] of cubes) {
+    rrect(ctx, x+dx, y+dy, s, s, 3); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.beginPath(); ctx.moveTo(x+dx+4, y+dy+5); ctx.lineTo(x+dx+9, y+dy+5); ctx.stroke();
+    ctx.strokeStyle = '#7fb5dc';
+  }
+  // 차가운 냉기
+  if (it.placed) {
+    ctx.strokeStyle = 'rgba(120,180,230,0.7)'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+    for (let i = 0; i < 3; i++) {
+      const ph = (S.time*0.7 + i/3) % 1, xx = x - 14 + i*12;
+      ctx.globalAlpha = 1 - ph; ctx.beginPath(); ctx.moveTo(xx, y-26-ph*10); ctx.lineTo(xx, y-32-ph*10); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+  if (!it.placed && !(S.drag && S.drag.id === 'ice')) {
+    ctx.fillStyle = '#5d6977'; ctx.font = `600 11px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('얼음', x, y+26);
+  }
+}
+function drawPump(ctx){
+  const off = S.pumpOff;
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+  const path = () => { ctx.beginPath(); HOSE.forEach(([x,y],i) => i ? ctx.lineTo(x,y) : ctx.moveTo(x,y)); ctx.stroke(); };
+  ctx.strokeStyle = '#7d8996'; ctx.lineWidth = 9; path();
+  ctx.strokeStyle = '#eef2f6'; ctx.lineWidth = 5; path();
+  // 호스 속 분자
+  ctx.fillStyle = gasColor(); ctx.strokeStyle = 'rgba(15,25,40,0.55)'; ctx.lineWidth = 1;
+  for (const tr of S.transit) { const [x,y] = hosePoint(tr.d); ctx.beginPath(); ctx.arc(x,y,PR,0,Math.PI*2); ctx.fill(); ctx.stroke(); }
+  // 배출 밸브: 손잡이가 호스와 나란하면 열림, 수직이면 닫힘
+  const [vx, vy] = VALVE, open = S.valveOpen;
+  ctx.fillStyle = open ? '#1d8656' : '#4a5562';
+  ctx.beginPath(); ctx.arc(vx, vy, 11, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle = open ? '#1d8656' : '#c8372d'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+  ctx.beginPath();
+  if (open) { ctx.moveTo(vx-20, vy-15); ctx.lineTo(vx+20, vy-15); }
+  else { ctx.moveTo(vx, vy-34); ctx.lineTo(vx, vy-10); }
+  ctx.stroke();
+  ctx.strokeStyle = open ? '#1d8656' : '#c8372d'; ctx.lineWidth = 3;
+  if (open) { ctx.beginPath(); ctx.moveTo(vx, vy-15); ctx.lineTo(vx, vy-10); ctx.stroke(); }
+  ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(vx, vy, 4, 0, Math.PI*2); ctx.fill();
+  ctx.font = `700 12px ${FONT}`; ctx.textAlign = 'left'; ctx.fillStyle = open ? '#1d8656' : '#18212b';
+  ctx.fillText(`배출 밸브 · ${open ? '열림' : '닫힘'}`, vx+24, vy-30);
+  ctx.font = `500 11px ${FONT}`; ctx.fillStyle = '#5d6977';
+  ctx.fillText('눌러서 열고 닫기', vx+24, vy-15);
+  // 빠져나간 분자
+  ctx.fillStyle = gasColor();
+  for (const f of S.puffs) { ctx.globalAlpha = Math.max(0, f.life); ctx.beginPath(); ctx.arc(f.x, f.y, PR, 0, Math.PI*2); ctx.fill(); }
+  ctx.globalAlpha = 1;
+  // 펌프 몸통
+  ctx.fillStyle = '#f1f4f7'; ctx.strokeStyle = '#7d8996'; ctx.lineWidth = 2.5;
+  rrect(ctx,495,360,52,186,6); ctx.fill(); ctx.stroke();
+  const plY = 368 + off;
+  ctx.fillStyle = 'rgba(42,99,212,0.08)'; ctx.fillRect(498, plY+10, 46, 546-plY-12);
+  ctx.fillStyle = '#4a5562'; ctx.fillRect(498,plY,46,10);
+  ctx.fillStyle = '#6b7784'; ctx.fillRect(516,330+off,10,plY-(330+off));
+  const grab = S.drag && S.drag.id === 'pump';
+  ctx.fillStyle = grab ? '#444' : '#2d3540'; rrect(ctx,478,320+off,86,14,7); ctx.fill();
+  ctx.fillStyle = '#4a5562'; rrect(ctx,482,546,78,9,3); ctx.fill();
+  ctx.fillStyle = '#5d6977'; ctx.font = `600 12px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('펌프', 521, 572);
+  if (!grab && off < 2 && S.parts.length + inbound() < MAXN) {
+    arrow(ctx, 521, 272, 521, 304, '#888', 2);
+    ctx.fillStyle = '#666'; ctx.font = `500 12px ${FONT}`; ctx.textAlign = 'center';
+    ctx.fillText('끌어 내리기', 521, 260);
+    ctx.globalAlpha = 1;
+  }
+}
+
+/* ---------- 직접 조작 (끌기) ---------- */
+function toLogical(e){ const r = stage.getBoundingClientRect(); return [(e.clientX-r.left)*LW/r.width, (e.clientY-r.top)*LH/r.height]; }
+function hitTest(x, y){
+  const py = pistonY();
+  if (S.mode === 'boyle') {
+    const capTop = py - 58;
+    if ((x > 170 && x < 345 && y > capTop-64 && y < capTop+10) || (x > 262 && x < 334 && y < capTop)) return 'hand';
+  }
+  if (heatMode()) {
+    for (const id of ['ice','fire']) {
+      const it = S.items[id], cy = id === 'fire' ? it.y - 10 : it.y - 6;
+      if (Math.abs(x-it.x) < 36 && Math.abs(y-cy) < 34) return id;
+    }
+  }
+  if (S.mode === 'avog') {
+    if (Math.hypot(x-VALVE[0], y-VALVE[1]+12) < 26) return 'valve';
+    const hy = 320 + S.pumpOff;
+    if (x > 470 && x < 572 && y > hy-16 && y < hy+30) return 'pump';
+  }
+  return null;
+}
+stage.addEventListener('pointerdown', e => {
+  const [x, y] = toLogical(e), id = hitTest(x, y);
+  if (!id) return;
+  e.preventDefault();
+  S.skip = false;
+  if (id === 'valve') { S.valveOpen = !S.valveOpen; if (S.valveOpen && S.parts.length <= MINN) { S.valveOpen = false; S.closedAt = S.time; } return; }
+  try { stage.setPointerCapture(e.pointerId); } catch(_) {}
+  S.drag = { id, x0:x, y0:y, F0:S.F, off0:S.pumpOff };
+  if (id === 'ice' || id === 'fire') { const it = S.items[id]; it.placed = false; S.drag.dx = it.x - x; S.drag.dy = it.y - y; }
+  stage.style.cursor = 'grabbing';
+});
+stage.addEventListener('pointermove', e => {
+  const [x, y] = toLogical(e);
+  if (!S.drag) {
+    const id = hitTest(x, y);
+    stage.style.cursor = id === 'valve' ? 'pointer' : id ? 'grab' : 'default';
+    return;
+  }
+  const d = S.drag;
+  if (d.id === 'hand') S.F = clamp(d.F0 + (y - d.y0) * 8, 0, FMAX);
+  else if (d.id === 'pump') {
+    const nOff = clamp(d.off0 + (y - d.y0), 0, PUMP_TRAVEL), delta = nOff - S.pumpOff;
+    if (delta > 0) {
+      S.pumpAcc += delta;
+      while (S.pumpAcc >= PUMP_PER) {
+        S.pumpAcc -= PUMP_PER;
+        if (S.parts.length + inbound() < MAXN) S.transit.push({d:0, dir:1});
+        else S.fullAt = S.time;
+      }
+    }
+    S.pumpOff = nOff;
+  } else {
+    const it = S.items[d.id];
+    it.x = clamp(x + d.dx, 20, LW-20); it.y = clamp(y + d.dy, 20, LH-14); it.tx = it.x; it.ty = it.y;
+  }
+});
+function endDrag(){
+  const d = S.drag; if (!d) return;
+  if (d.id === 'fire' || d.id === 'ice') {
+    const it = S.items[d.id], other = d.id === 'fire' ? 'ice' : 'fire';
+    // 수조 바로 아래(또는 수조 위)에 놓으면 그 자리에 고정. 자리는 하나라 다른 도구는 상자로 돌아감
+    if (it.x > 50 && it.x < 470 && it.y > 140) {
+      it.placed = true; it.tx = clamp(it.x, 120, 400); it.ty = SPOT_Y[d.id];
+      if (S.items[other].placed) sendHome(other);
+    } else sendHome(d.id);
+  }
+  S.drag = null; stage.style.cursor = 'default';
+}
+stage.addEventListener('pointerup', endDrag);
+stage.addEventListener('pointercancel', endDrag);
+stage.addEventListener('lostpointercapture', endDrag);
+
+/* ---------- 그래프 ---------- */
+function drawChart(){
+  const ctx = chart.getContext('2d'), w = chart.width/dpr, h = chart.height/dpr;
+  if (!w || !h) return;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.fillStyle = '#f2f2f2'; ctx.fillRect(0,0,w,h);
+  const md = S.mode;
+  const ax = md === 'boyle'   ? {x:[0,1.2,0.2,1], y:[0,350,50,0], xl:'부피 V (L)', yl:'압력 P (kPa)'}
+           : md === 'charles' ? (S.vtFull ? {x:[0,400,50,0], y:[0,1.2,0.2,1], xl:'절대 온도 T (K)', yl:'부피 V (L)'}
+                                          : {x:[260,380,10,0], y:[0.7,1.06,0.04,2], xl:'절대 온도 T (K)', yl:'부피 V (L)'})
+           : md === 'gay'     ? (S.vtFull ? {x:[0,400,50,0], y:[0,200,25,0], xl:'절대 온도 T (K)', yl:'압력 P (kPa)'}
+                                          : {x:[260,380,10,0], y:[105,165,5,0], xl:'절대 온도 T (K)', yl:'압력 P (kPa)'})
+           :                    {x:[0,80,10,0],  y:[0,3.5,0.5,1], xl:'분자 수 N (개)', yl:'부피 V (L)'};
+  const [x0,x1,xs,xd] = ax.x, [y0,y1,ys,yd] = ax.y;
+  const L = 58, Rr = 18, T = 30, B = 46, pw = w-L-Rr, ph = h-T-B;
+  const X = v => L + (v-x0)/(x1-x0)*pw, Y = v => T + ph - (v-y0)/(y1-y0)*ph;
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(L, T, pw, ph);
+  ctx.font = `400 14px ${FONT}`; ctx.lineWidth = 1;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (let i = 0; i <= Math.round((x1-x0)/xs); i++) {
+    const v = x0+i*xs, x = X(v);
+    ctx.strokeStyle = '#cfcfcf'; ctx.beginPath(); ctx.moveTo(x,T); ctx.lineTo(x,T+ph); ctx.stroke();
+    ctx.fillStyle = '#222'; ctx.fillText(v.toFixed(xd), x, T+ph+5);
+  }
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (let i = 0; i <= Math.round((y1-y0)/ys); i++) {
+    const v = y0+i*ys, y = Y(v);
+    ctx.strokeStyle = '#cfcfcf'; ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(L+pw,y); ctx.stroke();
+    ctx.fillStyle = '#222'; ctx.fillText(v.toFixed(yd), L-8, y);
+  }
+  if (md === 'charles' || md === 'gay') {
+    ctx.strokeStyle = '#e2b48c'; ctx.setLineDash([2,3]);
+    ctx.beginPath(); ctx.moveTo(X(273.15),T); ctx.lineTo(X(273.15),T+ph); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = '#b5651d'; ctx.font = `600 10px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText('0 °C', X(273.15), T+2);
+  }
+  ctx.strokeStyle = '#bdbdbd'; ctx.lineWidth = 1;
+  ctx.strokeRect(L+0.5, T+0.5, pw-1, ph-1);
+  ctx.fillStyle = '#222'; ctx.font = `400 15px ${FONT}`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.fillText(ax.xl, L+pw/2, h-4);
+  ctx.textAlign = 'left'; ctx.fillText(ax.yl, 6, 15);
+
+  ctx.save(); ctx.beginPath(); ctx.rect(L-2,T-2,pw+4,ph+4); ctx.clip();
+  const trail = S.trail[md];
+  if (trail.length > 1) {
+    ctx.strokeStyle = 'rgba(0,0,0,0.16)'; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.beginPath(); trail.forEach(([a,b],i) => i ? ctx.lineTo(X(a),Y(b)) : ctx.moveTo(X(a),Y(b))); ctx.stroke();
+  }
+  const recs = S.rec[md], pts = recs.map(r => dataXY(r.V, r.P, r.T, r.n));
+  if (fitReady().ok) {
+    ctx.strokeStyle = '#666'; ctx.lineWidth = 1.5; ctx.setLineDash([7,5]); ctx.beginPath();
+    if (md === 'boyle') {
+      const c = pts.reduce((a,[v,p]) => a + v*p, 0) / pts.length;
+      for (let i = 0; i <= 160; i++) { const v = 0.15 + (x1-0.15)*i/160; i ? ctx.lineTo(X(v),Y(c/v)) : ctx.moveTo(X(v),Y(c/v)); }
+    } else {
+      const k = pts.reduce((a,[x,y]) => a + x*y, 0) / pts.reduce((a,[x]) => a + x*x, 0);
+      ctx.moveTo(X(0), Y(0)); ctx.lineTo(X(x1), Y(k*x1));
+    }
+    ctx.stroke(); ctx.setLineDash([]);
+    const tq = md === 'gay' ? 'P' : 'V';
+    if ((md === 'charles' || md === 'gay') && !S.vtFull) {
+      ctx.fillStyle = '#555'; ctx.font = `400 12px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      ctx.fillText(`↙ 직선을 연장하면 0 K에서 ${tq} = 0`, L+8, T+30);
+    }
+    if ((md === 'charles' || md === 'gay') && S.vtFull) {
+      ctx.fillStyle = '#d4462f'; ctx.beginPath(); ctx.arc(X(0), Y(0), 4, 0, Math.PI*2); ctx.fill();
+      ctx.font = `600 11px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+      ctx.fillText(`0 K (−273 °C)에서 ${tq} = 0`, X(0)+8, Y(0)-8);
+    }
+  }
+  pts.forEach(([a,b], i) => {
+    const last = i === pts.length-1;
+    ctx.fillStyle = '#222'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(X(a), Y(b), 5.5, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  });
+  const [cx, cy] = dataXY(S.V, Pgas(), S.Tg, nMol());
+  const lx = X(cx), ly = Y(cy);
+  ctx.fillStyle = '#e8261b'; ctx.beginPath(); ctx.arc(lx, ly, 7, 0, Math.PI*2); ctx.fill();
+  if (S.settled && S.stable < HOLD && !S.skip) {
+    ctx.strokeStyle = '#e8261b'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(lx, ly, 11, -Math.PI/2, -Math.PI/2 + Math.PI*2*S.stable/HOLD); ctx.stroke();
+  }
+  const lab = md === 'boyle' ? `${Pgas().toFixed(0)} kPa, ${S.V.toFixed(2)} L`
+            : md === 'charles' ? `${S.Tg.toFixed(0)} K, ${S.V.toFixed(2)} L`
+            : md === 'gay' ? `${S.Tg.toFixed(0)} K, ${Pgas().toFixed(1)} kPa`
+            : `${S.parts.length}개, ${S.V.toFixed(2)} L`;
+  ctx.font = `400 12px ${FONT}`; ctx.fillStyle = '#444';
+  const tw = ctx.measureText(lab).width;
+  const tx = lx + 12 + tw > L+pw ? lx - 12 - tw : lx + 12;
+  ctx.textAlign = 'left'; ctx.fillText(lab, tx, ly - 12);
+  ctx.restore();
+}
+
+/* ---------- UI ---------- */
+const $ = id => document.getElementById(id);
+
+function setMode(mode){
+  S.mode = mode;
+  const m = MODES[mode];
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.mode === mode)));
+  $('lawEq').textContent = m.eq; $('lawText').textContent = m.text;
+  $('hint').innerHTML = m.hint;
+  $('gTitle').textContent = m.title; $('guideName').textContent = m.guide;
+  $('viewBtn').hidden = !heatMode();
+  $('mExt').hidden = mode === 'gay';
+  ['tP','tV','tT','tN'].forEach(id => $(id).classList.toggle('const', m.consts.includes(id)));
+  resetApparatus();
+}
+
+function statusText(){
+  const target = S.Tw + 273.15, it = S.items;
+  if (S.mode === 'avog') {
+    if (S.time - S.fullAt < 2) return `실린더가 가득 찼어요. 분자는 최대 ${MAXN}개까지 넣을 수 있어요.`;
+    if (S.time - S.closedAt < 2.5) return `분자가 ${MINN}개만 남아 배출 밸브가 저절로 닫혔어요.`;
+    if (S.valveOpen) return '배출 밸브가 열려 있어요. 호스 입구로 들어간 분자가 빠져나가요. 다시 눌러 닫으세요.';
+    if (S.transit.some(t => t.dir > 0)) return '펌프로 밀어 넣은 기체 분자가 호스를 따라 실린더로 들어가요.';
+    if (S.transit.length) return '밸브를 닫았어요. 호스에 남은 분자가 빠져나가는 중이에요.';
+  }
+  if (heatMode()) {
+    const heating = it.fire.placed && !it.ice.placed, cooling = it.ice.placed && !it.fire.placed;
+    if (heating && S.Tw >= 100) return '물이 끓고 있어요. 물은 100 °C보다 뜨거워지지 않아요. 모닥불을 빼면 점이 찍혀요.';
+    if (cooling && S.Tw <= 0) return '물이 0 °C까지 식었어요. 얼음을 빼면 점이 찍혀요.';
+    const g = S.mode === 'gay' ? ' 피스톤에 더 자주, 더 세게 부딪혀 압력이 올라가요.' : ' 기체가 팽창해 피스톤이 올라가요.';
+    const c = S.mode === 'gay' ? ' 피스톤에 덜 부딪혀 압력이 내려가요.' : ' 기체가 수축해 피스톤이 내려가요.';
+    if (heating) return '모닥불이 물을 데우고 있어요. 분자가 빨라지면서' + g;
+    if (cooling) return '얼음이 물을 식히고 있어요. 분자가 느려지면서' + c;
+    if (Math.abs(S.Tg - target) > 0.5)
+      return S.Tg < target ? '물의 열이 기체로 전달돼 분자가 빨라지고 있어요.' : '기체의 열이 물로 빠져나가 분자가 느려지고 있어요.';
+    if (S.mode === 'gay') return '열평형 상태예요. 피스톤이 핀에 고정돼 부피는 변하지 않아요.';
+  }
+  if (!S.settled) return S.V > Veq() ? '누르는 압력이 더 커서 피스톤이 내려가요.' : '기체 압력이 더 커서 피스톤이 올라가요.';
+  return '두 압력이 같아져 피스톤이 멈췄어요.';
+}
+
+function updateUI(){
+  const pe = Pext(), pm = S.Pmeas;
+  $('barExt').style.width = clamp(pe/350*100,0,100) + '%';
+  $('barGas').style.width = clamp(pm/350*100,0,100) + '%';
+  $('valExt').textContent = pe.toFixed(1) + ' kPa';
+  $('valGas').textContent = pm.toFixed(1) + ' kPa';
+  const pill = $('pill'); pill.textContent = S.settled ? '평형' : '변화 중'; pill.className = 'pill ' + (S.settled ? 'ok' : 'moving');
+  $('status').textContent = statusText();
+  $('rP').textContent = Pgas().toFixed(1);
+  $('rV').textContent = S.V.toFixed(3);
+  $('rT').textContent = S.Tg.toFixed(1);
+  $('rN').textContent = String(S.parts.length);
+  const f = fitReady(), m = MODES[S.mode];
+  $('gSub').textContent = f.ok ? `점 ${f.count}개 · 추세선이 그려졌어요`
+    : f.count < FIT_MIN ? `상태가 0.5초 유지되면 점이 찍혀요 · 추세선까지 점 ${FIT_MIN - f.count}개 더`
+    : `점을 더 넓게 찍으면 추세선이 나타나요 (${m.spanTxt} 이상)`;
+}
+
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => { if (b.dataset.mode !== S.mode) setMode(b.dataset.mode); }));
+$('resetBtn').addEventListener('click', resetApparatus);
+$('viewBtn').addEventListener('click', () => {
+  S.vtFull = !S.vtFull;
+  $('viewBtn').textContent = S.vtFull ? '확대해서 보기' : '0 K까지 보기';
+});
+$('clearBtn').addEventListener('click', () => { S.rec[S.mode] = []; S.trail[S.mode] = []; S.skip = true; });
+
+let last = performance.now(), uiT = 0;
+function frame(now){
+  const dt = Math.min(0.033, Math.max(0.001, (now-last)/1000)); last = now;
+  update(dt); drawStage(); drawChart();
+  uiT += dt; if (uiT > 0.1) { uiT = 0; updateUI(); }
+  requestAnimationFrame(frame);
+}
+setMode('boyle'); resize(); updateUI();
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
