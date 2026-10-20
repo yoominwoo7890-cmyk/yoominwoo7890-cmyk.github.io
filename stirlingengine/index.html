@@ -54,6 +54,10 @@ input[type=range]{width:100%;margin:0;accent-color:#555;cursor:pointer}
 .readout div{white-space:nowrap}
 .readout b{font-weight:500;color:#444}
 .gtitle{margin:10px 0 0;font-size:1.05rem;font-weight:700}
+.ghead{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:6px 12px}
+.gbtns{display:flex;gap:4px}
+.gbtns .btn{padding:3px 10px;font-size:.85rem}
+.gbtns .btn[aria-pressed="true"]{background:#444;border-color:#444;color:#fff}
 .foot{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
 .btn{border:1px solid #bdbdbd;background:#fff;padding:5px 14px;font-size:.9rem;border-radius:3px}
 .btn:hover{background:#fafafa;border-color:#999}
@@ -103,7 +107,14 @@ td.src{color:#666}
         <div>W = <b id="rW">0</b> J</div>
         <div>η = <b id="rEta">0</b> %</div>
       </div>
-      <h2 class="gtitle">P–V 그래프</h2>
+      <div class="ghead">
+        <h2 class="gtitle" id="gTitle">P–V 그래프</h2>
+        <div class="gbtns" role="group" aria-label="그래프 종류">
+          <button class="btn" type="button" data-g="pv" aria-pressed="true">P–V</button>
+          <button class="btn" type="button" data-g="pt" aria-pressed="false">P–T</button>
+          <button class="btn" type="button" data-g="vt" aria-pressed="false">V–T</button>
+        </div>
+      </div>
       <canvas id="cvP" aria-label="압력-부피 그래프"></canvas>
       <h2 class="gtitle">열기관 다이어그램</h2>
       <canvas id="cvF" aria-label="열기관 에너지 흐름"></canvas>
@@ -400,17 +411,29 @@ function drawPV(ps,E){
     const ma=s.length===2?[(a[0]+b[0])/2,(a[1]+b[1])/2]:a;
     arrowAt(c,ma[0],ma[1],Math.atan2(b[1]-a[1],b[0]-a[0]),cols[i]);
   });
+  // 열 출입 화살표: 곡선을 향하면 흡수, 곡선에서 멀어지면 방출
+  const heatArrow=(x0,y0,x1,y1,col,on)=>{
+    c.save();c.globalAlpha=on?1:0.3;c.strokeStyle=col;c.lineWidth=2.5;c.lineCap='round';
+    const a=Math.atan2(y1-y0,x1-x0),bx=x1-Math.cos(a)*6,by=y1-Math.sin(a)*6;
+    c.beginPath();c.moveTo(x0,y0);c.lineTo(bx,by);c.stroke();arrowAt(c,bx,by,a,col);c.restore();
+  };
+  const va=1.35,va3=1.15,x13=tx(va),x3=tx(va3),y1c=ty(nR*T1/va),y3c=ty(nR*T2/va3);
+  const yV2=ty(nR*(T1+T2)/2/V2),yV1=ty(nR*(T1+T2)/2/V1);
+  heatArrow(x13,y1c-32,x13,y1c-6,C.hot,ps.k===0);
+  heatArrow(tx(V2)+5,yV2,tx(V2)+29,yV2,C.cold,ps.k===1);
+  heatArrow(x3,y3c+6,x3,Math.min(y3c+32,PV.y1-3),C.cold,ps.k===2);
+  heatArrow(tx(V1)-31,yV1,tx(V1)-7,yV1,C.hot,ps.k===3);
   // 과정 번호
   c.font=`500 12.5px ${SANS}`;
   const vm=(V1+V2)/2;
   c.fillStyle=C.hot;c.textAlign='left';c.fillText('①',tx(vm)+6,ty(nR*T1/vm)-8);
-  c.fillStyle=C['steel-dark'];c.fillText('②',tx(V2)+8,ty(nR*(T1+T2)/2/V2)+4);
+  c.fillStyle=C['steel-dark'];c.textAlign='center';c.fillText('②',tx(V2)+17,yV2-9);c.textAlign='left';
   c.fillStyle=C.cold;c.textAlign='right';c.fillText('③',tx(vm)-6,ty(nR*T2/vm)+16);
-  c.fillStyle=C['steel-dark'];c.fillText('④',tx(V1)-8,ty(nR*(T1+T2)/2/V1)+4);
+  c.fillStyle=C['steel-dark'];c.textAlign='center';c.fillText('④',tx(V1)-19,yV1-9);
   // 등온선 라벨
   c.font=`400 12px ${MONO}`;c.textAlign='right';
-  c.fillStyle=C.hot;c.fillText('T₁ '+T1+' K',PV.x1-5,ty(nR*T1/2.72)-6);
-  c.fillStyle=C.cold;c.fillText('T₂ '+T2+' K',PV.x1-5,ty(nR*T2/2.72)+14);
+  c.textAlign='center';c.fillStyle=C.hot;c.fillText('T₁ '+T1+' K',tx(2.2),ty(nR*T1/2.2)-9);
+  c.fillStyle=C.cold;c.fillText('T₂ '+T2+' K',tx(2.2),Math.min(ty(nR*T2/2.2)+17,PV.y1-4));
   // 일 라벨
   const lv=1.75,ly=ty((nR*T1/lv+nR*T2/lv)/2);
   c.fillStyle=C.brass;c.font=`500 13.5px ${MONO}`;c.textAlign='center';c.fillText('W '+E.W.toFixed(0)+' J',tx(lv),ly+4);
@@ -420,6 +443,72 @@ function drawPV(ps,E){
   c.strokeStyle=alpha(C.ink,0.35);c.setLineDash([2,3]);c.lineWidth=1;
   c.beginPath();c.moveTo(x,y);c.lineTo(x,PV.y1);c.moveTo(x,y);c.lineTo(PV.x0,y);c.stroke();c.setLineDash([]);
   c.fillStyle=C.ink;c.beginPath();c.arc(x,y,5,0,Math.PI*2);c.fill();
+  c.strokeStyle=C.surface;c.lineWidth=2;c.stroke();
+}
+
+
+// ── P-T, V-T 그래프 ──────────────────────────────
+let graph='pv';
+const AX={
+  pt:{x:[0,1100,200,0],y:[0,900,150,0],xl:'온도 T (K)',yl:'압력 P (kPa)'},
+  vt:{x:[0,1100,200,0],y:[0,3.5,0.5,1],xl:'온도 T (K)',yl:'부피 V (L)'}
+};
+function drawAlt(ps,E){
+  const c=ctx.P,[W,H]=LOG.P;c.clearRect(0,0,W,H);
+  const ax=AX[graph],[x0,x1,xs,xd]=ax.x,[y0,y1,ys,yd]=ax.y;
+  const X=v=>PV.x0+(v-x0)/(x1-x0)*(PV.x1-PV.x0),Y=v=>PV.y1-(v-y0)/(y1-y0)*(PV.y1-PV.y0);
+  // 그림 영역, 격자
+  c.fillStyle='#ffffff';c.fillRect(PV.x0,PV.y0,PV.x1-PV.x0,PV.y1-PV.y0);
+  c.font=`400 13px ${SANS}`;c.lineWidth=1;c.fillStyle='#222';
+  c.textAlign='right';c.textBaseline='middle';
+  for(let i=0;i<=Math.round((y1-y0)/ys);i++){const v=y0+i*ys,y=Y(v);c.strokeStyle='#cfcfcf';c.beginPath();c.moveTo(PV.x0,y);c.lineTo(PV.x1,y);c.stroke();c.fillText(v.toFixed(yd),PV.x0-8,y);}
+  c.textAlign='center';c.textBaseline='top';
+  for(let i=0;i<=Math.round((x1-x0)/xs);i++){const v=x0+i*xs,x=X(v);c.strokeStyle='#cfcfcf';c.beginPath();c.moveTo(x,PV.y0);c.lineTo(x,PV.y1);c.stroke();c.fillText(v.toFixed(xd),x,PV.y1+5);}
+  c.textBaseline='alphabetic';
+  c.strokeStyle='#bdbdbd';c.strokeRect(PV.x0+.5,PV.y0+.5,PV.x1-PV.x0-1,PV.y1-PV.y0-1);
+  c.font=`500 14px ${SANS}`;c.fillStyle='#222';
+  c.textAlign='center';c.fillText(ax.xl,(PV.x0+PV.x1)/2,H-4);
+  c.textAlign='left';c.fillText(ax.yl,4,14);
+
+  // 네 꼭짓점 (T, P, V)
+  const st=[[T1,V1],[T1,V2],[T2,V2],[T2,V1]].map(([T,V])=>({T,V,P:nR*T/V}));
+  const pt=q=>graph==='pt'?[X(q.T),Y(q.P)]:[X(q.T),Y(q.V)];
+  // 등적선: P-T에서는 원점을 지나는 직선
+  if(graph==='pt'){
+    c.save();c.setLineDash([3,4]);c.strokeStyle=alpha(C['steel-dark'],0.45);
+    [V1,V2].forEach(V=>{c.beginPath();c.moveTo(X(0),Y(0));c.lineTo(X(1100),Y(nR*1100/V));c.stroke();});
+    c.restore();
+  }
+  const segs=[0,1,2,3].map(i=>[pt(st[i]),pt(st[(i+1)%4])]);
+  const cols=[C.hot,C['steel-dark'],C.cold,C['steel-dark']];
+  const cen=segs.reduce((a,s)=>[a[0]+s[0][0]/4,a[1]+s[0][1]/4],[0,0]);
+  segs.forEach((s,i)=>{
+    const [a,b]=s;
+    c.strokeStyle=cols[i];c.lineWidth=i===ps.k?3.4:2;c.lineCap='round';
+    c.beginPath();c.moveTo(a[0],a[1]);c.lineTo(b[0],b[1]);c.stroke();c.lineCap='butt';
+    const m=[(a[0]+b[0])/2,(a[1]+b[1])/2],ang=Math.atan2(b[1]-a[1],b[0]-a[0]);
+    arrowAt(c,m[0],m[1],ang,cols[i]);
+    // 고리 바깥쪽 법선
+    let nx=-(b[1]-a[1]),ny=b[0]-a[0];const nl=Math.hypot(nx,ny)||1;nx/=nl;ny/=nl;
+    if((m[0]-cen[0])*nx+(m[1]-cen[1])*ny<0){nx=-nx;ny=-ny;}
+    // 열 출입: 선을 향하면 흡수, 선에서 멀어지면 방출
+    const absorb=i===0||i===3,col=absorb?C.hot:C.cold,q=[m[0]+nx*18,m[1]+ny*18];
+    const far=[q[0]+nx*26,q[1]+ny*26],near=[q[0]+nx*2,q[1]+ny*2];
+    const [f,t]=absorb?[far,near]:[near,far];
+    c.save();c.globalAlpha=ps.k===i?1:0.3;c.strokeStyle=col;c.lineWidth=2.5;c.lineCap='round';
+    const aa=Math.atan2(t[1]-f[1],t[0]-f[0]),bx=t[0]-Math.cos(aa)*6,by=t[1]-Math.sin(aa)*6;
+    c.beginPath();c.moveTo(f[0],f[1]);c.lineTo(bx,by);c.stroke();arrowAt(c,bx,by,aa,col);c.restore();
+    // 과정 번호 (고리 안쪽)
+    c.font=`500 12.5px ${SANS}`;c.fillStyle=cols[i];c.textAlign='center';
+    c.fillText('①②③④'[i],m[0]-nx*16,m[1]-ny*16+4);
+  });
+  // 온도 이름표
+  c.font=`400 12px ${SANS}`;c.textAlign='center';
+  c.fillStyle=C.hot;c.fillText('T₁',X(T1),PV.y0+14);
+  c.fillStyle=C.cold;c.fillText('T₂',X(T2),PV.y0+14);
+  // 현재 상태
+  const cur=pt({T:ps.Tg,V:ps.V,P:ps.P});
+  c.fillStyle=C.ink;c.beginPath();c.arc(cur[0],cur[1],5,0,Math.PI*2);c.fill();
   c.strokeStyle=C.surface;c.lineWidth=2;c.stroke();
 }
 
@@ -494,7 +583,7 @@ function frame(dt){
   if(playing){const hz=(0.11+0.24*Math.max(0,E.W/W_MAX))*speed;curHz=hz;ph=(ph+hz*dt)%1;}
   const ps=state(ph);
   updParts(geom(ps),ps,dt);
-  drawEngine(ps,E);drawPV(ps,E);drawFlow(ps,E);
+  drawEngine(ps,E);(graph==='pv'?drawPV:drawAlt)(ps,E);drawFlow(ps,E);
   updStage(ps.k);
 }
 function tick(ts){
@@ -510,6 +599,12 @@ function setPlay(v){
   if(v)start();else{cancelAnimationFrame(raf);raf=0;}
 }
 $('play').addEventListener('click',()=>setPlay(!playing));
+document.querySelectorAll('.gbtns button').forEach(b=>b.addEventListener('click',()=>{
+  graph=b.dataset.g;
+  document.querySelectorAll('.gbtns button').forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));
+  $('gTitle').textContent={pv:'P–V',pt:'P–T',vt:'V–T'}[graph]+' 그래프';
+  redraw();
+}));
 const sSp=$('sSp');
 sSp.addEventListener('input',()=>{speed=+sSp.value;$('oSp').textContent=speed+'×';});
 $('resetBtn').addEventListener('click',()=>{T1=600;T2=300;sT1.value=600;sT2.value=300;speed=1;sSp.value=1;$('oSp').textContent='1×';ph=0.08;updReadout();snapParts(state(ph));redraw();});
