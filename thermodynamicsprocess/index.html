@@ -1,1 +1,845 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PV 그래프 변환기</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* 수업용 시뮬레이션: 회색 실험판 하나에 실린더(왼쪽)와 네 그래프(오른쪽). 카드·배지 없이 평평하게. */
+:root{
+  --bg:#ffffff;
+  --board:#f2f2f2;
+  --ink:#222222;
+  --muted:#777777;
+  --rule:#d6d6d6;
+  --red:#d33a2c;
+  --blue:#2f5fc4;
+  --green:#2a7d4f;
+  --font:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5;margin:0}
+.app{max-width:1280px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 32px}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,canvas:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 
+header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 24px;border-bottom:1px solid var(--rule);margin-bottom:14px}
+h1{margin:0 0 9px;font-size:1.3rem;font-weight:700}
+.tabs{display:flex;flex-wrap:wrap;gap:0 18px;order:3}
+.tabs button{border:0;background:none;padding:6px 0 9px;font-size:1rem;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px}
+.tabs button:hover{color:var(--ink)}
+.tabs button[aria-selected="true"]{color:var(--ink);font-weight:700;border-bottom-color:var(--ink)}
+.tabs .sep{width:1px;background:var(--rule);margin:8px 0 12px}
+.law{order:4;margin:0 0 9px auto;font-size:1.1rem;font-weight:500;color:#333;white-space:nowrap}
+
+.sim{background:var(--board);display:grid;grid-template-columns:minmax(0,1fr);gap:12px 28px;padding:16px 18px 18px}
+@media (min-width:980px){.sim{grid-template-columns:minmax(0,0.8fr) minmax(0,1.2fr)}}
+.left,.right{min-width:0;display:flex;flex-direction:column;gap:8px}
+
+.cycbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.segs{list-style:none;margin:2px 0 0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+.segs li{min-width:0}
+.segs button{width:100%;text-align:left;border:0;background:#e6e6e6;padding:6px 8px 7px;border-top:4px solid var(--c);display:flex;flex-direction:column;line-height:1.3;position:relative;overflow:hidden}
+.segs button b{font-size:.82rem;font-weight:500;color:var(--muted)}
+.segs button span{font-size:.95rem;font-weight:700;color:var(--c);white-space:nowrap}
+.segs button small{font-size:.78rem;color:var(--muted)}
+.segs button i{position:absolute;left:0;bottom:0;height:3px;background:var(--c);width:0}
+.segs button[aria-current="true"]{background:#fff}
+.segs button:hover{background:#fafafa}
+#stage{display:block;width:100%;max-width:520px;margin:0 auto;touch-action:none;user-select:none;-webkit-user-select:none}
+.hint{margin:0;font-size:.9rem;color:var(--muted);text-align:center}
+.meters{display:flex;flex-direction:column;gap:6px;font-size:.95rem;border-top:1px solid var(--rule);padding-top:12px}
+.bar{display:grid;grid-template-columns:150px minmax(0,1fr) 96px;gap:12px;align-items:center}
+.bar .t{position:relative;height:9px;background:#e0e0e0}
+.bar .t::after{content:"";position:absolute;left:50%;top:-4px;bottom:-4px;width:1px;background:#9a9a9a}
+.bar .t i{position:absolute;top:0;bottom:0;width:0}
+.bar output{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+.mhead{display:flex;justify-content:space-between;align-items:baseline;font-size:.9rem;color:var(--muted)}
+.pill{font-weight:700;font-size:.95rem;color:var(--muted)}
+.pill.in{color:var(--red)} .pill.out{color:var(--blue)}
+
+.readout{display:grid;grid-template-columns:repeat(4,minmax(0,auto));justify-content:space-between;gap:2px 18px;font-size:1.15rem;color:#666;font-variant-numeric:tabular-nums}
+.readout div{white-space:nowrap}
+.readout b{font-weight:500;color:#444}
+.readout em{font-style:normal;font-size:.75rem;color:var(--green);margin-left:4px;visibility:hidden}
+.readout .const em{visibility:visible}
+.gsel{display:flex;flex-wrap:wrap;gap:0 18px;border-bottom:1px solid var(--rule);margin-top:6px}
+.gsel button{border:0;background:none;padding:4px 0 7px;font-size:1rem;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-1px}
+.gsel button:hover{color:var(--ink)}
+.gsel button[aria-selected="true"]{color:var(--ink);font-weight:700;border-bottom-color:var(--ink)}
+#chart{display:block;width:100%;aspect-ratio:4/3.1;touch-action:none}
+.foot{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:8px}
+.foot .key{flex:1;min-width:0;font-size:.9rem;color:#555}
+.foot .key i{display:inline-block;width:8px;height:8px;border-radius:50%;margin:0 4px 0 12px;vertical-align:1px}
+.foot .key i:first-child{margin-left:0}
+.btn{border:1px solid #bdbdbd;background:#fff;padding:5px 14px;font-size:.9rem;border-radius:3px}
+.btn:hover{background:#fafafa;border-color:#999}
+.btn[aria-pressed="true"]{background:#222;border-color:#222;color:#fff}
+
+@media (max-width:560px){
+  .readout{grid-template-columns:repeat(2,minmax(0,1fr));font-size:1.05rem}
+  .segs{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .gsel{gap:0 12px}
+  .gsel button{font-size:.92rem}
+  .bar{grid-template-columns:118px minmax(0,1fr) 84px;gap:8px;font-size:.88rem}
+  .law{margin-left:0}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <h1>PV 그래프 변환기</h1>
+    <b class="law" id="law"></b>
+    <nav class="tabs" role="tablist" aria-label="과정 선택">
+      <button role="tab" data-mode="isochoric" aria-selected="false">등적 과정</button>
+      <button role="tab" data-mode="isobaric" aria-selected="true">등압 과정</button>
+      <button role="tab" data-mode="isothermal" aria-selected="false">등온 과정</button>
+      <button role="tab" data-mode="adiabatic" aria-selected="false">단열 과정</button>
+      <span class="sep" aria-hidden="true"></span>
+      <button role="tab" data-mode="cycle" aria-selected="false">순환 과정</button>
+    </nav>
+  </header>
+
+  <main class="sim">
+    <section class="left">
+      <div class="cycbar" id="cycbar" hidden>
+        <button class="btn" data-cyc="rect">사각형 순환</button>
+        <button class="btn" data-cyc="carnot">카르노 기관</button>
+        <button class="btn" data-cyc="otto">오토 기관</button>
+        <button class="btn" data-cyc="diesel">디젤 기관</button>
+      </div>
+      <ol class="segs" id="segs" hidden></ol>
+      <canvas id="stage" tabindex="0" aria-label="피스톤이 달린 실린더 속 기체. 모닥불이나 얼음을 실린더 아래로 끌어 놓거나, 단열 과정에서는 피스톤을 끌어 조작합니다."></canvas>
+      <p class="hint" id="hint"></p>
+      <div class="meters">
+        <div class="mhead"><span id="mfrom">A에서부터</span><span class="pill" id="pill">멈춤</span></div>
+        <div class="bar"><span>흡수한 열 Q</span><div class="t"><i id="bQ"></i></div><output id="vQ">0 J</output></div>
+        <div class="bar"><span>내부 에너지 변화 ΔU</span><div class="t"><i id="bU"></i></div><output id="vU">0 J</output></div>
+        <div class="bar"><span>기체가 한 일 W</span><div class="t"><i id="bW"></i></div><output id="vW">0 J</output></div>
+      </div>
+    </section>
+
+    <section class="right">
+      <div class="readout">
+        <div id="tP">P = <b id="rP">0</b> kPa<em>일정</em></div>
+        <div id="tV">V = <b id="rV">0</b> L<em>일정</em></div>
+        <div id="tT">T = <b id="rT">0</b> K<em>일정</em></div>
+        <div id="tS">S = <b id="rS">0</b> J/K<em>일정</em></div>
+      </div>
+      <div class="gsel" role="tablist" aria-label="그래프 선택">
+        <button role="tab" data-g="pv" aria-selected="true">P–V 그래프</button>
+        <button role="tab" data-g="pt" aria-selected="false">P–T 그래프</button>
+        <button role="tab" data-g="vt" aria-selected="false">V–T 그래프</button>
+        <button role="tab" data-g="st" aria-selected="false">S–T 그래프</button>
+      </div>
+      <canvas id="chart" aria-label="선택한 그래프"></canvas>
+      <div class="foot">
+        <button class="btn" id="playBtn" hidden>재생</button>
+        <button class="btn" id="resetBtn">처음으로</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+(() => {
+const GAM = 5/3, nR = 100*20/300, CV = 1.5;     // 단원자 이상 기체. A: 100 kPa, 20 L, 300 K
+const COL = {isochoric:'#2f5fc4', isobaric:'#d9822b', isothermal:'#2a7d4f', adiabatic:'#b0397a'};
+const NAME = {isochoric:'등적', isobaric:'등압', isothermal:'등온', adiabatic:'단열'};
+const BASIC = {
+  isochoric:{x:[40,250], xA:100, law:'P / T = 일정', hint:'모닥불이나 얼음을 실린더 아래로 끌어다 놓아 보세요.'},
+  isobaric:{x:[8,50], xA:20, law:'V / T = 일정', hint:'모닥불이나 얼음을 실린더 아래로 끌어다 놓아 보세요.'},
+  isothermal:{x:[8,60], xA:20, law:'PV = 일정', hint:'모닥불이나 얼음을 실린더 아래로 끌어다 놓아 보세요.'},
+  adiabatic:{x:[10,60], xA:20, law:'PV<sup>γ</sup> = 일정', hint:'피스톤 손잡이를 위아래로 끌어 보세요.'}
+};
+const BTYPES = Object.keys(BASIC);
+const KEEP = {isochoric:'tV', isobaric:'tP', isothermal:'tT', adiabatic:'tS'};
+
+const st = (P,V) => { const T = P*V/nR; return {P, V, T, S: CV*nR*Math.log(T/300) + nR*Math.log(V/20)}; };
+function stateOf(type, x){
+  if(type==='isochoric') return st(x, 20);
+  if(type==='isobaric') return st(100, x);
+  if(type==='isothermal') return st(2000/x, x);
+  return st(100*Math.pow(20/x, GAM), x);
+}
+function energyOf(type, x){
+  const s = stateOf(type, x), dU = CV*(s.P*s.V - 2000);
+  const W = type==='isochoric' ? 0 : type==='isobaric' ? 100*(x-20) : type==='isothermal' ? 2000*Math.log(x/20) : CV*(2000 - s.P*s.V);
+  return {W, dU, Q: type==='adiabatic' ? 0 : dU + W};
+}
+
+/* ---------- 순환 과정 ---------- */
+const CYC = {
+  rect:  {A:[100,20], steps:[['isochoric',200],['isobaric',40],['isochoric',100],['isobaric',20]]},
+  carnot:{A:[400,10], steps:(() => { const k = Math.pow(1/0.6, 1/(GAM-1)); return [['isothermal',20],['adiabatic',20*k],['isothermal',10*k],['adiabatic',10]]; })()},
+  otto:  {A:[100,40], steps:[['adiabatic',10],['isochoric',2*100*Math.pow(4,GAM)],['adiabatic',40],['isochoric',100]]},
+  diesel:{A:[100,40], steps:[['adiabatic',8],['isobaric',14],['adiabatic',40],['isochoric',100]]}
+};
+function buildCycle(def){
+  const pts = [], marks = [0], segs = [];
+  let P0 = def.A[0], V0 = def.A[1];
+  for(const [type, val] of def.steps){
+    let P1, V1;
+    if(type==='isochoric'){ V1 = V0; P1 = val; }
+    else if(type==='isobaric'){ P1 = P0; V1 = val; }
+    else if(type==='isothermal'){ V1 = val; P1 = P0*V0/V1; }
+    else { V1 = val; P1 = P0*Math.pow(V0/V1, GAM); }
+    const M = 160;
+    for(let j = pts.length ? 1 : 0; j <= M; j++){
+      const t = j/M; let P, V;
+      if(type==='isochoric'){ V = V0; P = P0 + (P1-P0)*t; }
+      else if(type==='isobaric'){ P = P0; V = V0 + (V1-V0)*t; }
+      else { V = V0*Math.pow(V1/V0, t); P = type==='isothermal' ? P0*V0/V : P0*Math.pow(V0/V, GAM); }
+      const s = st(P, V); s.type = type; pts.push(s);
+    }
+    const up = type === 'isochoric' ? P1 > P0 : V1 > V0;
+    const verb = type === 'isochoric' ? (up ? '가열' : '냉각') : (up ? '팽창' : '압축');
+    segs.push({type, a:marks.length-1, i0:pts.length-1-M, i1:pts.length-1, name:`${NAME[type]} ${verb}`});
+    marks.push(pts.length-1); P0 = P1; V0 = V1;
+  }
+  let W = 0, U = 0, Q = 0, Qin = 0;
+  Object.assign(pts[0], {W:0, U:0, Q:0});
+  for(let i = 1; i < pts.length; i++){
+    const a = pts[i-1], b = pts[i];
+    const dW = (a.P+b.P)/2*(b.V-a.V), dU = CV*(b.P*b.V - a.P*a.V), dQ = b.type==='adiabatic' ? 0 : dU + dW;
+    W += dW; U += dU; Q += dQ; if(dQ > 0) Qin += dQ;
+    b.W = W; b.U = U; b.Q = Q;
+  }
+  segs.forEach(g => { g.Q = pts[g.i1].Q - pts[g.i0].Q; });
+  return {pts, marks, segs, W, Qin, e: W/Qin};
+}
+
+/* ---------- 상태 ---------- */
+const S = {
+  mode:'isobaric', x:{}, cyc:'rect', cycle:null, u:0, playing:false,
+  heat:0, heatAt:-9, time:0, parts:[], Tg:300, drag:null
+};
+BTYPES.forEach(t => S.x[t] = BASIC[t].xA);
+const basicMode = () => S.mode !== 'cycle';
+
+function cur(){
+  if(basicMode()){
+    const x = S.x[S.mode], s = stateOf(S.mode, x);
+    return Object.assign(s, energyOf(S.mode, x), {type:S.mode});
+  }
+  const p = S.cycle.pts, f = S.u*(p.length-1), i = Math.min(p.length-2, Math.floor(f)), t = f - i, a = p[i], b = p[i+1];
+  const o = {type:b.type};
+  for(const k of ['P','V','T','S','W','U','Q']) o[k] = a[k] + (b[k]-a[k])*t;
+  o.dU = o.U;
+  return o;
+}
+function noteHeat(q0, q1, type){
+  if(Math.abs(q1-q0) < 1e-9 && type !== 'adiabatic') return;
+  S.heat = type==='adiabatic' ? 0 : (q1 > q0 ? 1 : -1);
+  S.heatAt = S.time;
+}
+function setX(v){
+  const b = BASIC[S.mode], x = Math.min(b.x[1], Math.max(b.x[0], v)), old = S.x[S.mode];
+  if(x === old) return;
+  noteHeat(energyOf(S.mode, old).Q, energyOf(S.mode, x).Q, S.mode);
+  S.x[S.mode] = x;
+}
+function setU(v, wrap){
+  const u = wrap ? ((v % 1) + 1) % 1 : Math.min(1, Math.max(0, v));
+  const q0 = cur().Q, oldU = S.u;
+  S.u = u;
+  const c = cur();
+  if(!(wrap && u < oldU)) noteHeat(q0, c.Q, c.type);
+}
+
+/* ---------- 축 범위 ---------- */
+let DOM = {}, EMAX = 1;
+function guide(type, n){
+  const [a,b] = BASIC[type].x, out = [];
+  for(let i = 0; i <= n; i++){ const x = a + (b-a)*i/n; const s = stateOf(type, x); s.x = x; out.push(s); }
+  return out;
+}
+function computeDomains(){
+  if(basicMode()){
+    let sLo = Infinity, sHi = -Infinity; EMAX = 1;
+    BTYPES.forEach(t => guide(t, 120).forEach(s => { sLo = Math.min(sLo, s.S); sHi = Math.max(sHi, s.S); }));
+    guide(S.mode, 120).forEach(s => { const e = energyOf(S.mode, s.x); EMAX = Math.max(EMAX, Math.abs(e.W), Math.abs(e.dU), Math.abs(e.Q)); });
+    const pad = (sHi-sLo)*0.06;
+    DOM = {P:[0,350], V:[0,60], T:[0,800], S:[sLo-pad, sHi+pad]};
+  } else {
+    const p = S.cycle.pts, mx = k => Math.max(...p.map(s => s[k])), mn = k => Math.min(...p.map(s => s[k]));
+    const sLo = mn('S'), sHi = mx('S'), pad = (sHi-sLo)*0.12;
+    DOM = {P:[0, mx('P')*1.12], V:[0, mx('V')*1.15], T:[0, mx('T')*1.12], S:[sLo-pad, sHi+pad]};
+    EMAX = Math.max(1, ...p.map(s => Math.max(Math.abs(s.W), Math.abs(s.U), Math.abs(s.Q))));
+  }
+}
+
+/* ---------- 그리기 공통 ---------- */
+const FONT = '"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif';
+const lerp = (a,b,t) => a + (b-a)*t;
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+const mix = (a,b,t) => `rgb(${Math.round(lerp(a[0],b[0],t))},${Math.round(lerp(a[1],b[1],t))},${Math.round(lerp(a[2],b[2],t))})`;
+const gasColor = T => mix([42,99,212],[219,84,40], clamp((T-150)/550, 0, 1));
+function rrect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x,y,w,h,r) : ctx.rect(x,y,w,h); }
+function arrow(ctx,x0,y0,x1,y1,color,w=3){
+  const a = Math.atan2(y1-y0,x1-x0), hl = 10;
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = w; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(x0,y0); ctx.lineTo(x1-Math.cos(a)*hl*0.6, y1-Math.sin(a)*hl*0.6); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x1-hl*Math.cos(a-0.45), y1-hl*Math.sin(a-0.45)); ctx.lineTo(x1-hl*Math.cos(a+0.45), y1-hl*Math.sin(a+0.45)); ctx.closePath(); ctx.fill();
+}
+function niceStep(span, n){ const r = span/n, p = Math.pow(10, Math.floor(Math.log10(r))), f = r/p; return (f<1.5?1:f<3?2:f<7?5:10)*p; }
+
+/* ---------- 실린더 ---------- */
+const stage = document.getElementById('stage'), sctx = stage.getContext('2d');
+const LW = 480, LH = 480, CL = 140, CR = 290, BOT = 380, HMAX = 300, PR = 4.5, NP = 28, S0 = 120;
+const HEAT = 800;                                  // 모닥불·얼음이 1초에 주고받는 열 (J)
+const SPOT = {x:(CL+CR)/2, fire:BOT+62, ice:BOT+56};
+const HOME = {fire:[422, 330], ice:[422, 432]};
+let dpr = 1, stageScale = 1;
+const vMax = () => basicMode() ? 60 : DOM.V[1];
+const pistonY = V => BOT - HMAX*V/vMax();
+const vf = T => clamp(Math.pow(T/300, 1.1), 0.35, 4);
+const heatTool = () => basicMode() && S.mode !== 'adiabatic';
+S.items = {
+  fire:{x:HOME.fire[0], y:HOME.fire[1], tx:HOME.fire[0], ty:HOME.fire[1], placed:false},
+  ice:{x:HOME.ice[0], y:HOME.ice[1], tx:HOME.ice[0], ty:HOME.ice[1], placed:false}
+};
+function sendHome(id){ const it = S.items[id]; it.placed = false; [it.tx, it.ty] = HOME[id]; }
+function homeAll(snap){ for(const id of ['fire','ice']){ sendHome(id); if(snap){ const it = S.items[id]; it.x = it.tx; it.y = it.ty; } } }
+function rayleigh(){ return clamp(0.798*Math.sqrt(-2*Math.log(1-Math.random())), 0.3, 2.4); }
+function seedParticles(){
+  const c = cur(), py = pistonY(c.V);
+  S.parts = []; S.Tg = c.T;
+  for(let i = 0; i < NP; i++){
+    const s = S0*rayleigh()*vf(c.T), a = Math.random()*Math.PI*2;
+    S.parts.push({x:CL+PR+Math.random()*(CR-CL-2*PR), y:py+PR+Math.random()*Math.max(1, BOT-py-2*PR), vx:s*Math.cos(a), vy:s*Math.sin(a)});
+  }
+}
+
+function update(dt){
+  S.time += dt;
+  for(const id of ['fire','ice']){
+    const it = S.items[id];
+    if(!(S.drag && S.drag.from === id)){ const k = 1 - Math.exp(-dt*12); it.x += (it.tx-it.x)*k; it.y += (it.ty-it.y)*k; }
+  }
+  if(heatTool()){
+    const dir = S.items.fire.placed ? 1 : S.items.ice.placed ? -1 : 0;
+    if(dir){
+      const x = S.x[S.mode], dQdx = S.mode === 'isochoric' ? 30 : S.mode === 'isobaric' ? 250 : 2000/x;
+      setX(x + dir*HEAT/dQdx*dt);
+    }
+  }
+  if(S.playing && !basicMode()) setU(S.u + dt/16, true);
+  const c = cur();
+  if(Math.abs(c.T - S.Tg) > 1e-6){ const k = vf(c.T)/vf(S.Tg); for(const p of S.parts){ p.vx *= k; p.vy *= k; } S.Tg = c.T; }
+  const py = pistonY(c.V);
+  const steps = Math.max(1, Math.ceil(dt*240)), h = dt/steps;
+  for(let s = 0; s < steps; s++){
+    for(const p of S.parts){
+      p.x += p.vx*h; p.y += p.vy*h;
+      if(p.x < CL+PR){ p.x = CL+PR; p.vx = Math.abs(p.vx); } else if(p.x > CR-PR){ p.x = CR-PR; p.vx = -Math.abs(p.vx); }
+      if(p.y > BOT-PR){ p.y = BOT-PR; p.vy = -Math.abs(p.vy); }
+      if(p.y < py+PR){ p.y = py+PR; p.vy = Math.abs(p.vy); }
+    }
+  }
+}
+
+function flame(ctx, cx, by, w, h, col){
+  ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(cx-w/2, by);
+  ctx.bezierCurveTo(cx-w/2, by-h*0.55, cx-w*0.12, by-h*0.7, cx, by-h);
+  ctx.bezierCurveTo(cx+w*0.12, by-h*0.7, cx+w/2, by-h*0.55, cx+w/2, by);
+  ctx.closePath(); ctx.fill();
+}
+function drawFire(ctx, x, y, label){
+  const t = S.time, f = i => 1 + 0.13*Math.sin(t*13 + i*2.1) + 0.06*Math.sin(t*23 + i);
+  ctx.save();
+  if(S.drag && S.drag.from === 'fire'){ ctx.shadowColor = 'rgba(20,30,45,0.25)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 4; }
+  ctx.fillStyle = '#7a4a2a';
+  ctx.save(); ctx.translate(x, y+12); ctx.rotate(0.22); rrect(ctx,-30,-5,60,10,5); ctx.fill(); ctx.restore();
+  ctx.save(); ctx.translate(x, y+12); ctx.rotate(-0.22); rrect(ctx,-30,-5,60,10,5); ctx.fill(); ctx.restore();
+  ctx.shadowColor = 'transparent';
+  ctx.fillStyle = '#5c361d'; ctx.beginPath(); ctx.arc(x-27, y+6, 4, 0, Math.PI*2); ctx.arc(x+27, y+6, 4, 0, Math.PI*2); ctx.fill();
+  flame(ctx, x-13, y+8, 22, 30*f(1), '#f08a24');
+  flame(ctx, x+13, y+8, 22, 32*f(2), '#f08a24');
+  flame(ctx, x, y+8, 40, 50*f(0), '#f39a2b');
+  flame(ctx, x, y+8, 26, 36*f(3), '#f7c341');
+  flame(ctx, x, y+8, 12, 18*f(4), '#fff1b8');
+  ctx.restore();
+  if(label){ ctx.fillStyle = '#555'; ctx.font = `500 13px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('모닥불', x, y+38); }
+}
+function drawIce(ctx, x, y, label, placed){
+  const cubes = [[-18,-6,18],[0,-8,18],[-9,-22,17]];
+  ctx.save();
+  if(S.drag && S.drag.from === 'ice'){ ctx.shadowColor = 'rgba(20,30,45,0.25)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 4; }
+  for(const [dx,dy,s] of cubes){ rrect(ctx, x+dx, y+dy, s, s, 3); ctx.fillStyle = 'rgba(236,247,255,0.97)'; ctx.fill(); }
+  ctx.restore();
+  ctx.strokeStyle = '#7fb5dc'; ctx.lineWidth = 1.5;
+  for(const [dx,dy,s] of cubes){
+    rrect(ctx, x+dx, y+dy, s, s, 3); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.beginPath(); ctx.moveTo(x+dx+4, y+dy+5); ctx.lineTo(x+dx+9, y+dy+5); ctx.stroke();
+    ctx.strokeStyle = '#7fb5dc';
+  }
+  if(placed){
+    ctx.strokeStyle = 'rgba(120,180,230,0.7)'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+    for(let i = 0; i < 3; i++){
+      const ph = (S.time*0.7 + i/3) % 1, xx = x - 14 + i*12;
+      ctx.globalAlpha = 1 - ph; ctx.beginPath(); ctx.moveTo(xx, y-26-ph*10); ctx.lineTo(xx, y-32-ph*10); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+  if(label){ ctx.fillStyle = '#555'; ctx.font = `500 13px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('얼음', x, y+30); }
+}
+
+function drawStage(){
+  const ctx = sctx, c = cur(), py = pistonY(c.V), type = c.type;
+  ctx.setTransform(stageScale,0,0,stageScale,0,0);
+  ctx.fillStyle = '#f2f2f2'; ctx.fillRect(0,0,LW,LH);
+  ctx.textBaseline = 'alphabetic';
+  const act = clamp(1 - (S.time - S.heatAt)/0.5, 0, 1);
+  const heatNow = act > 0 ? S.heat : 0;
+  const tools = heatTool(), fire = S.items.fire, ice = S.items.ice;
+
+  // 도구 상자와 놓을 자리
+  if(tools){
+    ctx.strokeStyle = '#d3dae2'; ctx.lineWidth = 1.5; ctx.setLineDash([5,4]);
+    rrect(ctx, 376, 268, 92, 196, 12); ctx.stroke(); ctx.setLineDash([]);
+    if(S.drag && (S.drag.from === 'fire' || S.drag.from === 'ice')){
+      ctx.save(); ctx.strokeStyle = '#888'; ctx.fillStyle = 'rgba(0,0,0,0.03)'; ctx.lineWidth = 2; ctx.setLineDash([6,5]);
+      rrect(ctx, CL-40, BOT+18, CR-CL+80, 72, 12); ctx.fill(); ctx.stroke(); ctx.restore();
+    }
+  }
+  // 열기 · 냉기
+  const hot = tools ? fire.placed : heatNow > 0, cold = tools ? ice.placed : heatNow < 0;
+  if(hot){
+    const g = ctx.createRadialGradient(SPOT.x, BOT+10, 4, SPOT.x, BOT+10, 120);
+    g.addColorStop(0, 'rgba(255,150,40,0.45)'); g.addColorStop(1, 'rgba(255,150,40,0)');
+    ctx.fillStyle = g; ctx.fillRect(SPOT.x-130, BOT-110, 260, 200);
+  }
+  if(cold){
+    const g = ctx.createRadialGradient(SPOT.x, BOT+10, 4, SPOT.x, BOT+10, 110);
+    g.addColorStop(0, 'rgba(90,170,235,0.4)'); g.addColorStop(1, 'rgba(90,170,235,0)');
+    ctx.fillStyle = g; ctx.fillRect(SPOT.x-120, BOT-100, 240, 180);
+  }
+
+  // 단열재
+  if(type === 'adiabatic'){
+    ctx.save();
+    ctx.fillStyle = '#ece3cf';
+    const bands = [[CL-36, 60, 26, BOT-60+36], [CR+10, 60, 26, BOT-60+36], [CL-36, BOT+10, CR-CL+72, 26]];
+    bands.forEach(([x,y,w,h]) => ctx.fillRect(x,y,w,h));
+    ctx.beginPath(); bands.forEach(([x,y,w,h]) => ctx.rect(x,y,w,h)); ctx.clip();
+    ctx.strokeStyle = '#cdbb94'; ctx.lineWidth = 1.5;
+    for(let k = 0; k < LW+LH; k += 9){ ctx.beginPath(); ctx.moveTo(k, 0); ctx.lineTo(k-LH, LH); ctx.stroke(); }
+    ctx.restore();
+    ctx.fillStyle = '#8a7650'; ctx.font = `500 14px ${FONT}`; ctx.textAlign = 'center';
+    ctx.fillText('단열재', (CL+CR)/2, BOT+58);
+  }
+
+  // 실린더 속 기체
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(CL, 64, CR-CL, BOT-64);
+  const gc = gasColor(c.T);
+  ctx.fillStyle = gc; ctx.globalAlpha = 0.08; ctx.fillRect(CL, py, CR-CL, BOT-py); ctx.globalAlpha = 1;
+  ctx.save(); ctx.beginPath(); ctx.rect(CL, py, CR-CL, BOT-py); ctx.clip();
+  ctx.strokeStyle = gc; ctx.globalAlpha = 0.3; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
+  for(const p of S.parts){ ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx*0.07, p.y - p.vy*0.07); ctx.stroke(); }
+  ctx.restore(); ctx.globalAlpha = 1;
+  ctx.fillStyle = gc; ctx.strokeStyle = 'rgba(15,25,40,0.55)'; ctx.lineWidth = 1;
+  for(const p of S.parts){ ctx.beginPath(); ctx.arc(p.x, p.y, PR, 0, Math.PI*2); ctx.fill(); ctx.stroke(); }
+
+  // 벽
+  ctx.fillStyle = '#7f8c99';
+  ctx.fillRect(CL-10, 60, 10, BOT+10-60); ctx.fillRect(CR, 60, 10, BOT+10-60); ctx.fillRect(CL-10, BOT, CR-CL+20, 10);
+  ctx.fillStyle = '#a3afbb'; ctx.fillRect(CL-12, 56, 14, 5); ctx.fillRect(CR-2, 56, 14, 5);
+
+  // 부피 눈금
+  const vm = vMax(), step = niceStep(vm, 6);
+  ctx.strokeStyle = '#3d4854'; ctx.fillStyle = '#3d4854'; ctx.lineWidth = 1.2;
+  ctx.font = `400 12px ${FONT}`; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+  const tx = type === 'adiabatic' ? CR+38 : CR+10;
+  for(let i = 0; i*step/2 <= vm + 1e-9; i++){
+    const v = i*step/2, y = BOT - HMAX*v/vm, major = i % 2 === 0;
+    ctx.beginPath(); ctx.moveTo(tx, y); ctx.lineTo(tx + (major ? 9 : 5), y); ctx.stroke();
+    if(major) ctx.fillText(`${Math.round(v)} L`, tx + 12, y);
+  }
+  ctx.fillStyle = '#d4462f';
+  ctx.beginPath(); ctx.moveTo(tx+1, py); ctx.lineTo(tx+9, py-5); ctx.lineTo(tx+9, py+5); ctx.closePath(); ctx.fill();
+  ctx.textBaseline = 'alphabetic';
+
+  // 열 흐름 화살표 (실린더 바닥을 지나 기체로 들어가거나 나옴)
+  if(heatNow !== 0 && type !== 'adiabatic'){
+    ctx.globalAlpha = act;
+    const col = heatNow > 0 ? '#d9622b' : '#2f7fc9', y0 = BOT+6, y1 = BOT-44;
+    [CL+32, (CL+CR)/2, CR-32].forEach(x => heatNow > 0 ? arrow(ctx, x, y0, x, y1, col) : arrow(ctx, x, y1, x, y0, col));
+    ctx.globalAlpha = 1;
+  }
+
+  // 피스톤
+  ctx.fillStyle = '#56626f'; ctx.fillRect(CL+1, py-16, CR-CL-2, 16);
+  ctx.fillStyle = '#8b98a5'; ctx.fillRect(CL+1, py-16, CR-CL-2, 3);
+  const mid = (CL+CR)/2, capTop = py - 58;
+  ctx.fillStyle = '#6b7784'; ctx.fillRect(mid-7, capTop+8, 14, 34);
+  if(type === 'isobaric'){
+    ctx.fillStyle = '#2d3540';
+    rrect(ctx, mid-8, capTop-50, 16, 12, 4); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(mid-38, capTop+8); ctx.lineTo(mid+38, capTop+8); ctx.lineTo(mid+29, capTop-40); ctx.lineTo(mid-29, capTop-40); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.font = `700 14px ${FONT}`; ctx.textAlign = 'center'; ctx.fillText('추', mid, capTop-11);
+  } else {
+    const grab = S.drag && S.drag.from === 'stage';
+    ctx.fillStyle = grab ? '#222' : '#4a5562'; rrect(ctx, mid-34, capTop, 68, 10, 3); ctx.fill();
+    if(basicMode() && type === 'adiabatic' && !S.drag){
+      ctx.fillStyle = '#9aa4ae';
+      ctx.beginPath(); ctx.moveTo(mid+46, capTop-4); ctx.lineTo(mid+40, capTop+4); ctx.lineTo(mid+52, capTop+4); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(mid+46, capTop+16); ctx.lineTo(mid+40, capTop+8); ctx.lineTo(mid+52, capTop+8); ctx.closePath(); ctx.fill();
+    }
+  }
+  if(type === 'isochoric'){
+    const y = py - 30;
+    ctx.fillStyle = '#c8372d';
+    [[CL-24, CL+16], [CR-16, CR+24]].forEach(([a,b], i) => {
+      rrect(ctx, a, y, b-a, 8, 3); ctx.fill();
+      ctx.beginPath(); ctx.arc(i ? b : a, y+4, 7, 0, Math.PI*2); ctx.fill();
+    });
+    ctx.font = `500 13px ${FONT}`; ctx.textAlign = 'left'; ctx.fillText('고정 핀', CL+4, y-6);
+  }
+
+  // 모닥불 · 얼음
+  if(tools){
+    const fd = S.drag && S.drag.from === 'fire', idg = S.drag && S.drag.from === 'ice';
+    drawIce(ctx, ice.x, ice.y, !ice.placed && !idg, ice.placed);
+    drawFire(ctx, fire.x, fire.y, !fire.placed && !fd);
+  } else if(!basicMode() && type !== 'adiabatic'){
+    if(heatNow > 0) drawFire(ctx, SPOT.x, SPOT.fire, false);
+    else if(heatNow < 0) drawIce(ctx, SPOT.x, SPOT.ice, false, true);
+  }
+
+  ctx.textAlign = 'left'; ctx.font = `500 15px ${FONT}`; ctx.fillStyle = '#222';
+  if(basicMode()) ctx.fillText(`기체 ${Math.round(c.T)} K`, 14, 30);
+  else {
+    const g = S.cycle.segs[Math.min(S.cycle.segs.length-1, Math.floor(S.u*S.cycle.segs.length))];
+    ctx.font = `700 18px ${FONT}`; ctx.fillStyle = COL[g.type]; ctx.fillText(g.name, 14, 30);
+    ctx.font = `500 14px ${FONT}`; ctx.fillStyle = '#555'; ctx.fillText(`기체 ${Math.round(c.T)} K`, 14, 52);
+  }
+}
+
+/* ---------- 그래프 ---------- */
+const AXL = {P:'압력 P (kPa)', V:'부피 V (L)', T:'절대 온도 T (K)', S:'엔트로피 S (J/K)'};
+const GSET = {pv:{x:'V', y:'P'}, pt:{x:'T', y:'P'}, vt:{x:'T', y:'V'}, st:{x:'T', y:'S'}};
+const CHARTS = [{id:'chart', el:document.getElementById('chart'), g:'pv', x:'V', y:'P'}];
+document.querySelectorAll('.gsel button').forEach(b => b.addEventListener('click', () => {
+  const c = CHARTS[0]; c.g = b.dataset.g; c.x = GSET[c.g].x; c.y = GSET[c.g].y;
+  document.querySelectorAll('.gsel button').forEach(o => o.setAttribute('aria-selected', String(o === b)));
+}));
+
+function fmtTick(v, step){ const d = Math.max(0, -Math.floor(Math.log10(step)+1e-9)); return v.toFixed(Math.min(d,2)); }
+function polyline(ctx, pts, X, Y, xk, yk){ ctx.beginPath(); pts.forEach((s,i) => i ? ctx.lineTo(X(s[xk]), Y(s[yk])) : ctx.moveTo(X(s[xk]), Y(s[yk]))); }
+
+function drawChart(c){
+  const cv = c.el, ctx = cv.getContext('2d'), w = cv.clientWidth, h = cv.clientHeight;
+  if(!w || !h) return;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.fillStyle = '#f2f2f2'; ctx.fillRect(0,0,w,h);
+  const L = 50, Rr = 12, T = 30, B = 38, pw = w-L-Rr, ph = h-T-B;
+  const [x0,x1] = DOM[c.x], [y0,y1] = DOM[c.y];
+  const X = v => L + (v-x0)/(x1-x0)*pw, Y = v => T + ph - (v-y0)/(y1-y0)*ph;
+  c.X = X; c.Y = Y;
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(L, T, pw, ph);
+  ctx.font = `400 12px ${FONT}`; ctx.lineWidth = 1;
+  const xs = niceStep(x1-x0, Math.max(3, Math.round(pw/70))), ys = niceStep(y1-y0, Math.max(3, Math.round(ph/42)));
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for(let i = Math.ceil(x0/xs - 1e-9); i*xs <= x1 + 1e-9; i++){
+    const v = i*xs, x = X(v); ctx.strokeStyle = '#dcdcdc'; ctx.beginPath(); ctx.moveTo(x,T); ctx.lineTo(x,T+ph); ctx.stroke();
+    ctx.fillStyle = '#222'; ctx.fillText(fmtTick(v,xs), x, T+ph+4);
+  }
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for(let i = Math.ceil(y0/ys - 1e-9); i*ys <= y1 + 1e-9; i++){
+    const v = i*ys, y = Y(v); ctx.strokeStyle = '#dcdcdc'; ctx.beginPath(); ctx.moveTo(L,y); ctx.lineTo(L+pw,y); ctx.stroke();
+    ctx.fillStyle = '#222'; ctx.fillText(fmtTick(v,ys), L-6, y);
+  }
+  ctx.strokeStyle = '#bdbdbd'; ctx.strokeRect(L+0.5, T+0.5, pw-1, ph-1);
+  ctx.fillStyle = '#222'; ctx.font = `500 13px ${FONT}`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic'; ctx.fillText(AXL[c.x], L+pw/2, h-3);
+  ctx.textAlign = 'left'; ctx.fillText(AXL[c.y], 4, 16);
+
+  ctx.save(); ctx.beginPath(); ctx.rect(L, T, pw, ph); ctx.clip();
+  ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+
+  // P–V: 등온선
+  if(c.g === 'pv'){
+    const tStep = niceStep(DOM.T[1], 6);
+    ctx.font = `500 11px ${FONT}`; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+    let lastY = -Infinity;
+    for(let Tk = tStep; Tk < DOM.T[1]; Tk += tStep){
+      const k = nR*Tk, v0 = Math.max(0.3, x0); ctx.strokeStyle = '#a9b3ad'; ctx.lineWidth = 1.2; ctx.setLineDash([5,4]); ctx.beginPath();
+      for(let i = 0; i <= 80; i++){ const V = v0 + (x1 - v0)*i/80, P = k/V; i ? ctx.lineTo(X(V), Y(P)) : ctx.moveTo(X(V), Y(P)); }
+      ctx.stroke(); ctx.setLineDash([]);
+      const Pr = k/x1, ly = Y(Pr)-1; if(pw >= 420 && Pr > y0 && Pr < y1*0.95 && Math.abs(ly-lastY) >= 13 && ly < T+ph-14){ ctx.fillStyle = '#6f7a73'; ctx.fillText(`${Math.round(Tk)} K`, L+pw-3, ly); lastY = ly; }
+    }
+  }
+
+  const xk = c.x, yk = c.y, now = cur();
+  if(basicMode()){
+    const mode = S.mode, xA = BASIC[mode].xA, xc = S.x[mode];
+    ctx.strokeStyle = COL[mode]; ctx.globalAlpha = 0.3; ctx.lineWidth = 2;
+    polyline(ctx, guide(mode, 100), X, Y, xk, yk); ctx.stroke(); ctx.globalAlpha = 1;
+    const trail = []; for(let i = 0; i <= 60; i++) trail.push(stateOf(mode, xA + (xc-xA)*i/60));
+    if(c.g === 'pv' && mode !== 'isochoric' && Math.abs(xc-xA) > 1e-6){
+      ctx.fillStyle = COL[mode]; ctx.globalAlpha = 0.16;
+      polyline(ctx, trail, X, Y, xk, yk); ctx.lineTo(X(xc), Y(0)); ctx.lineTo(X(xA), Y(0)); ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    ctx.strokeStyle = COL[mode]; ctx.lineWidth = 3.2; polyline(ctx, trail, X, Y, xk, yk); ctx.stroke();
+    const A = stateOf(mode, xA);
+    ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(X(A[xk]), Y(A[yk]), 4.5, 0, Math.PI*2); ctx.fill();
+    ctx.font = `700 13px ${FONT}`; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom'; ctx.fillText('A', X(A[xk])-6, Y(A[yk])-4);
+  } else {
+    const cy = S.cycle, p = cy.pts;
+    const sk = Math.min(cy.segs.length-1, Math.floor(S.u*cy.segs.length));
+    cy.segs.forEach(g => {
+      ctx.strokeStyle = COL[g.type]; ctx.globalAlpha = 0.35; ctx.lineWidth = 2;
+      polyline(ctx, p.slice(g.i0, g.i1+1), X, Y, xk, yk); ctx.stroke(); ctx.globalAlpha = 1;
+    });
+    if(c.g === 'pv' || c.g === 'st'){
+      ctx.fillStyle = 'rgba(0,0,0,0.05)'; polyline(ctx, p, X, Y, xk, yk); ctx.closePath(); ctx.fill();
+    }
+    const end = S.u*(p.length-1), fe = Math.floor(end);
+    ctx.lineWidth = 3.4;
+    let i = 0;
+    while(i < fe){
+      const type = p[i+1].type; ctx.strokeStyle = COL[type]; ctx.beginPath(); ctx.moveTo(X(p[i][xk]), Y(p[i][yk]));
+      while(i < fe && p[i+1].type === type){ i++; ctx.lineTo(X(p[i][xk]), Y(p[i][yk])); }
+      ctx.stroke();
+    }
+    if(end > fe && fe < p.length-1){
+      ctx.strokeStyle = COL[p[fe+1].type]; ctx.beginPath(); ctx.moveTo(X(p[fe][xk]), Y(p[fe][yk])); ctx.lineTo(X(now[xk]), Y(now[yk])); ctx.stroke();
+    }
+    // 구간 이름: 각 구간 가운데에서 바깥쪽으로
+    const scr = cy.marks.slice(0, -1).map(m => [X(p[m][xk]), Y(p[m][yk])]);
+    const gx = scr.reduce((a,q) => a+q[0], 0)/scr.length, gy = scr.reduce((a,q) => a+q[1], 0)/scr.length;
+    ctx.font = `700 13px ${FONT}`; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+    cy.segs.forEach((g, k) => {
+      const q = p[Math.round((g.i0+g.i1)/2)], mx = X(q[xk]), my = Y(q[yk]);
+      const a = p[g.i0], b = p[g.i1];
+      let nx = -(Y(b[yk]) - Y(a[yk])), ny = X(b[xk]) - X(a[xk]); const nl = Math.hypot(nx, ny);
+      if(nl < 2){ nx = mx - gx; ny = my - gy; } 
+      const len = Math.hypot(nx, ny) || 1; nx /= len; ny /= len;
+      if(nx*(mx-gx) + ny*(my-gy) < 0){ nx = -nx; ny = -ny; }
+      const tw = ctx.measureText(g.name).width, al = nx > 0.35 ? 0 : nx < -0.35 ? 1 : 0.5;
+      const lx = clamp(mx + nx*14 - al*tw, L+4, L+pw-4-tw), ly = clamp(my + ny*14, T+10, T+ph-10);
+      ctx.textAlign = 'left';
+      ctx.globalAlpha = k === sk ? 1 : 0.6;
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.strokeText(g.name, lx, ly);
+      ctx.fillStyle = COL[g.type]; ctx.fillText(g.name, lx, ly);
+      ctx.globalAlpha = 1;
+    });
+    const cxm = L + pw/2;
+    cy.marks.slice(0, -1).forEach((m, k) => {
+      const s = p[m], px = X(s[xk]), pyy = Y(s[yk]);
+      ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(px, pyy, 4, 0, Math.PI*2); ctx.fill();
+      ctx.textAlign = px > cxm ? 'left' : 'right';
+      ctx.fillText(String.fromCharCode(65+k), px + (px > cxm ? 7 : -7), pyy - 9);
+    });
+  }
+  ctx.fillStyle = '#e8261b'; ctx.beginPath(); ctx.arc(X(now[xk]), Y(now[yk]), 6.5, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
+/* ---------- 끌기 ---------- */
+function toStage(e){ const r = stage.getBoundingClientRect(); return [(e.clientX-r.left)*LW/r.width, (e.clientY-r.top)*LH/r.height]; }
+function hitItem(x, y){
+  if(!heatTool()) return null;
+  for(const id of ['fire','ice']){
+    const it = S.items[id], cy = id === 'fire' ? it.y - 10 : it.y - 6;
+    if(Math.abs(x-it.x) < 36 && Math.abs(y-cy) < 34) return id;
+  }
+  return null;
+}
+function hitPiston(x, y){
+  if(!basicMode() || S.mode !== 'adiabatic') return false;
+  const py = pistonY(cur().V);
+  return x > CL-40 && x < CR+40 && y > py-80 && y < py+30;
+}
+stage.addEventListener('pointerdown', e => {
+  const [x, y] = toStage(e), id = hitItem(x, y);
+  if(!id && !hitPiston(x, y)) return;
+  e.preventDefault();
+  try { stage.setPointerCapture(e.pointerId); } catch(_) {}
+  if(id){
+    const it = S.items[id]; it.placed = false;
+    S.drag = {from:id, dx:it.x - x, dy:it.y - y};
+  } else S.drag = {from:'stage', y0:y, x0v:S.x[S.mode]};
+  stage.style.cursor = 'grabbing';
+});
+stage.addEventListener('pointermove', e => {
+  const [x, y] = toStage(e), d = S.drag;
+  if(!d){ stage.style.cursor = hitItem(x, y) || hitPiston(x, y) ? 'grab' : 'default'; return; }
+  if(d.from === 'stage') setX(d.x0v - (y - d.y0)/HMAX*vMax());
+  else if(d.from === 'fire' || d.from === 'ice'){
+    const it = S.items[d.from];
+    it.x = clamp(x + d.dx, 24, LW-24); it.y = clamp(y + d.dy, 40, LH-20); it.tx = it.x; it.ty = it.y;
+  }
+});
+function endStage(){
+  const d = S.drag; if(!d) return;
+  if(d.from === 'fire' || d.from === 'ice'){
+    const it = S.items[d.from], other = d.from === 'fire' ? 'ice' : 'fire';
+    // 실린더 아래 자리에 놓으면 고정. 자리는 하나라 다른 도구는 상자로 돌아감
+    if(it.x > CL-70 && it.x < CR+70 && it.y > BOT-90){
+      it.placed = true; it.tx = SPOT.x; it.ty = SPOT[d.from];
+      if(S.items[other].placed) sendHome(other);
+    } else sendHome(d.from);
+  }
+  if(d.from === 'stage' || d.from === 'fire' || d.from === 'ice'){ S.drag = null; stage.style.cursor = 'default'; }
+}
+stage.addEventListener('pointerup', endStage);
+stage.addEventListener('pointercancel', endStage);
+stage.addEventListener('lostpointercapture', endStage);
+stage.addEventListener('keydown', e => {
+  const k = e.key, up = k === 'ArrowUp' || k === 'ArrowRight', dn = k === 'ArrowDown' || k === 'ArrowLeft';
+  if(!up && !dn) return;
+  e.preventDefault();
+  if(basicMode()){ const [a,b] = BASIC[S.mode].x; setX(S.x[S.mode] + (up ? 1 : -1)*(b-a)/100); }
+  else { stopPlay(); setU(S.u + (up ? 1 : -1)*0.005); }
+});
+
+function chartSamples(){
+  if(basicMode()) return guide(S.mode, 240);
+  const p = S.cycle.pts; return p.map((s, i) => Object.assign({u: i/(p.length-1)}, s));
+}
+function chartPick(c, e, limit){
+  if(!c.X) return null;
+  const r = c.el.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+  let best = null, bd = Infinity;
+  for(const s of chartSamples()){ const d = Math.hypot(c.X(s[c.x]) - mx, c.Y(s[c.y]) - my); if(d < bd){ bd = d; best = s; } }
+  return bd <= limit ? best : null;
+}
+function applyPick(s){ if(!s) return; if(basicMode()) setX(s.x); else { stopPlay(); setU(s.u); } }
+CHARTS.forEach(c => {
+  c.el.addEventListener('pointerdown', e => {
+    if(basicMode()) return;
+    const s = chartPick(c, e, 26); if(!s) return;
+    e.preventDefault();
+    try { c.el.setPointerCapture(e.pointerId); } catch(_) {}
+    S.drag = {from:c.id}; applyPick(s); c.el.style.cursor = 'grabbing';
+  });
+  c.el.addEventListener('pointermove', e => {
+    if(S.drag && S.drag.from === c.id){ applyPick(chartPick(c, e, Infinity)); return; }
+    if(e.pointerType === 'mouse') c.el.style.cursor = !basicMode() && chartPick(c, e, 26) ? 'grab' : 'default';
+  });
+  const end = () => { if(S.drag && S.drag.from === c.id){ S.drag = null; c.el.style.cursor = 'default'; } };
+  c.el.addEventListener('pointerup', end); c.el.addEventListener('pointercancel', end);
+});
+
+/* ---------- 화면 정보 ---------- */
+const $ = id => document.getElementById(id);
+const fmtJ = v => { const r = Math.round(v); return (r > 0 ? '+' : r < 0 ? '−' : '') + Math.abs(r).toLocaleString('ko-KR') + ' J'; };
+function setBar(id, out, v){
+  const w = clamp(Math.abs(v)/EMAX*50, 0, 50), el = $(id);
+  el.style.width = w + '%'; el.style.left = v >= 0 ? '50%' : (50 - w) + '%';
+  el.style.background = v >= 0 ? '#d33a2c' : '#2f5fc4';
+  const o = $(out); o.textContent = fmtJ(v); o.style.color = Math.round(v) === 0 ? '#777' : v > 0 ? '#d33a2c' : '#2f5fc4';
+}
+function updateUI(){
+  const c = cur();
+  $('rP').textContent = c.P.toFixed(1);
+  $('rV').textContent = c.V.toFixed(1);
+  $('rT').textContent = c.T.toFixed(0);
+  $('rS').textContent = (Math.abs(c.S) < 0.005 ? 0 : c.S).toFixed(2).replace('-', '−');
+  ['tP','tV','tT','tS'].forEach(id => $(id).classList.toggle('const', KEEP[c.type] === id));
+  setBar('bQ','vQ', c.Q); setBar('bU','vU', c.dU); setBar('bW','vW', c.W);
+  const moving = S.time - S.heatAt < 0.35 || (S.playing && !basicMode());
+  const pill = $('pill');
+  if(!moving){ pill.textContent = '멈춤'; pill.className = 'pill'; }
+  else if(c.type === 'adiabatic'){ pill.textContent = '열 출입 없음'; pill.className = 'pill'; }
+  else if(S.heat > 0){ pill.textContent = '열 흡수'; pill.className = 'pill in'; }
+  else { pill.textContent = '열 방출'; pill.className = 'pill out'; }
+}
+
+function renderChrome(){
+  const m = S.mode, basic = basicMode();
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.mode === m)));
+  $('cycbar').hidden = basic;
+  $('playBtn').hidden = basic;
+  document.querySelectorAll('[data-cyc]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.cyc === S.cyc)));
+  $('playBtn').textContent = S.playing ? '멈춤' : '재생';
+  if(basic){
+    $('law').innerHTML = BASIC[m].law;
+    $('hint').textContent = BASIC[m].hint;
+    $('mfrom').textContent = 'A에서부터';
+  } else {
+    $('law').innerHTML = `열효율 e = W / Q<sub>1</sub> = ${(S.cycle.e*100).toFixed(1)} %`;
+    $('hint').textContent = '재생하거나 그래프의 빨간 점을 옮겨 보세요.';
+    $('mfrom').textContent = 'A에서부터 지금까지';
+  }
+  renderSegs();
+}
+
+function renderSegs(){
+  const el = $('segs'); el.hidden = basicMode();
+  if(basicMode()) return;
+  const L = k => String.fromCharCode(65 + (k % S.cycle.segs.length));
+  el.innerHTML = S.cycle.segs.map((g, k) => {
+    const heat = g.type === 'adiabatic' ? '열 출입 없음' : g.Q > 0 ? '열 흡수' : '열 방출';
+    return `<li><button type="button" data-seg="${k}" style="--c:${COL[g.type]}"><b>${L(k)} → ${L(k+1)}</b><span>${g.name}</span><small>${heat}</small><i></i></button></li>`;
+  }).join('');
+}
+function updateSegs(){
+  if(basicMode()) return;
+  const n = S.cycle.segs.length, f = S.u*n, k = Math.min(n-1, Math.floor(f));
+  document.querySelectorAll('#segs button').forEach((b, j) => {
+    b.setAttribute('aria-current', String(j === k));
+    b.querySelector('i').style.width = (j < k ? 100 : j === k ? (f-k)*100 : 0) + '%';
+  });
+}
+$('segs').addEventListener('click', e => {
+  const b = e.target.closest('[data-seg]'); if(!b) return;
+  stopPlay(); S.u = (+b.dataset.seg)/S.cycle.segs.length; S.heatAt = -9;
+});
+
+function setMode(m){
+  S.mode = m; S.playing = false; S.heatAt = -9; homeAll(true);
+  if(m !== 'cycle') S.x[m] = BASIC[m].xA;
+  if(m === 'cycle'){ S.cycle = buildCycle(CYC[S.cyc]); S.u = 0; }
+  computeDomains(); renderChrome(); seedParticles();
+}
+function stopPlay(){ if(S.playing){ S.playing = false; renderChrome(); } }
+
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => { if(b.dataset.mode !== S.mode) setMode(b.dataset.mode); }));
+document.querySelectorAll('[data-cyc]').forEach(b => b.addEventListener('click', () => {
+  S.cyc = b.dataset.cyc; S.cycle = buildCycle(CYC[S.cyc]); S.u = 0; S.playing = false;
+  computeDomains(); renderChrome(); seedParticles();
+}));
+$('playBtn').addEventListener('click', () => { S.playing = !S.playing; renderChrome(); });
+$('resetBtn').addEventListener('click', () => {
+  if(basicMode()) S.x[S.mode] = BASIC[S.mode].xA; else { S.u = 0; S.playing = false; }
+  S.heatAt = -9; homeAll(true); renderChrome();
+});
+
+/* ---------- 크기와 반복 ---------- */
+function resize(){
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = stage.clientWidth || LW;
+  stage.style.height = (w*LH/LW) + 'px';
+  stage.width = Math.round(w*dpr); stage.height = Math.round(w*LH/LW*dpr);
+  stageScale = w/LW*dpr;
+  CHARTS.forEach(c => { c.el.width = Math.round(c.el.clientWidth*dpr); c.el.height = Math.round(c.el.clientHeight*dpr); });
+}
+const ro = new ResizeObserver(resize);
+ro.observe(stage); CHARTS.forEach(c => ro.observe(c.el));
+
+let last = performance.now(), uiT = 0;
+function frame(now){
+  const dt = Math.min(0.033, Math.max(0.001, (now-last)/1000)); last = now;
+  update(dt); drawStage(); CHARTS.forEach(drawChart);
+  uiT += dt; if(uiT > 0.08){ uiT = 0; updateUI(); }
+  updateSegs();
+  requestAnimationFrame(frame);
+}
+setMode('isobaric'); resize(); updateUI();
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
