@@ -1,1 +1,539 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>스털링 엔진</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* 수업용 시뮬레이션: 회색 실험판 하나에 엔진(왼쪽)과 그래프(오른쪽) */
+:root{
+  --bench:#ffffff;
+  --surface:#f2f2f2;
+  --ink:#222222;
+  --ink-2:#777777;
+  --line:#d6d6d6;
+  --hot:#d33a2c;
+  --cold:#2f5fc4;
+  --brass:#2a7d4f;
+  --steel:#9aa3ab;
+  --steel-dark:#5f6b76;
+  --font:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bench);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5}
+.app{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 32px}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--cold);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
 
+header{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 24px;border-bottom:1px solid var(--line);margin-bottom:14px}
+h1{margin:0 0 9px;font-size:1.3rem;font-weight:700}
+.steps{order:3;display:flex;flex-wrap:wrap;gap:0 18px}
+.steps button{border:0;background:none;padding:6px 0 9px;font-size:1rem;color:var(--ink-2);border-bottom:3px solid transparent;margin-bottom:-1px}
+.steps button:hover{color:var(--ink)}
+.steps button[aria-current="true"]{color:var(--ink);font-weight:700;border-bottom-color:var(--ink)}
+.law{order:4;margin:0 0 9px auto;font-size:1.1rem;font-weight:500;color:#333;white-space:nowrap}
+
+.sim{background:var(--surface);display:grid;grid-template-columns:minmax(0,1fr);gap:12px 28px;padding:16px 18px 18px}
+@media (min-width:940px){.sim{grid-template-columns:minmax(0,0.85fr) minmax(0,1fr)}}
+.left,.right{min-width:0;display:flex;flex-direction:column;gap:8px}
+canvas{display:block;width:100%}
+
+.ctrl{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+.field{display:grid;grid-template-columns:110px minmax(0,1fr) 64px;gap:12px;align-items:center;font-size:.95rem}
+.field output{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+#oT1{color:var(--hot)} #oT2{color:var(--cold)}
+input[type=range]{width:100%;margin:0;accent-color:#555;cursor:pointer}
+
+.readout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 20px;font-size:1.2rem;color:#666;font-variant-numeric:tabular-nums}
+.readout div{white-space:nowrap}
+.readout b{font-weight:500;color:#444}
+.gtitle{margin:10px 0 0;font-size:1.05rem;font-weight:700}
+.foot{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
+.btn{border:1px solid #bdbdbd;background:#fff;padding:5px 14px;font-size:.9rem;border-radius:3px}
+.btn:hover{background:#fafafa;border-color:#999}
+
+.table-wrap{overflow-x:auto;margin-top:18px}
+table{width:100%;border-collapse:collapse;font-size:.95rem;min-width:480px}
+th,td{padding:7px 12px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+th{font-weight:500;color:#555;border-bottom:1px solid #bdbdbd}
+th:nth-child(-n+2),td:nth-child(-n+2){text-align:left}
+tbody tr{border-bottom:1px solid #e3e3e3}
+tbody tr.on{background:#f2f2f2}
+tbody tr.on td:first-child{font-weight:700}
+tfoot td{font-weight:700}
+.pos{color:var(--hot)}.neg{color:var(--cold)}
+td.src{color:#666}
+@media (max-width:520px){.field{grid-template-columns:84px minmax(0,1fr) 56px}.readout{font-size:1.05rem}.steps{gap:0 12px}.steps button{font-size:.92rem}}
+</style>
+
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>스털링 엔진</h1>
+    <b class="law">η = W / Q₁</b>
+    <nav class="steps" aria-label="과정">
+      <button type="button" data-k="0">① 등온 팽창</button>
+      <button type="button" data-k="1">② 등적 냉각</button>
+      <button type="button" data-k="2">③ 등온 압축</button>
+      <button type="button" data-k="3">④ 등적 가열</button>
+    </nav>
+  </header>
+
+  <main class="sim">
+    <section class="left">
+      <canvas id="cvE" aria-label="스털링 엔진 단면"></canvas>
+      <div class="ctrl">
+        <div class="field"><label for="sT1">고열원 온도</label><input type="range" id="sT1" min="400" max="1000" step="10" value="600"><output id="oT1">600 K</output></div>
+        <div class="field"><label for="sT2">저열원 온도</label><input type="range" id="sT2" min="200" max="500" step="10" value="300"><output id="oT2">300 K</output></div>
+        <div class="field"><label for="sSp">재생 속도</label><input type="range" id="sSp" min="0.25" max="3" step="0.25" value="1"><output id="oSp">1×</output></div>
+      </div>
+    </section>
+
+    <section class="right">
+      <div class="readout">
+        <div>Q₁ = <b id="rQ1">0</b> J</div>
+        <div>Q₂ = <b id="rQ2">0</b> J</div>
+        <div>W = <b id="rW">0</b> J</div>
+        <div>η = <b id="rEta">0</b> %</div>
+      </div>
+      <h2 class="gtitle">P–V 그래프</h2>
+      <canvas id="cvP" aria-label="압력-부피 그래프"></canvas>
+      <h2 class="gtitle">열기관 다이어그램</h2>
+      <canvas id="cvF" aria-label="열기관 에너지 흐름"></canvas>
+      <div class="foot">
+        <button class="btn" type="button" id="play" aria-pressed="true">일시정지</button>
+        <button class="btn" type="button" id="resetBtn">처음으로</button>
+      </div>
+    </section>
+  </main>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>과정</th><th>열 교환</th><th>열 Q (J)</th><th>기체가 한 일 W (J)</th><th>내부 에너지 변화 ΔU (J)</th></tr></thead>
+      <tbody id="tb"></tbody>
+      <tfoot><tr><td>합</td><td></td><td id="sQ"></td><td id="sW"></td><td>0.0</td></tr></tfoot>
+    </table>
+  </div>
+</div>
+<script>
+(function(){
+// ── 물리 상수와 조건 ──────────────────────────────
+const R=8.314, n=0.1, nR=n*R, Cv=1.5*nR;      // J/K
+const V1=1.0, V2=2.5, LNR=Math.log(V2/V1);     // L  (J/L = kPa)
+const ISO_V=0.125;                              // P-V 그래프에서 등적 과정 하나가 차지하는 사이클 비율
+const B=[0,0.5-ISO_V,0.5,1-ISO_V,1];
+const DELTA=Math.PI*2*ISO_V/2;                  // 사점 앞뒤로 크랭크가 지나가는 각
+const W_MAX=nR*(1000-200)*LNR;
+
+let T1=600,T2=300,eps=0,speed=1,ph=0.08,curHz=0.2,playing=true,lastTs=null,raf=0,curK=-1;
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+if(reduce) playing=false;
+
+function energy(){
+  const QH=nR*T1*LNR, QC=nR*T2*LNR, Qv=Cv*(T1-T2);
+  const Q1=QH+(1-eps)*Qv, Q2=QC+(1-eps)*Qv, W=QH-QC;
+  return {QH,QC,Qv,Q1,Q2,W,eta:W/Q1,etaC:1-T2/T1};
+}
+
+// ── 크랭크 기구 (엔진 그림 좌표) ───────────────────
+const G={cx:132,yc:58,r:26,L:84,fw:44};
+function pinD(th){return G.r*Math.cos(th)+Math.sqrt(G.L*G.L-G.r*G.r*Math.sin(th)**2);}
+function pistonFrac(th){return ((G.r+G.L)-pinD(th))/(2*G.r);}   // 0: 최저(V1) ~ 1: 최고(V2)
+
+function state(p){
+  let k=0; while(k<3&&p>=B[k+1])k++;
+  const t=(p-B[k])/(B[k+1]-B[k]);
+  // 크랭크는 일정한 각속도로 계속 돈다. 사점 근처 ±DELTA 구간이 등적 과정이다.
+  const th=(DELTA+2*Math.PI*p)%(2*Math.PI);
+  const f0=pistonFrac(DELTA),f1=pistonFrac(Math.PI-DELTA);
+  let s,Tg;
+  if(k===0){s=(pistonFrac(th)-f0)/(f1-f0);Tg=T1;}
+  else if(k===1){s=1;Tg=T1+(T2-T1)*t;}
+  else if(k===2){s=(pistonFrac(th)-f0)/(f1-f0);Tg=T2;}
+  else {s=0;Tg=T2+(T1-T2)*t;}
+  s=Math.min(1,Math.max(0,s));
+  const V=V1+(V2-V1)*s;
+  // 디스플레이서는 피스톤보다 90° 앞서 사인 운동한다 (1: 위쪽 끝, 기체가 가열부에 모임)
+  const h=0.5+0.5*Math.sin(th);
+  return {k,t,th,s,V,Tg,P:nR*Tg/V,f:h};
+}
+
+// ── 테마 색 ───────────────────────────────────────
+let C={};
+function readTheme(){
+  const cs=getComputedStyle(document.documentElement);
+  ['surface','ink','ink-2','line','hot','cold','brass','steel','steel-dark','bench'].forEach(k=>C[k]=cs.getPropertyValue('--'+k).trim());
+}
+function mix(a,b,t){
+  const pa=hex(a),pb=hex(b);
+  return `rgb(${Math.round(pa[0]+(pb[0]-pa[0])*t)},${Math.round(pa[1]+(pb[1]-pa[1])*t)},${Math.round(pa[2]+(pb[2]-pa[2])*t)})`;
+}
+function hex(h){h=h.replace('#','');if(h.length===3)h=h.split('').map(c=>c+c).join('');return [0,2,4].map(i=>parseInt(h.substr(i,2),16));}
+function alpha(h,a){const p=hex(h);return `rgba(${p[0]},${p[1]},${p[2]},${a})`;}
+
+// ── 캔버스 ────────────────────────────────────────
+const cv={E:document.getElementById('cvE'),P:document.getElementById('cvP'),F:document.getElementById('cvF')};
+const LOG={E:[300,440],P:[440,300],F:[440,170]};
+const ctx={};
+function setup(){
+  const dpr=window.devicePixelRatio||1;
+  for(const key in cv){
+    const c=cv[key],[lw,lh]=LOG[key],w=c.parentElement.clientWidth-(key==='E'?0:0);
+    const s=w/lw;
+    c.style.height=(lh*s)+'px';
+    c.width=Math.round(w*dpr);c.height=Math.round(lh*s*dpr);
+    const x=c.getContext('2d');x.setTransform(s*dpr,0,0,s*dpr,0,0);ctx[key]=x;
+  }
+}
+const SANS='"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif', MONO=SANS;
+
+// ── 기체 입자 ─────────────────────────────────────
+const NP=56, parts=[];
+(function(){
+  const keys=[...Array(NP)].map((_,i)=>(i+0.5)/NP);
+  for(let i=keys.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[keys[i],keys[j]]=[keys[j],keys[i]];}
+  keys.forEach(k=>parts.push({key:k,zone:1,u:Math.random(),v:Math.random(),du:Math.random()*2-1,dv:Math.random()*2-1,tr:null,x:0,y:0}));
+})();
+function geom(ps){
+  const cx=G.cx, pinY=G.yc+pinD(ps.th);
+  const pisTop=pinY-6, pisBot=pinY+20;
+  const dispH=74, dTopCold=312, dTopHot=204;
+  const dTop=dTopCold-ps.f*(dTopCold-dTopHot), dBot=dTop+dispH;
+  return {cx,pinY,pisTop,pisBot,dTop,dBot,cylIn:[cx-46,cx+46],cylTop:108,cylBot:392,
+    hot:{x0:cx-43,x1:cx+43,y0:dBot+3,y1:389},cold:{x0:cx-43,x1:cx+43,y0:pisBot+3,y1:dTop-3},
+    portHot:388,portCold:199,ductX:cx+62};
+}
+function regionPt(g,zone,u,v){const r=zone?g.hot:g.cold;return [r.x0+u*(r.x1-r.x0),r.y0+v*Math.max(0,r.y1-r.y0)];}
+function updParts(g,ps,dt){
+  const jit=(z)=>0.35*Math.sqrt((z?T1:T2)/300);
+  parts.forEach(p=>{
+    const want=p.key<ps.f-1e-6?1:0;
+    if(p.tr){
+      p.tr.d+=dt*Math.max(520,curHz*300/ISO_V*1.3);
+      const pts=p.tr.pts.slice();pts.push(regionPt(g,p.tr.to,p.u,p.v));
+      let rem=p.tr.d,done=true;
+      for(let i=0;i<pts.length-1;i++){
+        const a=pts[i],b=pts[i+1],L=Math.hypot(b[0]-a[0],b[1]-a[1]);
+        if(rem<=L){const t=L?rem/L:1;p.x=a[0]+(b[0]-a[0])*t;p.y=a[1]+(b[1]-a[1])*t;done=false;break;}
+        rem-=L;
+      }
+      if(done){p.zone=p.tr.to;p.tr=null;}
+      return;
+    }
+    if(want!==p.zone && dt>0){
+      const cx=g.cx,start=[p.x,p.y];
+      const hotIn=[cx+40,g.portHot],hotOut=[g.ductX,g.portHot],coldOut=[g.ductX,g.portCold],coldIn=[cx+40,g.portCold];
+      const path=want===0?[start,hotIn,hotOut,coldOut,coldIn]:[start,coldIn,coldOut,hotOut,hotIn];
+      p.u=Math.random();p.v=Math.random();
+      p.tr={pts:path,to:want,d:0};
+      return;
+    }
+    const j=jit(p.zone)*dt*(playing?1:0);
+    p.u+=p.du*j;p.v+=p.dv*j*1.6;
+    if(p.u<0){p.u=-p.u;p.du=Math.abs(p.du);} if(p.u>1){p.u=2-p.u;p.du=-Math.abs(p.du);}
+    if(p.v<0){p.v=-p.v;p.dv=Math.abs(p.dv);} if(p.v>1){p.v=2-p.v;p.dv=-Math.abs(p.dv);}
+    const q=regionPt(g,p.zone,p.u,p.v);p.x=q[0];p.y=q[1];
+  });
+}
+function snapParts(ps){const g=geom(ps);parts.forEach(p=>{p.tr=null;p.zone=p.key<ps.f-1e-6?1:0;const q=regionPt(g,p.zone,p.u,p.v);p.x=q[0];p.y=q[1];});}
+
+// ── 엔진 그리기 ───────────────────────────────────
+const ENGINE_C={ink:'#1B2228','ink-2':'#58636C',line:'#C7CECB',hot:'#C2432A',cold:'#2A62A6',brass:'#9A6F22',steel:'#8C979E','steel-dark':'#5E6A72'};
+function drawEngine(ps,E){
+  const saved=C;C=Object.assign({},C,ENGINE_C);
+  try{drawEngineBody(ps,E);}finally{C=saved;}
+}
+function drawEngineBody(ps,E){
+  const c=ctx.E,[W,H]=LOG.E,g=geom(ps),cx=g.cx;
+  c.clearRect(0,0,W,H);
+  const [xl,xr]=g.cylIn, wall=6;
+
+  // 냉각 핀 (왼쪽, 냉각부 높이)
+  c.fillStyle=C['steel'];
+  for(let y=128;y<=250;y+=11){c.fillRect(xl-wall-20,y,20,4);}
+  for(let y=128;y<=190;y+=11){c.fillRect(g.ductX+12,y,16,4);}
+
+  // 기체 공간
+  c.fillStyle=alpha(C.cold,0.13);c.fillRect(xl,g.pisBot,xr-xl,Math.max(0,g.dTop-g.pisBot));
+  c.fillStyle=alpha(C.hot,0.15);c.fillRect(xl,g.dBot,xr-xl,Math.max(0,g.cylBot-g.dBot));
+  c.fillStyle=alpha(C.cold,0.06);c.fillRect(xl,g.cylTop,xr-xl,g.pisTop-g.cylTop);
+
+  // 재생기 덕트
+  const dx0=g.ductX-7,dx1=g.ductX+7;
+  c.fillStyle=C.surface;c.fillRect(xr,g.portCold-5,dx1-xr+5,10);c.fillRect(xr,g.portHot-5,dx1-xr+5,10);
+  c.fillRect(dx0,g.portCold-5,14,g.portHot-g.portCold+10);
+  c.strokeStyle=C['steel-dark'];c.lineWidth=1.5;
+  c.beginPath();
+  c.moveTo(xr+wall,g.portCold-5);c.lineTo(dx1+5,g.portCold-5);c.lineTo(dx1+5,g.portHot+5);c.lineTo(xr+wall,g.portHot+5);
+  c.moveTo(xr+wall,g.portCold+5);c.lineTo(dx0-1,g.portCold+5);c.lineTo(dx0-1,g.portHot-5);c.lineTo(xr+wall,g.portHot-5);
+  c.stroke();
+
+  // 실린더 벽
+  c.fillStyle=C['steel-dark'];
+  c.fillRect(xl-wall,g.cylTop,wall,g.cylBot-g.cylTop);
+  c.fillRect(xr,g.cylTop,wall,g.portCold-5-g.cylTop);
+  c.fillRect(xr,g.portCold+5,wall,g.portHot-5-(g.portCold+5));
+  c.fillRect(xr,g.portHot+5,wall,g.cylBot-(g.portHot+5));
+
+  // 고온 헤드와 가열부
+  const heat=(T1-400)/600;
+  c.fillStyle=mix(C['steel-dark'],C.hot,0.35+0.5*heat);
+  c.fillRect(xl-wall,g.cylBot,xr-xl+wall*2,10);
+  c.fillStyle=alpha(C.hot,0.18+0.3*heat);
+  c.fillRect(xl-wall+4,g.cylBot+14,xr-xl+wall*2-8,8);
+  c.fillStyle=alpha(C.hot,0.35+0.4*heat);
+  for(let x=xl+4;x<xr-4;x+=12){c.beginPath();c.moveTo(x,g.cylBot+30);c.quadraticCurveTo(x+3,g.cylBot+22,x+6,g.cylBot+30);c.fill();}
+
+  // 디스플레이서
+  c.fillStyle=mix(C.surface,C['steel'],0.55);
+  c.fillRect(xl+3,g.dTop,xr-xl-6,g.dBot-g.dTop);
+  c.strokeStyle=C['steel-dark'];c.lineWidth=1;c.strokeRect(xl+3.5,g.dTop+.5,xr-xl-7,g.dBot-g.dTop-1);
+  c.strokeStyle=alpha(C['steel-dark'],0.35);
+  for(let y=g.dTop+10;y<g.dBot-4;y+=10){c.beginPath();c.moveTo(xl+8,y);c.lineTo(xr-8,y);c.stroke();}
+  // 디스플레이서 로드 (피스톤을 관통)
+  c.strokeStyle=C['steel-dark'];c.lineWidth=3;
+  c.beginPath();c.moveTo(cx-22,g.dTop);c.lineTo(cx-22,g.pisBot);c.stroke();
+
+  // 기체 입자
+  parts.forEach(p=>{
+    let col;
+    if(p.tr){const t=Math.min(1,Math.max(0,(p.y-g.portCold)/(g.portHot-g.portCold)));col=mix(C.cold,C.hot,t);}
+    else col=p.zone?C.hot:C.cold;
+    c.fillStyle=col;c.beginPath();c.arc(p.x,p.y,2.1,0,Math.PI*2);c.fill();
+  });
+
+  // 파워 피스톤
+  c.fillStyle=C.brass;c.fillRect(xl+1,g.pisTop,xr-xl-2,g.pisBot-g.pisTop);
+  c.fillStyle=alpha(C.ink,0.25);c.fillRect(xl+1,g.pisTop+6,xr-xl-2,2);c.fillRect(xl+1,g.pisTop+12,xr-xl-2,2);
+  // 플라이휠
+  const fx=cx,fy=G.yc;
+  c.strokeStyle=C['steel-dark'];c.lineWidth=7;c.beginPath();c.arc(fx,fy,G.fw,0,Math.PI*2);c.stroke();
+  c.lineWidth=2;
+  for(let i=0;i<5;i++){const a=ps.th+i*2*Math.PI/5;c.beginPath();c.moveTo(fx,fy);c.lineTo(fx-Math.sin(a)*G.fw,fy+Math.cos(a)*G.fw);c.stroke();}
+  const px=fx-G.r*Math.sin(ps.th),py=fy+G.r*Math.cos(ps.th);
+  // 커넥팅 로드
+  c.strokeStyle=C.ink;c.lineWidth=4;c.lineCap='round';
+  c.beginPath();c.moveTo(px,py);c.lineTo(cx,g.pinY);c.stroke();c.lineCap='butt';
+  c.fillStyle=C.ink;c.beginPath();c.arc(fx,fy,5,0,Math.PI*2);c.fill();
+  c.fillStyle=C.surface;c.beginPath();c.arc(px,py,3,0,Math.PI*2);c.fill();
+  c.strokeStyle=C.ink;c.lineWidth=1.5;c.stroke();
+  c.fillStyle=C.ink;c.beginPath();c.arc(cx,g.pinY,3,0,Math.PI*2);c.fill();
+
+  // 열 출입 화살표
+  const inA=ps.k===0?1:ps.k===3?(1-eps):0;
+  const outA=ps.k===2?1:ps.k===1?(1-eps):0;
+  if(inA>0.02){
+    c.save();c.globalAlpha=inA;c.strokeStyle=C.hot;c.fillStyle=C.hot;c.lineWidth=2;
+    [cx-30,cx,cx+30].forEach((x,i)=>{
+      const off=((ph*40+i*0.33)%1)*6;
+      c.beginPath();c.moveTo(x,g.cylBot+44);for(let y=g.cylBot+44;y>g.cylBot+16;y-=2)c.lineTo(x+Math.sin((y+off)*0.45)*2.5,y);c.stroke();
+      c.beginPath();c.moveTo(x-4,g.cylBot+18);c.lineTo(x+4,g.cylBot+18);c.lineTo(x,g.cylBot+11);c.closePath();c.fill();
+    });
+    c.restore();
+  }
+  if(outA>0.02){
+    c.save();c.globalAlpha=outA;c.strokeStyle=C.cold;c.fillStyle=C.cold;c.lineWidth=2;
+    [175,205,235].forEach(y=>{
+      const x0=xl-wall-24,x1=x0-22;
+      c.beginPath();c.moveTo(x0,y);for(let x=x0;x>x1+6;x-=2)c.lineTo(x,y+Math.sin(x*0.5+ph*60)*2.2);c.stroke();
+      c.beginPath();c.moveTo(x1+6,y-4);c.lineTo(x1+6,y+4);c.lineTo(x1,y);c.closePath();c.fill();
+    });
+    c.restore();
+  }
+
+  // 부품 이름
+  c.font=`400 12px ${SANS}`;c.fillStyle=C['ink-2'];c.textAlign='left';
+  const lab=(t,x,y,lx,ly)=>{c.fillText(t,x,y);c.strokeStyle=alpha(C['ink-2'],0.5);c.lineWidth=0.75;c.beginPath();c.moveTo(lx[0],lx[1]);c.lineTo(ly[0],ly[1]);c.stroke();};
+  const rx=g.ductX+34;
+  lab('피스톤',rx,g.pisTop+14,[xr+2,g.pisTop+10],[rx-3,g.pisTop+10]);
+  c.textAlign='right';
+  lab('디스플레이서',xl-wall-3,(g.dTop+g.dBot)/2+20,[xl+10,(g.dTop+g.dBot)/2+16],[xl-wall-2,(g.dTop+g.dBot)/2+16]);
+  c.textAlign='left';
+}
+
+// ── P-V 그래프 ────────────────────────────────────
+const PV={x0:56,x1:428,y0:26,y1:250,vmin:0.75,vmax:2.75,pmin:0,pmax:900};
+const tx=v=>PV.x0+(v-PV.vmin)/(PV.vmax-PV.vmin)*(PV.x1-PV.x0);
+const ty=p=>PV.y1-(p-PV.pmin)/(PV.pmax-PV.pmin)*(PV.y1-PV.y0);
+function arrowAt(c,x,y,ang,col){c.save();c.translate(x,y);c.rotate(ang);c.fillStyle=col;c.beginPath();c.moveTo(6,0);c.lineTo(-4,-4.5);c.lineTo(-4,4.5);c.closePath();c.fill();c.restore();}
+function drawPV(ps,E){
+  const c=ctx.P,[W,H]=LOG.P;c.clearRect(0,0,W,H);
+  // 그림 영역
+  c.fillStyle='#ffffff';c.fillRect(PV.x0,PV.y0,PV.x1-PV.x0,PV.y1-PV.y0);
+  c.font=`400 13px ${SANS}`;c.lineWidth=1;c.fillStyle='#222';
+  c.textAlign='right';c.textBaseline='middle';
+  for(let p=0;p<=900;p+=150){const y=ty(p);c.strokeStyle='#cfcfcf';c.beginPath();c.moveTo(PV.x0,y);c.lineTo(PV.x1,y);c.stroke();c.fillText(p,PV.x0-8,y);}
+  c.textAlign='center';c.textBaseline='top';
+  [1,1.5,2,2.5].forEach(v=>{const x=tx(v);c.strokeStyle='#cfcfcf';c.beginPath();c.moveTo(x,PV.y0);c.lineTo(x,PV.y1);c.stroke();c.fillText(v.toFixed(1),x,PV.y1+5);});
+  c.textBaseline='alphabetic';
+  c.strokeStyle='#bdbdbd';c.strokeRect(PV.x0+.5,PV.y0+.5,PV.x1-PV.x0-1,PV.y1-PV.y0-1);
+  c.font=`500 14px ${SANS}`;
+  c.textAlign='center';c.fillText('부피 V (L)',(PV.x0+PV.x1)/2,H-4);
+  c.textAlign='left';c.fillText('압력 P (kPa)',4,14);
+
+  // 등온선 (점선)
+  const iso=(T,col)=>{c.save();c.setLineDash([3,4]);c.strokeStyle=alpha(col,0.45);c.lineWidth=1;c.beginPath();
+    let first=true;for(let v=0.8;v<=2.72;v+=0.02){const p=nR*T/v;if(p>PV.pmax)continue;const x=tx(v),y=ty(p);first?(c.moveTo(x,y),first=false):c.lineTo(x,y);}c.stroke();c.restore();};
+  iso(T1,C.hot);iso(T2,C.cold);
+
+  // 사이클 경로
+  const N=50,s0=[],s2=[];
+  for(let i=0;i<=N;i++){const v=V1+(V2-V1)*i/N;s0.push([tx(v),ty(nR*T1/v)]);}
+  for(let i=0;i<=N;i++){const v=V2+(V1-V2)*i/N;s2.push([tx(v),ty(nR*T2/v)]);}
+  c.fillStyle=alpha(C.brass,0.2);c.beginPath();
+  s0.forEach((q,i)=>i?c.lineTo(q[0],q[1]):c.moveTo(q[0],q[1]));s2.forEach(q=>c.lineTo(q[0],q[1]));c.closePath();c.fill();
+
+  const segs=[s0,[[tx(V2),ty(nR*T1/V2)],[tx(V2),ty(nR*T2/V2)]],s2,[[tx(V1),ty(nR*T2/V1)],[tx(V1),ty(nR*T1/V1)]]];
+  const cols=[C.hot,C['steel-dark'],C.cold,C['steel-dark']];
+  segs.forEach((s,i)=>{
+    c.strokeStyle=cols[i];c.lineWidth=i===ps.k?3.4:2;c.lineJoin='round';
+    c.beginPath();s.forEach((q,j)=>j?c.lineTo(q[0],q[1]):c.moveTo(q[0],q[1]));c.stroke();
+    const m=Math.floor((s.length-1)/2);
+    const a=s.length===2?s[0]:s[m],b=s.length===2?s[1]:s[m+1];
+    const ma=s.length===2?[(a[0]+b[0])/2,(a[1]+b[1])/2]:a;
+    arrowAt(c,ma[0],ma[1],Math.atan2(b[1]-a[1],b[0]-a[0]),cols[i]);
+  });
+  // 과정 번호
+  c.font=`500 12.5px ${SANS}`;
+  const vm=(V1+V2)/2;
+  c.fillStyle=C.hot;c.textAlign='left';c.fillText('①',tx(vm)+6,ty(nR*T1/vm)-8);
+  c.fillStyle=C['steel-dark'];c.fillText('②',tx(V2)+8,ty(nR*(T1+T2)/2/V2)+4);
+  c.fillStyle=C.cold;c.textAlign='right';c.fillText('③',tx(vm)-6,ty(nR*T2/vm)+16);
+  c.fillStyle=C['steel-dark'];c.fillText('④',tx(V1)-8,ty(nR*(T1+T2)/2/V1)+4);
+  // 등온선 라벨
+  c.font=`400 12px ${MONO}`;c.textAlign='right';
+  c.fillStyle=C.hot;c.fillText('T₁ '+T1+' K',PV.x1-5,ty(nR*T1/2.72)-6);
+  c.fillStyle=C.cold;c.fillText('T₂ '+T2+' K',PV.x1-5,ty(nR*T2/2.72)+14);
+  // 일 라벨
+  const lv=1.75,ly=ty((nR*T1/lv+nR*T2/lv)/2);
+  c.fillStyle=C.brass;c.font=`500 13.5px ${MONO}`;c.textAlign='center';c.fillText('W '+E.W.toFixed(0)+' J',tx(lv),ly+4);
+
+  // 현재 상태
+  const x=tx(ps.V),y=ty(ps.P);
+  c.strokeStyle=alpha(C.ink,0.35);c.setLineDash([2,3]);c.lineWidth=1;
+  c.beginPath();c.moveTo(x,y);c.lineTo(x,PV.y1);c.moveTo(x,y);c.lineTo(PV.x0,y);c.stroke();c.setLineDash([]);
+  c.fillStyle=C.ink;c.beginPath();c.arc(x,y,5,0,Math.PI*2);c.fill();
+  c.strokeStyle=C.surface;c.lineWidth=2;c.stroke();
+}
+
+// ── 에너지 흐름 ───────────────────────────────────
+function flowArrow(c,x0,y0,x1,y1,w,col){
+  const ang=Math.atan2(y1-y0,x1-x0),len=Math.hypot(x1-x0,y1-y0),hl=Math.min(14,len*0.4),hw=Math.max(w+8,12);
+  c.save();c.translate(x0,y0);c.rotate(ang);c.fillStyle=col;
+  c.fillRect(0,-w/2,len-hl,w);
+  c.beginPath();c.moveTo(len-hl,-hw/2);c.lineTo(len,0);c.lineTo(len-hl,hw/2);c.closePath();c.fill();c.restore();
+}
+function drawFlow(ps,E){
+  const c=ctx.F,[W,H]=LOG.F;c.clearRect(0,0,W,H);
+  const ey=58,ex=220,er=30,bw=96,bh=56;
+  // 열원
+  c.fillStyle=alpha(C.hot,0.12);c.fillRect(8,ey-bh/2,bw,bh);c.strokeStyle=C.hot;c.lineWidth=1.5;c.strokeRect(8.5,ey-bh/2+.5,bw-1,bh-1);
+  c.fillStyle=alpha(C.cold,0.12);c.fillRect(W-8-bw,ey-bh/2,bw,bh);c.strokeStyle=C.cold;c.strokeRect(W-8-bw+.5,ey-bh/2+.5,bw-1,bh-1);
+  c.textAlign='center';c.font=`500 13.5px ${SANS}`;
+  c.fillStyle=C.hot;c.fillText('고열원',8+bw/2,ey-4);
+  c.fillStyle=C.cold;c.fillText('저열원',W-8-bw/2,ey-4);
+  c.font=`400 12.5px ${MONO}`;
+  c.fillStyle=C.hot;c.fillText(T1+' K',8+bw/2,ey+13);
+  c.fillStyle=C.cold;c.fillText(T2+' K',W-8-bw/2,ey+13);
+  // 화살표
+  const MW=30,w1=MW,w2=Math.max(2,MW*E.Q2/E.Q1),ww=Math.max(2,MW*E.W/E.Q1);
+  const actIn=ps.k===0||(ps.k===3&&eps<1), actOut=ps.k===2||(ps.k===1&&eps<1), actW=ps.k===0||ps.k===2;
+  c.globalAlpha=actIn?1:0.4;flowArrow(c,8+bw+4,ey,ex-er-4,ey,w1,C.hot);
+  c.globalAlpha=actOut?1:0.4;flowArrow(c,ex+er+4,ey,W-8-bw-4,ey,w2,C.cold);
+  c.globalAlpha=actW?1:0.4;flowArrow(c,ex,ey+er+4,ex,H-34,ww,C.brass);
+  c.globalAlpha=1;
+  // 엔진
+  c.fillStyle=C.surface;c.beginPath();c.arc(ex,ey,er,0,Math.PI*2);c.fill();
+  c.strokeStyle=C.ink;c.lineWidth=1.5;c.stroke();
+  c.fillStyle=C.ink;c.font=`500 13.5px ${SANS}`;c.fillText('엔진',ex,ey+4);
+  // 값
+  c.font=`500 13.5px ${MONO}`;
+  c.fillStyle=C.hot;c.fillText('Q₁ '+E.Q1.toFixed(0)+' J',(8+bw+ex-er)/2,ey-w1/2-8);
+  c.fillStyle=C.cold;c.fillText('Q₂ '+E.Q2.toFixed(0)+' J',(ex+er+W-8-bw)/2,ey-Math.max(w2,12)/2-8);
+  c.fillStyle=C.brass;c.textAlign='left';c.fillText('W '+E.W.toFixed(0)+' J',ex+ww/2+10,H-44);
+  c.fillStyle=C['ink-2'];c.font=`400 12.5px ${SANS}`;c.textAlign='left';
+  c.fillText('η = '+(E.eta*100).toFixed(1)+' %',ex+ww/2+10,H-28);
+}
+
+// ── 글 상자 / 표 ──────────────────────────────────
+const $=id=>document.getElementById(id);
+const fmt=(x)=>(x>0.05?'+':x<-0.05?'−':'')+Math.abs(x).toFixed(1);
+const cls=(x)=>x>0.05?'pos':x<-0.05?'neg':'';
+function updReadout(){
+  const E=energy();
+  $('oT1').textContent=T1+' K';$('oT2').textContent=T2+' K';
+  $('rQ1').textContent=E.Q1.toFixed(1);$('rQ2').textContent=E.Q2.toFixed(1);$('rW').textContent=E.W.toFixed(1);$('rEta').textContent=(E.eta*100).toFixed(1);
+  const reg=eps*E.Qv,ext=(1-eps)*E.Qv;
+  const srcV=(dir)=>eps>=1?'재생기':eps<=0?(dir>0?'고열원':'저열원'):`재생기 ${reg.toFixed(0)} · ${dir>0?'고열원':'저열원'} ${ext.toFixed(0)}`;
+  const rows=[
+    ['① 등온 팽창','고열원',E.QH,E.QH,0],
+    ['② 등적 냉각',srcV(-1),-E.Qv,0,-E.Qv],
+    ['③ 등온 압축','저열원',-E.QC,-E.QC,0],
+    ['④ 등적 가열',srcV(1),E.Qv,0,E.Qv]
+  ];
+  $('tb').innerHTML=rows.map((r,i)=>`<tr data-k="${i}"><td>${r[0]}</td><td class="src">${r[1]}</td><td class="${cls(r[2])}">${fmt(r[2])}</td><td class="${cls(r[3])}">${fmt(r[3])}</td><td class="${cls(r[4])}">${fmt(r[4])}</td></tr>`).join('');
+  $('sQ').textContent=fmt(E.W);$('sW').textContent=fmt(E.W);
+  curK=-1;
+}
+function updStage(k){
+  if(k===curK)return;curK=k;
+  document.querySelectorAll('.steps button').forEach(b=>b.setAttribute('aria-current',+b.dataset.k===k?'true':'false'));
+  document.querySelectorAll('#tb tr').forEach(r=>r.classList.toggle('on',+r.dataset.k===k));
+  }
+
+// ── 루프 ──────────────────────────────────────────
+function frame(dt){
+  const E=energy();
+  if(playing){const hz=(0.11+0.24*Math.max(0,E.W/W_MAX))*speed;curHz=hz;ph=(ph+hz*dt)%1;}
+  const ps=state(ph);
+  updParts(geom(ps),ps,dt);
+  drawEngine(ps,E);drawPV(ps,E);drawFlow(ps,E);
+  updStage(ps.k);
+}
+function tick(ts){
+  const dt=lastTs===null?0:Math.min(0.05,(ts-lastTs)/1000);lastTs=ts;
+  frame(dt);
+  raf=playing?requestAnimationFrame(tick):0;
+}
+function start(){cancelAnimationFrame(raf);lastTs=null;raf=requestAnimationFrame(tick);}
+function redraw(){if(!playing){frame(0);}}
+
+function setPlay(v){
+  playing=v;const b=$('play');b.setAttribute('aria-pressed',v?'true':'false');b.textContent=v?'일시정지':'재생';
+  if(v)start();else{cancelAnimationFrame(raf);raf=0;}
+}
+$('play').addEventListener('click',()=>setPlay(!playing));
+const sSp=$('sSp');
+sSp.addEventListener('input',()=>{speed=+sSp.value;$('oSp').textContent=speed+'×';});
+$('resetBtn').addEventListener('click',()=>{T1=600;T2=300;sT1.value=600;sT2.value=300;speed=1;sSp.value=1;$('oSp').textContent='1×';ph=0.08;updReadout();snapParts(state(ph));redraw();});
+document.addEventListener('keydown',e=>{if(e.code==='Space'&&e.target.tagName!=='BUTTON'&&e.target.tagName!=='INPUT'){e.preventDefault();setPlay(!playing);}});
+document.querySelectorAll('.steps button').forEach(b=>b.addEventListener('click',()=>{
+  ph=B[+b.dataset.k]+0.002;snapParts(state(ph));redraw();
+}));
+
+const sT1=$('sT1'),sT2=$('sT2');
+sT1.addEventListener('input',()=>{T1=+sT1.value;if(T1<T2+50){T2=T1-50;sT2.value=T2;}updReadout();snapParts(state(ph));redraw();});
+sT2.addEventListener('input',()=>{T2=+sT2.value;if(T2>T1-50){T1=T2+50;sT1.value=T1;}updReadout();snapParts(state(ph));redraw();});
+
+const ro=new ResizeObserver(()=>{setup();frame(0);});
+ro.observe(cv.E.parentElement);ro.observe(cv.P.parentElement);
+const mq=matchMedia('(prefers-color-scheme: dark)');
+const onTheme=()=>{readTheme();frame(0);};
+mq.addEventListener?mq.addEventListener('change',onTheme):mq.addListener(onTheme);
+new MutationObserver(onTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+
+readTheme();setup();updReadout();snapParts(state(ph));frame(0);
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>frame(0));
+setPlay(playing);
+})();
+</script>
+
+</body>
+</html>
