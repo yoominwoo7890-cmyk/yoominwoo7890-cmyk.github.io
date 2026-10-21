@@ -1,1 +1,591 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>자리 배치 시뮬레이터</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f7;color:#1a1a1a;min-height:100vh;padding:24px 16px}
+.app{max-width:800px;margin:0 auto}
+h1{font-size:18px;font-weight:600;margin-bottom:16px;color:#1a1a1a}
 
+/* 버튼 공통 */
+.btn{font-size:13px;padding:6px 14px;border-radius:8px;border:1px solid #d1d1d6;background:#fff;color:#444;cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-family:inherit;text-decoration:none}
+.btn:hover{background:#f0f0f5}
+.btn.active{background:#e8e5ff;color:#4a3fcc;border-color:#b8b0ff}
+.btn.accent{border-color:#b8b0ff;color:#4a3fcc}
+.btn.accent-fill{border-color:#b8b0ff;background:#f0eeff;color:#4a3fcc}
+.btn.muted{border-color:#ddd;color:#888}
+.btn.danger{border-color:#ffc5c5;color:#c0392b}
+.btn.danger:hover{background:#fff0f0}
+
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+.hint{font-size:12px;color:#aaa}
+.edit-tools{padding:8px 10px;border-radius:10px;background:#f0eeff;border:1px dashed #b8b0ff}
+
+/* 무대: 화면 폭에 맞춰 캔버스를 축소(scale) */
+.stage{width:100%;background:#fff;border-radius:12px;border:1px solid #e0e0e5;margin-bottom:12px;overflow:hidden;display:flex;justify-content:center;padding:16px}
+.sizer{position:relative;flex-shrink:0}
+.canvas{position:absolute;left:0;top:0;transform-origin:0 0}
+
+.seat{position:absolute;border-radius:8px;border:1px solid #b8b0ff;background:#f0eeff;display:flex;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;padding:4px 6px;transition:box-shadow .12s}
+.seat .sn{font-size:19px;font-weight:500;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;color:#3C3489}
+.seat.empty .sn{font-size:14px;opacity:0.3}
+.seat.locked{border-color:#3b82f6;background:#eff6ff}
+.seat.locked .sn{color:#1d4ed8}
+.seat .li{font-size:9px;color:#1d4ed8;position:absolute;top:3px;right:5px}
+.seat .fb{font-size:11px;position:absolute;top:2px;left:5px;line-height:1}
+.seat.front-miss{border-style:dashed;border-color:#e0a030}
+.info-chip.warn-chip{border-color:#f5c26b;color:#a86a00;background:#fff7e6}
+.front-sel{font-size:13px;padding:5px 8px;border-radius:8px;border:1px solid #d1d1d6;background:#fff;color:#444;font-family:inherit}
+.seat.draggable{cursor:grab;touch-action:none}
+.seat.draggable:hover{box-shadow:0 0 0 2px #b8b0ff}
+.seat.dragging{opacity:.45;cursor:grabbing;z-index:100}
+.podium{position:absolute;border-radius:8px;background:#faf7ed;border:1.5px solid #c9b96a;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.podium span{font-size:18px;font-weight:600;color:#7A6230;letter-spacing:.02em}
+
+.view-label{font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid #e0e0e5;background:#f5f5f7;color:#888}
+.view-label.teacher{border-color:#1D9E75;color:#1D9E75;background:#E1F5EE}
+.info-bar{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap;align-items:center}
+.info-chip{font-size:12px;padding:3px 10px;border-radius:20px;border:1px solid #e0e0e5;color:#888;background:#f5f5f7}
+
+.section{background:#fff;border:1px solid #e0e0e5;border-radius:12px;padding:14px;margin-bottom:12px}
+.section label.title{font-size:13px;color:#666;display:block;margin-bottom:8px}
+.section textarea{width:100%;height:72px;font-size:13px;resize:vertical;border-radius:8px;border:1px solid #d1d1d6;padding:8px;background:#fafafa;color:#1a1a1a;font-family:inherit}
+.section textarea:focus{outline:none;border-color:#b8b0ff}
+.row{display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap}
+.row span{font-size:12px;color:#999}
+.row span.warn{color:#c0392b}
+
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center}
+.overlay .box{background:#fff;border-radius:12px;padding:20px;max-width:95vw;max-height:90vh;overflow:auto;text-align:center}
+#printImg{max-width:100%;border:1px solid #eee;border-radius:8px;display:block}
+
+@media print{
+  /* 여백 0 → 브라우저가 넣는 날짜·제목·URL·쪽번호 머리글/바닥글이 사라짐 */
+  @page{margin:0}
+  html,body{background:#fff;padding:0;margin:0;min-height:0}
+  .app{max-width:none;margin:0}
+
+  /* Ctrl+P: 교탁과 자리(배치도)만 남기고 나머지는 공간까지 제거 */
+  body:not(.print-img) .app>*:not(#stage){display:none!important}
+  body:not(.print-img) #stage{border:none;border-radius:0;margin:0;padding:10mm;overflow:visible}
+
+  /* 인쇄 미리보기 이미지가 열려 있을 때: 이미지만 인쇄 */
+  body.print-img .app>*:not(#printOverlay){display:none!important}
+  body.print-img #printOverlay{position:static;display:block!important;background:none}
+  body.print-img #printOverlay .box{padding:10mm;max-width:none;max-height:none;overflow:visible;border-radius:0}
+  body.print-img #printOverlay .box>*:not(#printImg){display:none!important}
+  body.print-img #printImg{border:none;border-radius:0;margin:0 auto;width:auto;max-width:100%;max-height:calc(100vh - 20mm)}
+
+  .seat,.podium{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  /* 시력 정보는 학생에게 보이지 않도록 인쇄물에서 숨김 */
+  .seat .fb{display:none!important}
+  .seat.front-miss{border-style:solid;border-color:#b8b0ff}
+}
+</style>
+</head>
+<body>
+<div class="app">
+<h1>🪑 자리 배치 시뮬레이터</h1>
+
+<div class="toolbar">
+  <button class="btn" onclick="randomize()">↺ 랜덤 배치</button>
+  <button class="btn" id="editBtn" onclick="toggleEdit()">⊞ 레이아웃 수정</button>
+  <button class="btn" id="mirrorBtn" onclick="toggleMirror()">👁 교탁 시점</button>
+  <button class="btn" onclick="clearLocks()">🔓 고정 해제 전체</button>
+  <button class="btn accent" onclick="printView()">🖨 인쇄</button>
+  <span class="hint">더블클릭(모바일: 길게 누르기): 고정/해제</span>
+</div>
+<div class="toolbar edit-tools" id="editTools" style="display:none">
+  <button class="btn" onclick="addSeat()">＋ 자리 추가</button>
+  <button class="btn danger" onclick="removeSeat()">－ 자리 제거</button>
+  <span class="hint">자리를 끌어서 옮기고, 끝나면 ✓ 수정 완료를 누르세요</span>
+</div>
+
+<div class="info-bar">
+  <span class="info-chip" id="lockInfo">🔒 고정: 0명</span>
+  <span class="info-chip" id="seatInfo">총 0자리</span>
+  <span class="info-chip" id="frontInfo" style="display:none"></span>
+  <span class="view-label" id="viewLabel">학생 시점</span>
+</div>
+
+<div class="stage" id="stage"><div class="sizer" id="sizer"><div class="canvas" id="canvas"></div></div></div>
+
+<div class="section">
+  <label class="title" for="nameInput">학생 이름 입력 <span style="color:#bbb;font-size:12px">— 쉼표 또는 줄바꿈으로 구분 · 고정된 자리는 유지됩니다 · 이름 앞에 <b>*</b>를 붙이면 앞자리 학생(예: *철수)</span></label>
+  <textarea id="nameInput" placeholder="예) *철수, 영희, 민수&#10;또는 한 줄에 한 명씩 (*는 앞자리 학생)"></textarea>
+  <div class="row">
+    <button class="btn" onclick="applyNames()">이름 적용</button>
+    <button class="btn" onclick="clearNames()">이름 초기화</button>
+    <label class="btn" title="한 줄에 한 명 또는 쉼표로 구분된 .txt 파일">📄 txt 파일 불러오기<input type="file" accept=".txt,text/plain" onchange="importNamesTxt(event)" style="display:none"></label>
+    <label style="font-size:12px;color:#666;display:inline-flex;align-items:center;gap:6px">👓 앞자리 범위
+      <select id="frontRowsSel" class="front-sel" onchange="setFrontRows(this.value)">
+        <option value="1">앞 1줄</option><option value="2">앞 2줄</option><option value="3">앞 3줄</option>
+      </select></label>
+    <span id="nameCount"></span>
+  </div>
+</div>
+
+<!-- 인쇄 오버레이 -->
+<div id="printOverlay" class="overlay">
+  <div class="box">
+    <p style="font-size:13px;color:#666;margin-bottom:12px">이미지로 저장하거나 바로 인쇄할 수 있습니다.</p>
+    <img id="printImg" alt="자리 배치도">
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:16px">
+      <a id="saveImgLink" class="btn accent-fill" download="자리배치.png">⬇ 이미지 저장</a>
+      <button class="btn accent" onclick="window.print()">🖨 인쇄</button>
+      <button class="btn muted" onclick="closePrint()">닫기</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+const SW=96,SH=64,GX=16,GY=14,PAD=24;
+const POD_H=SH,POD_GAP=14;
+const PX=SW+GX, PY=SH+GY;          // 한 칸의 가로/세로 간격
+const LONG_PRESS_MS=500;
+const LS_SEATS='seat_seats';
+
+let seats=[];
+let frontRows=1;                     // 앞자리로 볼 줄 수(1~3)
+let editMode=false, mirrorMode=false, nextId=0, viewScale=1;
+let drag=null, touchStart=null, longPressTimer=null;
+
+const $=id=>document.getElementById(id);
+
+// ── 데이터 검증 ───────────────────────────────────────────────
+function sanitizeSeats(arr){
+  if(!Array.isArray(arr))return null;
+  const out=[],used=new Set();
+  for(const s of arr){
+    if(!s||typeof s!=='object')continue;
+    const lx=Number(s.lx),ly=Number(s.ly);
+    if(!isFinite(lx)||!isFinite(ly))continue;
+    const id=(Number.isInteger(s.id)&&s.id>=0&&!used.has(s.id))?s.id:-1;
+    if(id>=0)used.add(id);
+    out.push({id,name:typeof s.name==='string'?s.name.trim().slice(0,30):'',locked:!!s.locked,front:!!s.front&&typeof s.name==='string'&&!!s.name.trim(),lx:Math.max(0,lx),ly:Math.max(0,ly)});
+  }
+  let n=used.size?Math.max(...used)+1:0;
+  out.forEach(s=>{if(s.id<0)s.id=n++;});
+  return out.length?out:null;
+}
+// 저장 형식: {seats}. 예전 형식(배열만 저장)도 읽음
+function readSaved(raw){
+  if(raw==null)return null;
+  try{
+    const v=typeof raw==='string'?JSON.parse(raw):raw;
+    if(Array.isArray(v))return v;
+    if(v&&Array.isArray(v.seats))return v.seats;
+  }catch(e){}
+  return null;
+}
+function calcNextId(){return seats.reduce((m,s)=>Math.max(m,s.id),-1)+1;}
+
+// ── 좌표 / 캔버스 ─────────────────────────────────────────────
+function layoutBounds(){
+  if(!seats.length)return{w:SW,h:SH,minX:0,minY:0,maxX:SW,maxY:SH};
+  const minX=Math.min(...seats.map(s=>s.lx));
+  const minY=Math.min(...seats.map(s=>s.ly));
+  const maxX=Math.max(...seats.map(s=>s.lx+SW));
+  const maxY=Math.max(...seats.map(s=>s.ly+SH));
+  return{minX,minY,maxX,maxY,w:maxX-minX,h:maxY-minY};
+}
+function podW(seatsW){return Math.max(SW*2+GX,Math.round(seatsW/3));}
+function canvasSize(){
+  const b=layoutBounds();
+  return{cw:b.w+PAD*2,ch:PAD+POD_H+POD_GAP+b.h+PAD,pw:podW(b.w),bw:b.w,bh:b.h,bMinX:b.minX,bMinY:b.minY};
+}
+function origin(cs){return{ox:PAD-cs.bMinX,oy:PAD+POD_H+POD_GAP-cs.bMinY};}
+function toCanvas(lx,ly,cs){
+  const{ox,oy}=origin(cs);
+  if(!mirrorMode)return{x:ox+lx,y:oy+ly};
+  return{x:cs.cw-(ox+lx)-SW,y:cs.ch-(oy+ly)-SH};
+}
+
+// ── 격자: 모든 자리는 (열 c, 행 r) 칸 위에 놓인다 ─────────────
+const cellOf=s=>({c:Math.round(s.lx/PX),r:Math.round(s.ly/PY)});
+const cellKey=(c,r)=>c+','+r;
+function occupiedCells(exceptId){
+  const set=new Set();
+  seats.forEach(s=>{if(s.id!==exceptId){const{c,r}=cellOf(s);set.add(cellKey(c,r));}});
+  return set;
+}
+function nearestFreeCell(c,r,occ){
+  c=Math.max(0,c);r=Math.max(0,r);
+  if(!occ.has(cellKey(c,r)))return{c,r};
+  for(let d=1;d<100;d++){
+    let best=null,bd=Infinity;
+    for(let dc=-d;dc<=d;dc++)for(let dr=-d;dr<=d;dr++){
+      if(Math.max(Math.abs(dc),Math.abs(dr))!==d)continue;
+      const nc=c+dc,nr=r+dr;
+      if(nc<0||nr<0||occ.has(cellKey(nc,nr)))continue;
+      const dist=dc*dc+dr*dr;
+      if(dist<bd){bd=dist;best={c:nc,r:nr};}
+    }
+    if(best)return best;
+  }
+  return{c,r};
+}
+// 행 우선(앞줄 → 뒷줄, 왼쪽 → 오른쪽) 순서
+function seatsInOrder(){
+  return [...seats].sort((a,b)=>{const A=cellOf(a),B=cellOf(b);return A.r-B.r||A.c-B.c;});
+}
+// 왼쪽/위쪽 빈 줄 제거 (중간의 통로는 유지)
+function normalize(){
+  if(!seats.length)return;
+  const minC=Math.min(...seats.map(s=>cellOf(s).c));
+  const minR=Math.min(...seats.map(s=>cellOf(s).r));
+  seats.forEach(s=>{const{c,r}=cellOf(s);s.lx=(c-minC)*PX;s.ly=(r-minR)*PY;});
+}
+// 모든 자리를 가장 가까운 칸에 맞추고, 겹치면 가까운 빈 칸으로 이동
+function snapAll(){
+  const occ=new Set();
+  seatsInOrder().forEach(s=>{
+    const{c,r}=cellOf(s);
+    const f=nearestFreeCell(c,r,occ);
+    s.lx=f.c*PX;s.ly=f.r*PY;occ.add(cellKey(f.c,f.r));
+  });
+  normalize();
+}
+function snapSeat(seat){
+  const{c,r}=cellOf(seat);
+  const f=nearestFreeCell(c,r,occupiedCells(seat.id));
+  seat.lx=f.c*PX;seat.ly=f.r*PY;
+}
+
+function initSeats(){
+  seats=[];nextId=0;
+  [4,4,3,3,3,3].forEach((rowCount,ci)=>{
+    for(let ri=0;ri<rowCount;ri++)seats.push({id:nextId++,name:'',locked:false,lx:ci*PX,ly:ri*PY});
+  });
+}
+
+// ── 상태 변경 → 렌더 + 이 브라우저에 자동 저장 ─────────────────
+function commit(){
+  render();
+  lsSet(LS_SEATS,JSON.stringify({seats,frontRows}));
+}
+
+// ── 자리 추가/제거 ────────────────────────────────────────────
+function addSeat(){
+  if(!seats.length){seats.push({id:nextId++,name:'',locked:false,lx:0,ly:0});commit();return;}
+  // 이미 쓰고 있는 열에서만 빈 칸을 찾음 → 통로(빈 열)는 채우지 않음
+  const occ=occupiedCells();
+  const cells=seats.map(cellOf);
+  const cols=[...new Set(cells.map(x=>x.c))].sort((a,b)=>a-b);
+  const maxR=Math.max(...cells.map(x=>x.r));
+  let target=null;
+  for(let r=0;r<=maxR+1&&!target;r++){
+    for(const c of cols){if(!occ.has(cellKey(c,r))){target={c,r};break;}}
+  }
+  seats.push({id:nextId++,name:'',locked:false,lx:target.c*PX,ly:target.r*PY});
+  commit();
+}
+function removeSeat(){
+  if(seats.length<=1)return;
+  const ordered=seatsInOrder();
+  const last=ordered[ordered.length-1];
+  if(last.name||last.locked){
+    const what=last.name?`"${last.name}" 학생이 앉은 `:'';
+    if(!confirm(`맨 뒤 ${what}${last.locked?'고정된 ':''}자리가 삭제됩니다. 계속할까요?`))return;
+  }
+  seats=seats.filter(s=>s.id!==last.id);
+  commit();
+}
+
+// ── 렌더링 ────────────────────────────────────────────────────
+function render(){
+  const canvas=$('canvas');
+  canvas.innerHTML='';
+  const cs=canvasSize();
+  const{cw,ch,pw,bw}=cs;
+  canvas.style.width=cw+'px';
+  canvas.style.height=ch+'px';
+
+  let podX=Math.round(PAD+bw/2-pw/2),podY=PAD;
+  if(mirrorMode){podX=cw-podX-pw;podY=ch-podY-POD_H;}
+  const pod=document.createElement('div');
+  pod.className='podium';
+  pod.style.cssText=`left:${podX}px;top:${podY}px;width:${pw}px;height:${POD_H}px;`;
+  pod.innerHTML='<span>교탁</span>';
+  canvas.appendChild(pod);
+
+  const draggable=editMode&&!mirrorMode;
+  const fset=frontRowSet();
+  seats.forEach(s=>{
+    const{x,y}=toCanvas(s.lx,s.ly,cs);
+    const el=document.createElement('div');
+    el.className='seat'+(draggable?' draggable':'')+(s.locked?' locked':'')+(s.name?'':' empty');
+    el.dataset.id=s.id;
+    el.style.cssText=`left:${x}px;top:${y}px;width:${SW}px;height:${SH}px;`;
+    if(s.locked){const li=document.createElement('span');li.className='li';li.textContent='🔒';el.appendChild(li);}
+    if(s.front&&s.name){const fb=document.createElement('span');fb.className='fb';fb.textContent='👓';fb.title='앞자리 학생';el.appendChild(fb);}
+    if(s.front&&s.name&&!isFrontSeat(s,fset))el.classList.add('front-miss');
+    const sn=document.createElement('div');
+    sn.className='sn';
+    sn.textContent=s.name||'—';
+    if(s.name)el.title=s.name;
+    el.appendChild(sn);
+
+    el.addEventListener('dblclick',e=>{e.stopPropagation();toggleLock(s.id);});
+    el.addEventListener('contextmenu',e=>{if(touchStart)e.preventDefault();});
+    el.addEventListener('touchstart',e=>onSeatTouchStart(e,s.id,el),{passive:true});
+    if(draggable){
+      el.addEventListener('mousedown',e=>{
+        if(e.button!==0)return;
+        beginDrag(s.id,e.clientX,e.clientY,el);
+        e.preventDefault();
+      });
+    }
+    canvas.appendChild(el);
+  });
+  fitCanvas(cs);
+  updateInfo();
+}
+// 무대 폭보다 넓으면 축소해서 잘리지 않게 표시
+function fitCanvas(cs=canvasSize(),maxW){
+  const stage=$('stage'),canvas=$('canvas'),sizer=$('sizer');
+  const avail=maxW||Math.max(100,stage.clientWidth-32);
+  viewScale=Math.min(1,avail/cs.cw);
+  canvas.style.transform=viewScale<1?`scale(${viewScale})`:'';
+  sizer.style.width=(cs.cw*viewScale)+'px';
+  sizer.style.height=(cs.ch*viewScale)+'px';
+}
+function updateInfo(){
+  $('lockInfo').textContent=`🔒 고정: ${seats.filter(s=>s.locked).length}명`;
+  const fset=frontRowSet();
+  const fronts=seats.filter(s=>s.front&&s.name);
+  const miss=fronts.filter(s=>!isFrontSeat(s,fset)).length;
+  const fi=$('frontInfo');
+  fi.textContent=`👓 앞자리: ${fronts.length}명`+(miss?` · ${miss}명은 앞줄에 자리가 부족해 그다음 줄에 배치됨`:'');
+  fi.style.display=fronts.length?'':'none';
+  fi.classList.toggle('warn-chip',miss>0);
+  $('seatInfo').textContent=`총 ${seats.length}자리`;
+  const vl=$('viewLabel');
+  vl.textContent=mirrorMode?'교탁 시점':'학생 시점';
+  vl.className='view-label'+(mirrorMode?' teacher':'');
+}
+function toggleMirror(){
+  mirrorMode=!mirrorMode;
+  const btn=$('mirrorBtn');
+  btn.classList.toggle('active',mirrorMode);
+  btn.textContent=mirrorMode?'👁 학생 시점':'👁 교탁 시점';
+  render();
+}
+function toggleLock(id){
+  const seat=seats.find(x=>x.id===id);
+  if(seat){seat.locked=!seat.locked;commit();}
+}
+
+// ── 드래그 (마우스/터치 공통) ─────────────────────────────────
+function beginDrag(id,clientX,clientY,el){
+  const rect=el.getBoundingClientRect();
+  drag={id,el,
+    offX:(clientX-rect.left)/viewScale, offY:(clientY-rect.top)/viewScale,
+    cs:canvasSize(),           // 드래그 중에는 좌표계를 고정해 흔들림 방지
+    startX:clientX,startY:clientY,moved:false};
+}
+function moveDrag(clientX,clientY){
+  if(!drag)return;
+  if(!drag.moved){
+    if(Math.hypot(clientX-drag.startX,clientY-drag.startY)<4)return;
+    drag.moved=true;drag.el.classList.add('dragging');
+  }
+  const seat=seats.find(s=>s.id===drag.id);if(!seat)return;
+  const ar=$('canvas').getBoundingClientRect();
+  const{ox,oy}=origin(drag.cs);
+  const cx=(clientX-ar.left)/viewScale-drag.offX;
+  const cy=(clientY-ar.top)/viewScale-drag.offY;
+  seat.lx=Math.max(0,cx-ox);seat.ly=Math.max(0,cy-oy);
+  drag.el.style.left=(ox+seat.lx)+'px';
+  drag.el.style.top=(oy+seat.ly)+'px';
+}
+function endDrag(){
+  if(!drag)return;
+  const d=drag;drag=null;
+  d.el.classList.remove('dragging');
+  if(!d.moved)return;
+  const seat=seats.find(s=>s.id===d.id);
+  if(seat){snapSeat(seat);normalize();}
+  commit();
+}
+document.addEventListener('mousemove',e=>moveDrag(e.clientX,e.clientY));
+document.addEventListener('mouseup',endDrag);
+
+// 터치: 길게 누르면 고정/해제, 수정 모드에서는 끌어서 이동
+function onSeatTouchStart(e,id,el){
+  if(e.touches.length!==1)return;
+  const t=e.touches[0];
+  touchStart={x:t.clientX,y:t.clientY};
+  clearTimeout(longPressTimer);
+  longPressTimer=setTimeout(()=>{
+    longPressTimer=null;
+    if(drag&&drag.moved)return;
+    drag=null;touchStart=null;
+    if(navigator.vibrate)navigator.vibrate(30);
+    toggleLock(id);
+  },LONG_PRESS_MS);
+  if(editMode&&!mirrorMode)beginDrag(id,t.clientX,t.clientY,el);
+}
+document.addEventListener('touchmove',e=>{
+  const t=e.touches[0];if(!t)return;
+  if(longPressTimer&&touchStart&&Math.hypot(t.clientX-touchStart.x,t.clientY-touchStart.y)>8){
+    clearTimeout(longPressTimer);longPressTimer=null;
+  }
+  if(drag){moveDrag(t.clientX,t.clientY);if(drag&&drag.moved)e.preventDefault();}
+},{passive:false});
+function onTouchEnd(){clearTimeout(longPressTimer);longPressTimer=null;touchStart=null;endDrag();}
+document.addEventListener('touchend',onTouchEnd);
+document.addEventListener('touchcancel',onTouchEnd);
+
+// ── 이름 / 랜덤 / 고정 ────────────────────────────────────────
+function shuffle(arr){
+  for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}
+  return arr;
+}
+// 앞자리 = 교탁에서 가까운 줄부터 frontRows개 줄
+function frontRowSet(){
+  const rows=[...new Set(seats.map(s=>cellOf(s).r))].sort((a,b)=>a-b);
+  return new Set(rows.slice(0,frontRows));
+}
+function isFrontSeat(s,set=frontRowSet()){return set.has(cellOf(s).r);}
+
+function randomize(){
+  const unlocked=seats.filter(s=>!s.locked);
+  const people=unlocked.map(s=>({name:s.name,front:s.front&&!!s.name}));
+  const frontPeople=shuffle(people.filter(p=>p.front));
+  const others=people.filter(p=>!p.front);
+  // 자리 순서: 앞줄 자리(무작위) → 나머지 자리(교탁에서 가까운 줄부터, 줄 안에서는 무작위)
+  const fset=frontRowSet();
+  const frontSeats=shuffle(unlocked.filter(s=>isFrontSeat(s,fset)));
+  const restSeats=shuffle(unlocked.filter(s=>!isFrontSeat(s,fset))).sort((a,b)=>cellOf(a).r-cellOf(b).r);
+  const order=frontSeats.concat(restSeats);
+  // 앞자리 학생이 먼저 앞쪽 자리를 차지하고, 남은 자리에 다른 학생을 무작위로
+  const remaining=shuffle(order.slice(frontPeople.length));
+  frontPeople.forEach((p,i)=>{order[i].name=p.name;order[i].front=true;});
+  shuffle(others).forEach((p,i)=>{remaining[i].name=p.name;remaining[i].front=false;});
+  commit();
+}
+// "*철수" → {name:'철수', front:true}
+function parseName(raw){
+  const m=raw.match(/^[*＊]\s*(.*)$/);
+  return m?{name:m[1].trim(),front:true}:{name:raw,front:false};
+}
+function applyNames(){
+  let list=$('nameInput').value.split(/[,\n]/).map(n=>n.trim()).filter(Boolean).map(parseName).filter(p=>p.name);
+  const total=list.length;
+  // 고정된 자리의 학생은 그대로 두고, 입력 목록에서 한 번씩 빼서 중복 배치를 막음
+  seats.filter(s=>s.locked&&s.name).forEach(s=>{
+    const i=list.findIndex(p=>p.name===s.name);
+    if(i>=0){s.front=list[i].front;list.splice(i,1);}
+  });
+  // 앞자리 학생을 목록 맨 앞으로 → 앞줄부터 채워짐
+  list=list.filter(p=>p.front).concat(list.filter(p=>!p.front));
+  const targets=seatsInOrder().filter(s=>!s.locked);
+  targets.forEach((s,i)=>{const p=list[i];s.name=p?p.name:'';s.front=!!(p&&p.front);});
+  const overflow=list.length-targets.length;
+  const cnt=$('nameCount');
+  if(overflow>0){
+    cnt.textContent=`${total}명 입력됨 — 자리가 ${overflow}개 부족해 마지막 ${overflow}명(${list.slice(-overflow).map(p=>p.name).join(', ')})이 빠졌습니다`;
+    cnt.className='warn';
+  }else{
+    cnt.textContent=`${total}명 입력됨`;
+    cnt.className='';
+  }
+  commit();
+}
+function setFrontRows(v){
+  frontRows=Math.max(1,Math.min(3,parseInt(v)||1));
+  commit();
+}
+// txt 파일에서 이름 불러오기 (UTF-8, 윈도우 메모장의 ANSI/EUC-KR 모두 지원)
+function importNamesTxt(e){
+  const file=e.target.files[0];if(!file)return;
+  e.target.value='';
+  if(file.size>200*1024){alert('파일이 너무 큽니다. (최대 200KB)');return;}
+  file.arrayBuffer().then(buf=>{
+    let text;
+    try{text=new TextDecoder('utf-8',{fatal:true}).decode(buf);}
+    catch(err){text=new TextDecoder('euc-kr').decode(buf);}
+    text=text.replace(/^﻿/,'').replace(/\r/g,'').trim();
+    if(!text){alert('파일에 이름이 없습니다.');return;}
+    $('nameInput').value=text;
+    applyNames();
+  }).catch(()=>alert('파일을 읽을 수 없습니다.'));
+}
+function clearNames(){
+  seats.forEach(s=>{s.name='';s.front=false;});
+  $('nameInput').value='';
+  $('nameCount').textContent='';
+  commit();
+}
+function clearLocks(){seats.forEach(s=>s.locked=false);commit();}
+function toggleEdit(){
+  editMode=!editMode;
+  const btn=$('editBtn');
+  btn.classList.toggle('active',editMode);
+  btn.textContent=editMode?'✓ 수정 완료':'⊞ 레이아웃 수정';
+  $('editTools').style.display=editMode?'flex':'none';
+  if(!editMode){snapAll();commit();}
+  else render();
+}
+
+// ── 인쇄 ──────────────────────────────────────────────────────
+function printView(){
+  function doCapture(){
+    const cs=canvasSize();
+    html2canvas($('canvas'),{
+      backgroundColor:'#ffffff',scale:2,logging:false,width:cs.cw,height:cs.ch,
+      onclone:doc=>{
+        // 화면에 맞춘 축소를 풀고 원래 크기로 캡처
+        doc.getElementById('canvas').style.transform='none';
+        const z=doc.getElementById('sizer');z.style.width=cs.cw+'px';z.style.height=cs.ch+'px';
+        doc.getElementById('stage').style.overflow='visible';
+      }
+    }).then(cvs=>{
+      const url=cvs.toDataURL('image/png');
+      $('printImg').src=url;
+      $('saveImgLink').href=url;
+      $('printOverlay').style.display='flex';
+      document.body.classList.add('print-img');
+    }).catch(()=>alert('캡처 실패. 브라우저 인쇄(Ctrl+P)를 이용해주세요.'));
+  }
+  if(typeof html2canvas==='undefined'){
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    s.onload=doCapture;
+    s.onerror=()=>alert('라이브러리 로드 실패. 브라우저 인쇄(Ctrl+P)를 이용해주세요.');
+    document.head.appendChild(s);
+  }else doCapture();
+}
+function closePrint(){
+  $('printOverlay').style.display='none';
+  document.body.classList.remove('print-img');
+}
+// Ctrl+P로 바로 인쇄할 때는 용지 폭에 맞춰 축소
+window.addEventListener('beforeprint',()=>{if(!document.body.classList.contains('print-img'))fitCanvas(canvasSize(),680);});
+window.addEventListener('afterprint',()=>fitCanvas());
+window.addEventListener('resize',()=>fitCanvas());
+
+// ── 이 브라우저(localStorage)에 현재 배치 자동 저장 ────────────
+function lsSet(k,v){try{localStorage.setItem(k,v);}catch(e){}}
+function lsGet(k){try{return localStorage.getItem(k);}catch(e){return null;}}
+
+// ── 시작 ──────────────────────────────────────────────────────
+(()=>{
+  // 예전 버전이 남긴 레이아웃 목록 데이터 정리
+  try{localStorage.removeItem('seat_layouts');}catch(e){}
+  const raw=lsGet(LS_SEATS);
+  const saved=sanitizeSeats(readSaved(raw));
+  try{const fr=parseInt(JSON.parse(raw).frontRows);if(fr>=1&&fr<=3)frontRows=fr;}catch(e){}
+  $('frontRowsSel').value=String(frontRows);
+  if(saved)seats=saved;else initSeats();
+  snapAll();nextId=calcNextId();
+  render();
+})();
+</script>
+</body>
+</html>
