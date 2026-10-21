@@ -221,7 +221,7 @@ function buildCycle(def){
 /* ---------- 상태 ---------- */
 const S = {
   mode:'isobaric', x:{}, cyc:'rect', cycle:null, u:0, playing:false,
-  heat:0, heatAt:-9, time:0, parts:[], Tg:300, drag:null
+  heat:0, heatAt:-9, time:0, parts:[], Tg:300, drag:null, ref:null, dir:0
 };
 BTYPES.forEach(t => S.x[t] = BASIC[t].xA);
 const basicMode = () => S.mode !== 'cycle';
@@ -245,9 +245,14 @@ function noteHeat(q0, q1, type){
 function setX(v){
   const b = BASIC[S.mode], x = Math.min(b.x[1], Math.max(b.x[0], v)), old = S.x[S.mode];
   if(x === old) return;
+  // 변화 방향이 바뀌면(가열 → 냉각, 팽창 → 압축) 화살표는 그 순간부터 다시 잰다
+  const dir = x > old ? 1 : -1;
+  if(S.dir && dir !== S.dir) S.ref = old;
+  S.dir = dir;
   noteHeat(energyOf(S.mode, old).Q, energyOf(S.mode, x).Q, S.mode);
   S.x[S.mode] = x;
 }
+function resetRef(){ S.ref = null; S.dir = 0; }
 function setU(v, wrap){
   const u = wrap ? ((v % 1) + 1) % 1 : Math.min(1, Math.max(0, v));
   const q0 = cur().Q, oldU = S.u;
@@ -257,7 +262,7 @@ function setU(v, wrap){
 }
 
 /* ---------- 축 범위 ---------- */
-let DOM = {}, EMAX = 1;
+let DOM = {}, EMAX = 1, ESPAN = 1;
 function guide(type, n){
   const [a,b] = BASIC[type].x, out = [];
   for(let i = 0; i <= n; i++){ const x = a + (b-a)*i/n; const s = stateOf(type, x); s.x = x; out.push(s); }
@@ -267,7 +272,12 @@ function computeDomains(){
   if(basicMode()){
     let sLo = Infinity, sHi = -Infinity; EMAX = 1;
     BTYPES.forEach(t => guide(t, 120).forEach(s => { sLo = Math.min(sLo, s.S); sHi = Math.max(sHi, s.S); }));
-    guide(S.mode, 120).forEach(s => { const e = energyOf(S.mode, s.x); EMAX = Math.max(EMAX, Math.abs(e.W), Math.abs(e.dU), Math.abs(e.Q)); });
+    const lo = {Q:0, W:0, dU:0}, hi = {Q:0, W:0, dU:0};
+    guide(S.mode, 120).forEach(s => {
+      const e = energyOf(S.mode, s.x); EMAX = Math.max(EMAX, Math.abs(e.W), Math.abs(e.dU), Math.abs(e.Q));
+      for(const k of ['Q','W','dU']){ lo[k] = Math.min(lo[k], e[k]); hi[k] = Math.max(hi[k], e[k]); }
+    });
+    ESPAN = Math.max(1, ...['Q','W','dU'].map(k => hi[k] - lo[k]));
     const pad = (sHi-sLo)*0.06;
     DOM = {P:[0,350], V:[0,60], T:[0,800], S:[sLo-pad, sHi+pad]};
   } else {
@@ -296,19 +306,30 @@ function niceStep(span, n){ const r = span/n, p = Math.pow(10, Math.floor(Math.l
 /* ---------- 실린더 ---------- */
 const stage = document.getElementById('stage'), sctx = stage.getContext('2d');
 const LW = 520, LH = 480, CL = 170, CR = 320, BOT = 380, HMAX = 300, PR = 4.5, NP = 28, S0 = 120;
-const HEAT = 800;                                  // 모닥불·얼음이 1초에 주고받는 열 (J)
+const HEAT = 1200;                                  // 모닥불·얼음이 1초에 주고받는 열 (J)
 const ECOL = {Q:'#d33a2c', W:'#8a7a12', U:'#23a04a'};
 // 굵은 블록 화살표 (y0 → y1)
-function blockArrow(ctx, x, y0, y1, w, col){
-  const dir = Math.sign(y1 - y0) || -1, len = Math.abs(y1 - y0), head = Math.min(len*0.55, w*1.1), sh = w*0.32;
-  const yh = y1 - dir*head;
+// 두께는 늘 같고 길이만 에너지에 비례. 머리 모양은 고정이고, 화살표가 머리보다 짧을 때만 머리를 같은 비율로 줄인다
+const SHAFT = 9, HEAD_L = 18, HEAD_W = 24;
+function blockArrow(ctx, x, y0, y1, _w, col){
+  const dir = Math.sign(y1 - y0) || -1, len = Math.abs(y1 - y0);
+  if(len < 2) return;
+  const k = Math.min(1, len/HEAD_L), hl = HEAD_L*k, hw = HEAD_W/2*k, sh = SHAFT/2;
+  const yh = y1 - dir*hl;
   ctx.fillStyle = col; ctx.beginPath();
-  ctx.moveTo(x - sh, y0); ctx.lineTo(x - sh, yh); ctx.lineTo(x - w*0.75, yh); ctx.lineTo(x, y1);
-  ctx.lineTo(x + w*0.75, yh); ctx.lineTo(x + sh, yh); ctx.lineTo(x + sh, y0); ctx.closePath(); ctx.fill();
+  if(len > HEAD_L){ ctx.moveTo(x - sh, y0); ctx.lineTo(x - sh, yh); }
+  else ctx.moveTo(x - hw, yh);
+  ctx.lineTo(x - hw, yh); ctx.lineTo(x, y1); ctx.lineTo(x + hw, yh);
+  if(len > HEAD_L){ ctx.lineTo(x + sh, yh); ctx.lineTo(x + sh, y0); }
+  ctx.closePath(); ctx.fill();
 }
 // 지금 보여 줄 Q, W, ΔU (기본 과정은 A부터, 순환 과정은 지금 구간의 시작부터)
 function shownEnergy(c){
-  if(basicMode()) return {Q:c.Q, W:c.W, U:c.dU};
+  if(basicMode()){
+    if(S.ref === null) return {Q:c.Q, W:c.W, U:c.dU};
+    const r = energyOf(S.mode, S.ref);
+    return {Q:c.Q - r.Q, W:c.W - r.W, U:c.dU - r.dU};
+  }
   const cy = S.cycle, g = cy.segs[Math.min(cy.segs.length-1, Math.floor(S.u*cy.segs.length))], a = cy.pts[g.i0];
   return {Q:c.Q - a.Q, W:c.W - a.W, U:c.dU - a.U};
 }
@@ -316,9 +337,16 @@ function eMax(){
   if(basicMode()) return EMAX;
   return Math.max(1, ...S.cycle.segs.map(g => { const a = S.cycle.pts[g.i0], b = S.cycle.pts[g.i1]; return Math.max(Math.abs(b.Q-a.Q), Math.abs(b.W-a.W), Math.abs(b.U-a.U)); }));
 }
+// 화살표 길이는 에너지에 정비례 (부호 있는 길이: + 는 기체로 들어옴·기체가 일을 함·증가)
+const ALEN = 115, AW = 18;
+function arrowLens(e){
+  // 세 화살표에 같은 배율을 쓰고, 가장 긴 것이 ALEN을 넘으면 셋을 함께 줄인다
+  const big = Math.max(Math.abs(e.Q), Math.abs(e.W), Math.abs(e.U)), k = ALEN/Math.max(eMax(), big);
+  return {Q:e.Q*k, W:e.W*k, U:e.U*k};
+}
 function drawFlows(ctx, py, type){
-  const c = cur(), e = shownEnergy(c), M = eMax(), mid = (CL+CR)/2;
-  const size = v => ({len: 26 + 84*Math.min(1, Math.abs(v)/M), w: 16 + 10*Math.min(1, Math.abs(v)/M)});
+  const c = cur(), e = shownEnergy(c), A = arrowLens(e), mid = (CL+CR)/2;
+  const size = v => ({len: Math.abs(v), w: AW});
   const label = (txt, x, y, col, align) => {
     ctx.font = `700 17px ${FONT}`; ctx.textAlign = align || 'center'; ctx.textBaseline = 'middle';
     ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 4; ctx.strokeText(txt, x, y);
@@ -348,7 +376,7 @@ function drawFlows(ctx, py, type){
 
   // ΔU: 온도계 아래
   if(Math.abs(e.U) > 1){
-    const s = size(e.U), up = e.U > 0, x = gx, top = gy + r + 18, bot = top + s.len;
+    const s = size(A.U), up = e.U > 0, x = gx, top = gy + r + 18, bot = top + s.len;
     up ? blockArrow(ctx, x - 40, bot, top, s.w, ECOL.U) : blockArrow(ctx, x - 40, top, bot, s.w, ECOL.U);
     label('ΔU', x - 40, bot + 16, ECOL.U);
   }
@@ -357,16 +385,17 @@ function drawFlows(ctx, py, type){
   if(type === 'adiabatic'){
     if(Math.abs(e.W) > 1) label('Q = 0', CL + 34, BOT + 82, '#8a7650');
   } else if(Math.abs(e.Q) > 1){
-    const s = size(e.Q), into = e.Q > 0, x = CL + 34, inner = BOT - 18, outer = inner + s.len + 20;
+    const s = size(A.Q), into = e.Q > 0, x = CL + 34, inner = BOT - 18, outer = inner + s.len;
     into ? blockArrow(ctx, x, outer, inner, s.w, ECOL.Q) : blockArrow(ctx, x, inner, outer, s.w, ECOL.Q);
-    label('열 Q', x, outer + 16, ECOL.Q);
+    label('열 Q', x - 18, BOT + 30, ECOL.Q, 'right');
   }
 
-  // W: 피스톤 오른쪽에서 위아래로
+  // W: 피스톤 높이에 맞춰 실린더 오른쪽 바깥 (위 = 기체가 밀어냄, 아래 = 기체가 눌림)
   if(Math.abs(e.W) > 1){
-    const s = size(e.W), out = e.W > 0, x = CR - 22, base = py - 4, tip = base - s.len;
-    out ? blockArrow(ctx, x, base, tip, s.w, ECOL.W) : blockArrow(ctx, x, tip, base, s.w, ECOL.W);
-    label('일 W', x, tip - 14, ECOL.W);
+    const s = size(A.W), out = e.W > 0, x = type === 'adiabatic' ? CR + 120 : CR + 72;
+    const top = py - s.len/2, bot = py + s.len/2;
+    out ? blockArrow(ctx, x, bot, top, s.w, ECOL.W) : blockArrow(ctx, x, top, bot, s.w, ECOL.W);
+    label('일 W', x, Math.max(14, top - 14), ECOL.W);
   }
 }
 const SPOT = {x:(CL+CR)/2 + 26, fire:BOT+62, ice:BOT+56};
@@ -802,8 +831,9 @@ CHARTS.forEach(c => {
 /* ---------- 화면 정보 ---------- */
 const $ = id => document.getElementById(id);
 const fmtJ = v => { const r = Math.round(v); return (r > 0 ? '+' : r < 0 ? '−' : '') + Math.abs(r).toLocaleString('ko-KR') + ' J'; };
+let BARMAX = 1;
 function setBar(id, out, v, col){
-  const w = clamp(Math.abs(v)/EMAX*50, 0, 50), el = $(id);
+  const w = clamp(Math.abs(v)/BARMAX*50, 0, 50), el = $(id);
   el.style.width = w + '%'; el.style.left = v >= 0 ? '50%' : (50 - w) + '%';
   el.style.background = col;
   const o = $(out); o.textContent = fmtJ(v); o.style.color = Math.round(v) === 0 ? '#777' : col;
@@ -815,7 +845,10 @@ function updateUI(){
   $('rT').textContent = c.T.toFixed(0);
   $('rS').textContent = (Math.abs(c.S) < 0.005 ? 0 : c.S).toFixed(2).replace('-', '−');
   ['tP','tV','tT','tS'].forEach(id => $(id).classList.toggle('const', KEEP[c.type] === id));
-  setBar('bQ','vQ', c.Q, ECOL.Q); setBar('bU','vU', c.dU, ECOL.U); setBar('bW','vW', c.W, ECOL.W);
+  // 막대도 실린더의 화살표와 같은 양을 보여 준다
+  const e = shownEnergy(c); BARMAX = Math.max(eMax(), Math.abs(e.Q), Math.abs(e.W), Math.abs(e.U));
+  setBar('bQ','vQ', e.Q, ECOL.Q); setBar('bU','vU', e.U, ECOL.U); setBar('bW','vW', e.W, ECOL.W);
+  $('mfrom').textContent = !basicMode() ? '지금 구간에서' : S.ref === null ? 'A에서부터' : '변화 방향이 바뀐 뒤부터';
   const moving = S.time - S.heatAt < 0.35 || (S.playing && !basicMode());
   const pill = $('pill');
   if(!moving){ pill.textContent = '멈춤'; pill.className = 'pill'; }
@@ -834,11 +867,9 @@ function renderChrome(){
   if(basic){
     $('law').innerHTML = BASIC[m].law;
     $('hint').textContent = BASIC[m].hint;
-    $('mfrom').textContent = 'A에서부터';
   } else {
     $('law').innerHTML = `열효율 e = W / Q<sub>1</sub> = ${(S.cycle.e*100).toFixed(1)} %`;
     $('hint').textContent = '재생하거나 그래프의 빨간 점을 옮겨 보세요.';
-    $('mfrom').textContent = 'A에서부터 지금까지';
   }
   renderSegs();
 }
@@ -866,7 +897,7 @@ $('segs').addEventListener('click', e => {
 });
 
 function setMode(m){
-  S.mode = m; S.playing = false; S.heatAt = -9; homeAll(true);
+  S.mode = m; S.playing = false; S.heatAt = -9; homeAll(true); resetRef();
   if(m !== 'cycle') S.x[m] = BASIC[m].xA;
   if(m === 'cycle'){ S.cycle = buildCycle(CYC[S.cyc]); S.u = 0; }
   computeDomains(); renderChrome(); seedParticles();
@@ -881,7 +912,7 @@ document.querySelectorAll('[data-cyc]').forEach(b => b.addEventListener('click',
 $('playBtn').addEventListener('click', () => { S.playing = !S.playing; renderChrome(); });
 $('resetBtn').addEventListener('click', () => {
   if(basicMode()) S.x[S.mode] = BASIC[S.mode].xA; else { S.u = 0; S.playing = false; }
-  S.heatAt = -9; homeAll(true); renderChrome();
+  S.heatAt = -9; homeAll(true); resetRef(); renderChrome();
 });
 
 /* ---------- 크기와 반복 ---------- */
