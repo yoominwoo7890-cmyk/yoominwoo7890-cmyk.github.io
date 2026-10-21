@@ -43,6 +43,7 @@ h1{margin:0 0 9px;font-size:1.3rem;font-weight:700}
 .left,.right{min-width:0;display:flex;flex-direction:column;gap:8px}
 
 .cycbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.ctl{display:flex;gap:6px;justify-content:flex-end;margin-bottom:-36px;position:relative;z-index:1}
 .segs{list-style:none;margin:2px 0 0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
 .segs li{min-width:0}
 .segs button{width:100%;text-align:left;border:0;background:#e6e6e6;padding:6px 8px 7px;border-top:4px solid var(--c);display:flex;flex-direction:column;line-height:1.3;position:relative;overflow:hidden}
@@ -117,6 +118,10 @@ h1{margin:0 0 9px;font-size:1.3rem;font-weight:700}
         <button class="btn" data-cyc="diesel">디젤 기관</button>
       </div>
       <ol class="segs" id="segs" hidden></ol>
+      <div class="ctl">
+        <button class="btn" id="playBtn" hidden>재생</button>
+        <button class="btn" id="resetBtn">처음으로</button>
+      </div>
       <canvas id="stage" tabindex="0" aria-label="피스톤이 달린 실린더 속 기체. 모닥불이나 얼음을 실린더 아래로 끌어 놓거나, 단열 과정에서는 피스톤을 끌어 조작합니다."></canvas>
       <p class="hint" id="hint"></p>
       <div class="meters">
@@ -141,10 +146,6 @@ h1{margin:0 0 9px;font-size:1.3rem;font-weight:700}
         <button role="tab" data-g="st" aria-selected="false">S–T 그래프</button>
       </div>
       <canvas id="chart" aria-label="선택한 그래프"></canvas>
-      <div class="foot">
-        <button class="btn" id="playBtn" hidden>재생</button>
-        <button class="btn" id="resetBtn">처음으로</button>
-      </div>
     </section>
   </main>
 </div>
