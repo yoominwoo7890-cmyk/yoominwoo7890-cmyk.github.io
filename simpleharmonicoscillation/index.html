@@ -1,1 +1,729 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>원운동과 단진동</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: stage on the left, a short control panel on the right (stacks under the stage on phones) */
+:root {
+  --bg: #ffffff;
+  --ink: #1c2230;
+  --muted: #6b7280;
+  --line: #e5e7ec;
+  --soft: #f4f5f8;
+  --accent: #e4572e;
+  --vr: #2563c9;
+  --vv: #12915f;
+  --sans: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme: light;
+}
+html, body { background: var(--bg); color: var(--ink); }
+body {
+  font-family: var(--sans);
+  font-size: 17px;
+  padding-block: 20px 32px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 16px; }
+h1 { font-size: 28px; font-weight: 700; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+h1 span { color: var(--accent); }
 
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 20px; align-items: start; }
+.stage { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--bg); min-width: 0; }
+canvas { display: block; width: 100%; height: auto; aspect-ratio: 820 / 700; max-width: 100%; touch-action: manipulation; }
+
+.panel { display: grid; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); }
+.sec { display: grid; gap: 14px; padding: 18px 20px; border-top: 1px solid var(--line); }
+.sec:first-child { border-top: 0; }
+.sec h2 { margin: 0; font-size: 14px; font-weight: 700; color: var(--muted); letter-spacing: 0.06em; }
+
+.playrow { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.btn {
+  font: inherit; font-size: 18px; font-weight: 500;
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+  padding: 12px 16px; border-radius: 10px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+}
+.btn.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+.btn svg { width: 16px; height: 16px; fill: currentColor; }
+
+.ctl { display: grid; gap: 6px; }
+.ctl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.ctl-head label { font-weight: 500; font-size: 18px; }
+.val { font-family: var(--mono); font-size: 18px; font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; height: 30px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+
+.stats { display: grid; gap: 8px; }
+.stat { display: flex; justify-content: space-between; align-items: baseline; font-size: 18px; }
+.stat b { font-weight: 500; }
+.hint { margin: 0; font-size: 15px; color: var(--muted); }
+
+.sw {
+  font: inherit; width: 100%;
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+  border-radius: 10px; padding: 11px 12px; cursor: pointer; text-align: left;
+}
+.sw .arrow { width: 30px; height: 12px; display: block; }
+.sw .name { font-size: 18px; font-weight: 500; }
+.sw .name i { font-family: Georgia, "Times New Roman", serif; font-weight: 700; }
+.track { width: 46px; height: 28px; border-radius: 14px; background: #d4d7de; position: relative; transition: background .15s; }
+.track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .15s; }
+.sw[aria-checked="true"] .track { background: var(--ink); }
+.sw[aria-checked="true"] .track::after { transform: translateX(18px); }
+.mag { display: grid; gap: 8px; }
+.mag .stat i { font-family: Georgia, "Times New Roman", serif; font-weight: 700; font-style: italic; }
+@media (prefers-reduced-motion: reduce) { .track, .track::after { transition: none; } }
+
+button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 2px; }
+
+@media (max-width: 860px) {
+  .main { grid-template-columns: 1fr; }
+  h1 { font-size: 23px; }
+}
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <h1>원운동의 그림자는 <span>단진동</span>이다</h1>
+
+  <div class="main">
+    <div class="stage"><canvas id="cv" width="820" height="700" aria-label="원운동과 그림자, 용수철 진자 시뮬레이션. 램프의 스위치를 눌러 빛을 켭니다."></canvas></div>
+
+    <aside class="panel">
+      <div class="sec">
+        <div class="playrow">
+          <button type="button" class="btn primary" id="play"></button>
+          <button type="button" class="btn" id="reset">처음으로</button>
+        </div>
+        <p class="hint">램프의 스위치를 눌러 빛을 켜 보세요.</p>
+      </div>
+
+      <div class="sec">
+        <h2>원운동</h2>
+        <div class="ctl">
+          <div class="ctl-head"><label for="sA">반지름 A</label><span class="val" id="vA"></span></div>
+          <input type="range" id="sA" min="4" max="10" step="0.5" value="8">
+        </div>
+        <div class="ctl">
+          <div class="ctl-head"><label for="sW">각속도 ω</label><span class="val" id="vW"></span></div>
+          <input type="range" id="sW" min="0.5" max="3" step="0.1" value="1.5">
+        </div>
+      </div>
+
+      <div class="sec">
+        <h2>벡터</h2>
+        <button type="button" class="sw" role="switch" id="swR" aria-checked="false">
+          <svg class="arrow" viewBox="0 0 30 12" aria-hidden="true"><path d="M1 6h21" stroke="var(--vr)" stroke-width="3" stroke-linecap="round"/><path d="M29 6l-9-5v10z" fill="var(--vr)"/></svg>
+          <span class="name">위치 벡터 <i>r</i></span><span class="track"></span>
+        </button>
+        <button type="button" class="sw" role="switch" id="swV" aria-checked="false">
+          <svg class="arrow" viewBox="0 0 30 12" aria-hidden="true"><path d="M1 6h21" stroke="var(--vv)" stroke-width="3" stroke-linecap="round"/><path d="M29 6l-9-5v10z" fill="var(--vv)"/></svg>
+          <span class="name">속도 벡터 <i>v</i></span><span class="track"></span>
+        </button>
+        <div class="mag">
+          <div class="stat"><b>|<i>r</i>| = A</b><span class="val" id="vR"></span></div>
+          <div class="stat"><b>|<i>v</i>| = Aω</b><span class="val" id="vV"></span></div>
+        </div>
+      </div>
+
+      <div class="sec">
+        <div class="stats">
+          <div class="stat"><b>주기 T</b><span class="val" id="vT"></span></div>
+          <div class="stat"><b>용수철 상수 k</b><span class="val" id="vK"></span></div>
+        </div>
+        <p class="hint">추의 질량 m = 1 kg, k = mω²</p>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+(() => {
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const W = 820, H = 700;
+
+  const C = { ink: '#1c2230', muted: '#6b7280', line: '#d9dce3', accent: '#e4572e' };
+
+  // ---------- world (units ≈ px, y up, z toward the viewer) ----------
+  const PX = 15, BALL = 17, MASS = 1;
+  const ZB = 12;                         // plane of motion (in front of the disk face)
+  const DISK_R = 172, DISK_F = -6, DISK_B = -20;
+  const HALF = 175;                      // half-width of each light sheet
+  const BZ0 = -4, BZ1 = 36;              // light sheet depth
+  const SCR_X = 280;                     // right screen (lit face)
+  const FLR_Y = -210;                    // floor screen (lit face)
+  const VS_X = 390, VS_TOP = 242;        // hanging spring
+  const HS_Y = -285, HS_WALL = -230;     // horizontal spring
+  const SLAB_Y = HS_Y - 18;
+  const GLEN = 190, GSPD = 45;           // graph length and scroll speed (world units, units/s)              // table top under the horizontal mass
+
+  // ---------- camera: upper-left front, about 30° off the disk normal ----------
+  const AL = 22 * Math.PI / 180, BE = 21 * Math.PI / 180, DIST = 1800;
+  const CAM = [-Math.sin(AL) * Math.cos(BE) * DIST, Math.sin(BE) * DIST, Math.cos(AL) * Math.cos(BE) * DIST];
+  const norm = v => { const l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; };
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const F = norm([-CAM[0], -CAM[1], -CAM[2]]);
+  const R = norm(cross(F, [0, 1, 0]));
+  const U = cross(R, F);
+  const Z = { k: 1, ox: 0, oy: 0 };
+  function P(x, y, z) {
+    const d = [x - CAM[0], y - CAM[1], z - CAM[2]];
+    const vz = dot(d, F), s = DIST / vz * Z.k;
+    return { x: Z.ox + dot(d, R) * s, y: Z.oy - dot(d, U) * s, s, d: vz };
+  }
+  const depth = (x, y, z) => dot([x - CAM[0], y - CAM[1], z - CAM[2]], F);
+  const facing = (n, c) => dot(n, [CAM[0] - c[0], CAM[1] - c[1], CAM[2] - c[2]]) > 0;
+
+  // fit the whole set into the canvas once
+  (function autofit() {
+    const pts = [[-292, -185, -12], [-292, 185, 44], [-185, 281, -12], [185, 281, 44], [292, 190, 60], [292, -190, -40],
+      [430, 256, 54], [430, -200, 12], [-244, SLAB_Y - 10, 54], [-380, -330, -30], [190, FLR_Y - 12, 60], [190, FLR_Y, -40], [110, SLAB_Y - 10, 54],
+      [VS_X + GLEN + 50, 190, ZB], [VS_X + GLEN + 50, -190, ZB], [-150, HS_Y - 50 - GLEN, ZB], [150, HS_Y - 50 - GLEN, ZB]];
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    for (const p of pts) { const q = P(...p); x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y); }
+    const padL = 24, padR = 24, padT = 96, padB = 24;
+    const k = Math.min((W - padL - padR) / (x1 - x0), (H - padT - padB) / (y1 - y0));
+    Z.k = k;
+    Z.ox = padL - x0 * k + ((W - padL - padR) - (x1 - x0) * k) / 2;
+    Z.oy = padT - y0 * k + ((H - padT - padB) - (y1 - y0) * k) / 2;
+  })();
+
+  // ---------- state ----------
+  const st = { A: 8, w: 1.5, theta: 0, running: true, side: false, top: false, sideA: 0, topA: 0, vecR: false, vecV: false, rA: 0, vA: 0, t: 0, hist: [] };
+  const VR = '#2563c9', VV = '#12915f';
+  const VSCALE = 0.45; // velocity arrow: 1 cm/s is drawn as 0.45 s worth of travel, so length ∝ Aω
+  const SW = { side: { x: 0, y: 0 }, top: { x: 0, y: 0 } };
+  const SW_W = 50, SW_H = 28;
+  const $ = id => document.getElementById(id);
+  const sA = $('sA'), sW = $('sW');
+  const ICON_PAUSE = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="3.5" height="12" rx="1"/><rect x="9.5" y="2" width="3.5" height="12" rx="1"/></svg>';
+  const ICON_PLAY = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.2v11.6c0 .6.7 1 1.2.6l8.6-5.8a.7.7 0 0 0 0-1.2L5.2 1.6C4.7 1.3 4 1.6 4 2.2z"/></svg>';
+  const fmt = (n, d) => n.toFixed(d);
+  function updateReadout() {
+    $('vA').textContent = fmt(st.A, 1) + ' cm';
+    $('vW').textContent = fmt(st.w, 1) + ' rad/s';
+    $('vT').textContent = fmt(2 * Math.PI / st.w, 2) + ' s';
+    $('vK').textContent = fmt(MASS * st.w * st.w, 2) + ' N/m';
+    $('vR').textContent = fmt(st.A, 1) + ' cm';
+    $('vV').textContent = fmt(st.A * st.w, 1) + ' cm/s';
+  }
+  function updatePlay() { $('play').innerHTML = st.running ? ICON_PAUSE + '일시정지' : ICON_PLAY + '재생'; }
+  sA.addEventListener('input', () => { st.A = +sA.value; st.hist = []; updateReadout(); });
+  sW.addEventListener('input', () => { st.w = +sW.value; updateReadout(); });
+  $('play').addEventListener('click', () => { st.running = !st.running; updatePlay(); });
+  $('reset').addEventListener('click', () => { st.theta = 0; st.hist = []; });
+  $('swR').addEventListener('click', () => { st.vecR = !st.vecR; $('swR').setAttribute('aria-checked', st.vecR); });
+  $('swV').addEventListener('click', () => { st.vecV = !st.vecV; $('swV').setAttribute('aria-checked', st.vecV); });
+
+  function hit(e) {
+    const r = cv.getBoundingClientRect();
+    const x = (e.clientX - r.left) * W / r.width, y = (e.clientY - r.top) * H / r.height;
+    for (const k of ['side', 'top']) {
+      const s = SW[k];
+      if (Math.abs(x - s.x) <= SW_W / 2 + 10 && Math.abs(y - s.y) <= SW_H / 2 + 10) return k;
+    }
+    return null;
+  }
+  cv.addEventListener('click', e => { const h = hit(e); if (h) st[h] = !st[h]; });
+  cv.addEventListener('mousemove', e => { cv.style.cursor = hit(e) ? 'pointer' : 'default'; });
+
+  const layer = document.createElement('canvas');
+  const lctx = layer.getContext('2d');
+  function fit() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    layer.width = W * dpr; layer.height = H * dpr; lctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  // ---------- drawing helpers ----------
+  function label(text, x, y, align = 'left', color = C.muted, size = 16, weight = 500) {
+    ctx.font = `${weight} ${size}px "IBM Plex Sans KR", "Apple SD Gothic Neo", sans-serif`;
+    ctx.fillStyle = color; ctx.textAlign = align; ctx.textBaseline = 'middle';
+    ctx.fillText(text, x, y);
+  }
+  function path(c, pts, close = true) {
+    c.beginPath(); c.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) c.lineTo(pts[i].x, pts[i].y);
+    if (close) c.closePath();
+  }
+  function poly(pts, fill, c = ctx) { path(c, pts); c.fillStyle = fill; c.fill(); }
+  function line3(a, b, color, width, dash) {
+    const p = P(...a), q = P(...b);
+    ctx.save(); if (dash) ctx.setLineDash(dash);
+    ctx.strokeStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke(); ctx.restore();
+  }
+  // circle in a plane: center c, unit axes a and b
+  function ring(c, a, b, r, n = 40) {
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const t = i / n * Math.PI * 2, co = Math.cos(t) * r, si = Math.sin(t) * r;
+      out.push(P(c[0] + a[0] * co + b[0] * si, c[1] + a[1] * co + b[1] * si, c[2] + a[2] * co + b[2] * si));
+    }
+    return out;
+  }
+  function shade(rgb, f) {
+    return `rgb(${Math.min(255, rgb[0] * f) | 0}, ${Math.min(255, rgb[1] * f) | 0}, ${Math.min(255, rgb[2] * f) | 0})`;
+  }
+  const LIGHT = { '+y': 1.12, '+z': 1, '-x': 0.86, '+x': 0.74, '-y': 0.62, '-z': 0.7 };
+  // axis-aligned box; returns the projected visible faces keyed by side
+  function box(x0, x1, y0, y1, z0, z1, rgb, opts = {}) {
+    const v = (x, y, z) => P(x, y, z);
+    const faces = {
+      '-x': { n: [-1, 0, 0], p: [[x0, y0, z0], [x0, y1, z0], [x0, y1, z1], [x0, y0, z1]] },
+      '+x': { n: [1, 0, 0], p: [[x1, y0, z0], [x1, y0, z1], [x1, y1, z1], [x1, y1, z0]] },
+      '-y': { n: [0, -1, 0], p: [[x0, y0, z0], [x0, y0, z1], [x1, y0, z1], [x1, y0, z0]] },
+      '+y': { n: [0, 1, 0], p: [[x0, y1, z0], [x1, y1, z0], [x1, y1, z1], [x0, y1, z1]] },
+      '-z': { n: [0, 0, -1], p: [[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0]] },
+      '+z': { n: [0, 0, 1], p: [[x0, y0, z1], [x0, y1, z1], [x1, y1, z1], [x1, y0, z1]] }
+    };
+    const seen = {};
+    for (const k in faces) {
+      const f = faces[k];
+      const c = f.p.reduce((s, q) => [s[0] + q[0] / 4, s[1] + q[1] / 4, s[2] + q[2] / 4], [0, 0, 0]);
+      if (!facing(f.n, c)) continue;
+      const pts = f.p.map(q => v(...q));
+      poly(pts, (opts.face && opts.face[k]) || shade(rgb, LIGHT[k]));
+      if (opts.edge) { path(ctx, pts); ctx.strokeStyle = opts.edge; ctx.lineWidth = 1; ctx.stroke(); }
+      seen[k] = pts;
+    }
+    return seen;
+  }
+
+  // 3D helix spring between a and b (axis along x or y), wire thicker for larger k
+  function spring(a, b, axis, coils, amp) {
+    const lw = 1.2 + (st.w - 0.5) / 2.5 * 4.8;
+    const len = axis === 'x' ? b[0] - a[0] : b[1] - a[1];
+    const lead = Math.min(14, Math.abs(len) * 0.12) * Math.sign(len);
+    const body = len - 2 * lead, N = coils * 28;
+    const pts = [];
+    for (let i = 0; i <= N; i++) {
+      const t = i / N, ph = 2 * Math.PI * coils * t;
+      const s = lead + body * t, c = Math.cos(ph) * amp, z = a[2] + Math.sin(ph) * amp;
+      const q = axis === 'x' ? [a[0] + s, a[1] + c, z] : [a[0] + c, a[1] + s, z];
+      const ax = axis === 'x' ? [a[0] + s, a[1], a[2]] : [a[0], a[1] + s, a[2]];
+      const p = P(...q); p.front = depth(...q) < depth(...ax); pts.push(p);
+    }
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    const sc = pts[0].s;
+    function pass(front, color, width, o = 0) {
+      ctx.strokeStyle = color; ctx.lineWidth = width; ctx.beginPath();
+      let open = false;
+      for (let i = 0; i < N; i++) {
+        if (pts[i].front === front) {
+          if (!open) { ctx.moveTo(pts[i].x + o, pts[i].y + o); open = true; }
+          ctx.lineTo(pts[i + 1].x + o, pts[i + 1].y + o);
+        } else open = false;
+      }
+      ctx.stroke();
+    }
+    pass(false, '#a7adb8', lw * sc * 0.85);
+    const pa = P(...a), pb = P(...b);
+    ctx.strokeStyle = '#2a3140'; ctx.lineWidth = lw * sc; ctx.beginPath();
+    ctx.moveTo(pa.x, pa.y); ctx.lineTo(pts[0].x, pts[0].y);
+    ctx.moveTo(pts[N].x, pts[N].y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
+    pass(true, '#2a3140', lw * sc);
+    pass(true, 'rgba(255,255,255,0.45)', Math.max(0.8, lw * sc * 0.32), -lw * sc * 0.25);
+  }
+
+  // position curve: orange by default, eases to the r-vector blue when that vector is on
+  function posColor() {
+    const a = [228, 87, 46], b = [37, 99, 201], t = st.rA;
+    return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(',')})`;
+  }
+  function trace(map, color = posColor(), dash = null) {
+    const lim = GLEN / GSPD;
+    ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+    if (dash) ctx.setLineDash(dash);
+    ctx.beginPath(); let started = false;
+    for (let i = st.hist.length - 1; i >= 0; i--) {
+      const h = st.hist[i]; if (st.t - h.t > lim) break;
+      const p = P(...map(h));
+      started ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); started = true;
+    }
+    ctx.stroke(); ctx.restore();
+  }
+  function arrow3(a, b, color, width) {
+    const p = P(...a), q = P(...b);
+    const dx = q.x - p.x, dy = q.y - p.y, l = Math.hypot(dx, dy);
+    if (l < 2) return;
+    const ux = dx / l, uy = dy / l, hl = Math.min(16, l * 0.5), hw = hl * 0.55;
+    const ex = q.x - ux * hl, ey = q.y - uy * hl;
+    ctx.save(); ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = width + 4;
+    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.strokeStyle = color; ctx.lineWidth = width;
+    ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(ex + ux, ey + uy); ctx.stroke();
+    ctx.fillStyle = color; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(ex - uy * hw, ey + ux * hw); ctx.lineTo(ex + uy * hw, ey - ux * hw); ctx.closePath();
+    ctx.stroke(); ctx.fill();
+    ctx.restore();
+  }
+  function vsub(t, sub, x, y, color) {
+    ctx.font = 'italic 700 19px Georgia, "Times New Roman", serif';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillStyle = color;
+    ctx.fillText(t, x, y);
+    if (sub) { const w = ctx.measureText(t).width; ctx.font = 'italic 700 13px Georgia, serif'; ctx.fillText(sub, x + w + 1, y + 6); }
+  }
+  function vlabel(t, x, y, color) {
+    ctx.font = 'italic 700 22px Georgia, "Times New Roman", serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.strokeText(t, x, y);
+    ctx.fillStyle = color; ctx.fillText(t, x, y);
+    // arrow over the letter
+    ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.beginPath();
+    ctx.moveTo(x - 6, y - 15); ctx.lineTo(x + 6, y - 15); ctx.moveTo(x + 3, y - 18); ctx.lineTo(x + 6, y - 15); ctx.lineTo(x + 3, y - 12); ctx.stroke();
+  }
+
+  function massCube(x, y, z) {
+    const h = 18;
+    const f = box(x - h, x + h, y - h, y + h, z - h, z + h, [226, 92, 56], { edge: 'rgba(28,34,48,0.25)' });
+    if (f['+z']) {
+      const c = P(x, y, z + h);
+      label('m', c.x, c.y + 1, 'center', '#ffffff', Math.round(16 * c.s), 700);
+    }
+  }
+
+  function toggle(s, on, a, labelSide) {
+    const x = s.x - SW_W / 2, y = s.y - SW_H / 2;
+    const tg = ctx.createLinearGradient(0, y, 0, y + SW_H);
+    tg.addColorStop(0, on ? '#121722' : '#c3c7cf'); tg.addColorStop(1, on ? '#323a4a' : '#dfe2e7');
+    ctx.fillStyle = tg; ctx.beginPath(); ctx.roundRect(x, y, SW_W, SW_H, SW_H / 2); ctx.fill();
+    const kx = x + SW_H / 2 + a * (SW_W - SW_H);
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 1.5;
+    const kg = ctx.createRadialGradient(kx - 3, s.y - 4, 1, kx, s.y, SW_H / 2 - 4);
+    kg.addColorStop(0, on ? '#fff1b8' : '#ffffff'); kg.addColorStop(1, on ? '#f0a91c' : '#e3e5ea');
+    ctx.fillStyle = kg; ctx.beginPath(); ctx.arc(kx, s.y, SW_H / 2 - 4, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    const text = on ? '켜짐' : '켜기', color = on ? C.ink : C.accent;
+    if (labelSide === 'right') label(text, x + SW_W + 10, s.y, 'left', color, 16, 700);
+    else label(text, s.x, y - 14, 'center', color, 16, 700);
+  }
+
+  function lensStrip(pts, a) {
+    poly(pts, '#e4e6eb');
+    if (a > 0.01) {
+      ctx.save(); ctx.globalAlpha = a;
+      ctx.shadowColor = 'rgba(255, 186, 40, 0.95)'; ctx.shadowBlur = 18;
+      poly(pts, '#ffd765');
+      ctx.restore();
+    }
+  }
+  function lampSide() {
+    const top = P(-279, 185, 16);
+    SW.side = { x: top.x, y: top.y - 56 };
+    ctx.strokeStyle = '#8a909c'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(top.x, top.y); ctx.lineTo(SW.side.x, SW.side.y + SW_H / 2); ctx.stroke();
+    box(-292, -266, -185, 185, -12, 44, [38, 45, 58]);
+    lensStrip([P(-271, -178, 44), P(-271, 178, 44), P(-266, 178, 44), P(-266, -178, 44)], st.sideA);
+    toggle(SW.side, st.side, st.sideA, 'top');
+  }
+  function lampTop() {
+    const end = P(185, 268, 16);
+    SW.top = { x: end.x + 10, y: end.y - 52 };
+    ctx.strokeStyle = '#8a909c'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(end.x, end.y); ctx.lineTo(end.x, SW.top.y); ctx.lineTo(SW.top.x - SW_W / 2, SW.top.y); ctx.stroke();
+    box(-185, 185, 255, 281, -12, 44, [38, 45, 58]);
+    lensStrip([P(-178, 255, 44), P(178, 255, 44), P(178, 260, 44), P(-178, 260, 44)], st.topA);
+    toggle(SW.top, st.top, st.topA, 'right');
+  }
+
+  function hull(pts) {
+    const p = pts.slice().sort((a, b) => a.x - b.x || a.y - b.y);
+    const cr = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    const lo = [], up = [];
+    for (const q of p) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+    for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+    return lo.slice(0, -1).concat(up.slice(0, -1));
+  }
+  // light sheet as a glowing volume, with the ball's shadow tube cut out
+  function beam(vertical, a, b) {
+    const c = lctx;
+    c.save(); c.globalAlpha = a;
+    let corners, from, to, end;
+    if (!vertical) {
+      corners = []; for (const x of [-266, SCR_X]) for (const y of [-HALF, HALF]) for (const z of [BZ0, BZ1]) corners.push(P(x, y, z));
+      from = P(-266, 0, 16); to = P(SCR_X, 0, 16); end = [SCR_X, b[1], ZB];
+    } else {
+      corners = []; for (const x of [-HALF, HALF]) for (const y of [255, FLR_Y]) for (const z of [BZ0, BZ1]) corners.push(P(x, y, z));
+      from = P(0, 255, 16); to = P(0, FLR_Y, 16); end = [b[0], FLR_Y, ZB];
+    }
+    const g = c.createLinearGradient(from.x, from.y, to.x, to.y);
+    g.addColorStop(0, 'rgba(255, 196, 64, 0.30)');
+    g.addColorStop(0.35, 'rgba(255, 204, 84, 0.15)');
+    g.addColorStop(1, 'rgba(255, 210, 100, 0.10)');
+    c.shadowColor = 'rgba(255, 196, 64, 0.25)'; c.shadowBlur = 26;
+    poly(hull(corners), g, c);
+    c.shadowBlur = 0;
+    // shadow tube from the ball to the screen
+    const p0 = P(...b), p1 = P(...end);
+    const dx = p1.x - p0.x, dy = p1.y - p0.y, l = Math.hypot(dx, dy) || 1, nx = -dy / l, ny = dx / l;
+    const r0 = BALL * p0.s, r1 = BALL * p1.s;
+    c.globalAlpha = 1; c.globalCompositeOperation = 'destination-out';
+    c.fillStyle = 'rgba(0,0,0,0.85)';
+    c.beginPath();
+    c.moveTo(p0.x + nx * r0, p0.y + ny * r0); c.lineTo(p1.x + nx * r1, p1.y + ny * r1);
+    c.lineTo(p1.x - nx * r1, p1.y - ny * r1); c.lineTo(p0.x - nx * r0, p0.y - ny * r0); c.closePath(); c.fill();
+    c.restore();
+  }
+
+  function softShadow(pts) {
+    ctx.save();
+    ctx.shadowColor = 'rgba(40,45,56,0.9)'; ctx.shadowBlur = 6;
+    poly(pts, 'rgba(40,45,56,0.85)');
+    ctx.restore();
+  }
+
+  // ---------- frame ----------
+  function draw() {
+    const Rr = st.A * PX;
+    const bx = Rr * Math.cos(st.theta), by = Rr * Math.sin(st.theta);
+    const sa = st.sideA, ta = st.topA;
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+
+    const late = [];
+    // --- horizontal spring set (lowest)
+    if (ta > 0.01) {
+      ctx.globalAlpha = ta;
+      box(-244, 110, SLAB_Y - 10, SLAB_Y, -30, 54, [226, 229, 235]);
+      line3([0, SLAB_Y, -30], [0, SLAB_Y, 54], '#c2c7d0', 1.2);
+      box(-244, HS_WALL, SLAB_Y, HS_Y + 45, -30, 54, [214, 218, 226]);
+      ctx.save(); ctx.shadowColor = 'rgba(28,34,48,0.35)'; ctx.shadowBlur = 8;
+      poly(ring([bx + 4, SLAB_Y, ZB + 4], [1, 0, 0], [0, 0, 1], 22, 24), 'rgba(28,34,48,0.18)');
+      ctx.restore();
+      spring([HS_WALL, HS_Y, ZB], [bx - 18, HS_Y, ZB], 'x', 11, 10);
+      massCube(bx, HS_Y, ZB);
+      const lp = P(-244, HS_Y + 10, 54);
+      label('용수철 진자', lp.x - 12, lp.y - 11, 'right');
+      label('k = ' + fmt(MASS * st.w * st.w, 2) + ' N/m', lp.x - 12, lp.y + 13, 'right', C.ink, 15, 500);
+      // x–t graph scrolling downward under the table
+      const g0 = HS_Y - 50, Rr = st.A * PX;
+      line3([-Rr, g0, ZB], [Rr, g0, ZB], '#c2c7d0', 1.2);
+      line3([0, g0, ZB], [0, g0 - GLEN, ZB], '#c2c7d0', 1.2);
+      line3([bx, HS_Y - 18, ZB], [bx, g0, ZB], C.line, 1.2, [3, 4]);
+      trace(h => [h.x, g0 - (st.t - h.t) * GSPD, ZB]);
+      if (st.rA > 0.01) late.push(() => {
+        ctx.globalAlpha = ta * st.rA;
+        line3([0, HS_Y + 26, ZB + 18], [0, HS_Y + 42, ZB + 18], VR, 2);
+        arrow3([0, HS_Y + 34, ZB + 18], [bx, HS_Y + 34, ZB + 18], VR, 3.5);
+      });
+      if (st.vA > 0.01) {
+        ctx.globalAlpha = ta * st.vA;
+        trace(h => [h.vx, g0 - (st.t - h.t) * GSPD, ZB], VV, [7, 5]);
+        const V = Rr * st.w * VSCALE, vx = -V * Math.sin(st.theta);
+        late.push(() => { ctx.globalAlpha = ta * st.vA; arrow3([bx, HS_Y + 56, ZB + 18], [bx + vx, HS_Y + 56, ZB + 18], VV, 3.5); });
+        const vl = P(-Math.max(Rr, V) - 10, g0 - 30, ZB); vsub('v', 'x', vl.x, vl.y, VV);
+        const pl = P(-Math.max(Rr, V) - 10, g0 - 4, ZB); vsub('x', '', pl.x, pl.y, posColor());
+        ctx.globalAlpha = ta;
+      }
+      const tl = P(0, g0 - GLEN, ZB); label('t', tl.x, tl.y + 14, 'center');
+      const xl = P(Rr, g0, ZB); label('x', xl.x + 12, xl.y, 'left');
+      ctx.globalAlpha = 1;
+    }
+
+    // --- floor screen
+    box(-190, 190, FLR_Y - 12, FLR_Y, -40, 60, [240, 242, 245], { face: { '+y': '#f4f5f8' }, edge: '#dcdfe5' });
+    const fl = P(-190, FLR_Y - 6, 60); label('스크린', fl.x - 10, fl.y, 'right');
+    if (ta > 0.01) {
+      ctx.globalAlpha = ta;
+      poly([P(-HALF, FLR_Y, BZ0), P(HALF, FLR_Y, BZ0), P(HALF, FLR_Y, BZ1), P(-HALF, FLR_Y, BZ1)], 'rgba(255, 208, 96, 0.6)');
+      softShadow(ring([bx, FLR_Y + 0.5, ZB], [1, 0, 0], [0, 0, 1], BALL, 28));
+      ctx.globalAlpha = 1;
+    }
+
+    // --- hanging spring set
+    if (sa > 0.01) {
+      ctx.globalAlpha = sa;
+      box(VS_X - 40, VS_X + 40, VS_TOP, VS_TOP + 14, -30, 54, [214, 218, 226]);
+      spring([VS_X, VS_TOP, ZB], [VS_X, by + 18, ZB], 'y', 11, 11);
+      massCube(VS_X, by, ZB);
+      const lp = P(VS_X + 48, VS_TOP - 30, ZB);
+      label('용수철 진자', lp.x, lp.y, 'left');
+      label('k = ' + fmt(MASS * st.w * st.w, 2) + ' N/m', lp.x, lp.y + 24, 'left', C.ink, 15, 500);
+      // y–t graph scrolling to the right
+      const g0 = VS_X + 50, Rr = st.A * PX;
+      line3([g0, -Rr, ZB], [g0, Rr, ZB], '#c2c7d0', 1.2);
+      line3([g0, 0, ZB], [g0 + GLEN, 0, ZB], '#c2c7d0', 1.2);
+      line3([VS_X + 18, by, ZB], [g0, by, ZB], C.line, 1.2, [3, 4]);
+      trace(h => [g0 + (st.t - h.t) * GSPD, h.y, ZB]);
+      if (st.rA > 0.01) {
+        ctx.globalAlpha = sa * st.rA;
+        line3([VS_X - 44, 0, ZB + 18], [VS_X - 28, 0, ZB + 18], VR, 2);
+        arrow3([VS_X - 36, 0, ZB + 18], [VS_X - 36, by, ZB + 18], VR, 3.5);
+        ctx.globalAlpha = sa;
+      }
+      if (st.vA > 0.01) {
+        ctx.globalAlpha = sa * st.vA;
+        trace(h => [g0 + (st.t - h.t) * GSPD, h.vy, ZB], VV, [7, 5]);
+        const V = Rr * st.w * VSCALE, vy = V * Math.cos(st.theta);
+        arrow3([VS_X - 58, by, ZB + 18], [VS_X - 58, by + vy, ZB + 18], VV, 3.5);
+        const vl = P(g0 + GLEN + 8, -Math.max(Rr, V) + 6, ZB); vsub('v', 'y', vl.x + 14, vl.y, VV);
+        const pl = P(g0 + GLEN + 8, Math.max(Rr, V) - 6, ZB); vsub('y', '', pl.x + 14, pl.y, posColor());
+        ctx.globalAlpha = sa;
+      }
+      const tl = P(g0 + GLEN, 0, ZB); label('t', tl.x + 10, tl.y, 'left');
+      const yl = P(g0, Rr, ZB); label('y', yl.x, yl.y - 12, 'center');
+      ctx.globalAlpha = 1;
+    }
+
+    // --- right screen
+    box(SCR_X, SCR_X + 12, -190, 190, -40, 60, [240, 242, 245], { face: { '-x': '#f4f5f8' }, edge: '#dcdfe5' });
+    const sl = P(SCR_X + 6, -190, 60); label('스크린', sl.x, sl.y + 18, 'center');
+    if (sa > 0.01) {
+      ctx.globalAlpha = sa;
+      poly([P(SCR_X - 0.5, -HALF, BZ0), P(SCR_X - 0.5, HALF, BZ0), P(SCR_X - 0.5, HALF, BZ1), P(SCR_X - 0.5, -HALF, BZ1)], 'rgba(255, 208, 96, 0.6)');
+      softShadow(ring([SCR_X - 0.5, by, ZB], [0, 1, 0], [0, 0, 1], BALL, 28));
+      ctx.globalAlpha = 1;
+    }
+
+    // --- disk (cylinder)
+    const n = 72, front = [], back = [];
+    for (let i = 0; i < n; i++) {
+      const t = i / n * Math.PI * 2, x = Math.cos(t) * DISK_R, y = Math.sin(t) * DISK_R;
+      front.push(P(x, y, DISK_F)); back.push(P(x, y, DISK_B));
+    }
+    ctx.save();
+    ctx.shadowColor = 'rgba(28,34,48,0.16)'; ctx.shadowBlur = 24; ctx.shadowOffsetY = 10;
+    poly(back, '#c9ced6');
+    ctx.restore();
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n, t = (i + 0.5) / n * Math.PI * 2;
+      const nn = [Math.cos(t), Math.sin(t), 0];
+      if (!facing(nn, [nn[0] * DISK_R, nn[1] * DISK_R, (DISK_F + DISK_B) / 2])) continue;
+      const lit = 0.78 + 0.22 * (-nn[0] * 0.5 + nn[1] * 0.85);
+      poly([front[i], front[j], back[j], back[i]], shade([214, 218, 225], lit));
+    }
+    const pc = P(0, 0, DISK_F);
+    const dg = ctx.createRadialGradient(pc.x - 60 * pc.s, pc.y - 70 * pc.s, 20 * pc.s, pc.x, pc.y, DISK_R * pc.s * 1.05);
+    dg.addColorStop(0, '#ffffff'); dg.addColorStop(0.7, '#f3f4f7'); dg.addColorStop(1, '#e6e9ee');
+    poly(front, dg);
+    path(ctx, front); ctx.strokeStyle = '#d3d7de'; ctx.lineWidth = 1; ctx.stroke();
+
+    // markings on the disk face
+    line3([-DISK_R + 8, 0, DISK_F], [DISK_R - 8, 0, DISK_F], C.line, 1);
+    line3([0, -DISK_R + 8, DISK_F], [0, DISK_R - 8, DISK_F], C.line, 1);
+    ctx.save(); ctx.setLineDash([3, 5]);
+    path(ctx, ring([0, 0, DISK_F], [1, 0, 0], [0, 1, 0], Rr, 72));
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore();
+    const th = ((st.theta % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    const arc = []; for (let i = 0; i <= 40; i++) { const t = th * i / 40; arc.push(P(30 * Math.cos(t), 30 * Math.sin(t), DISK_F)); }
+    path(ctx, arc, false); ctx.strokeStyle = C.accent; ctx.lineWidth = 2; ctx.stroke();
+    const wl = P(44 * Math.cos(th / 2), 44 * Math.sin(th / 2), DISK_F);
+    label('ωt', wl.x, wl.y, 'center', C.accent, 16, 700);
+    const xl = P(DISK_R - 2, 12, DISK_F), yl = P(12, DISK_R - 2, DISK_F);
+    label('x', xl.x, xl.y, 'center'); label('y', yl.x, yl.y, 'center');
+
+    // --- light sheets
+    lctx.clearRect(0, 0, W, H);
+    if (sa > 0.01) beam(false, sa, [bx, by, ZB]);
+    if (ta > 0.01) beam(true, ta, [bx, by, ZB]);
+    ctx.drawImage(layer, 0, 0, W, H);
+
+    // arm, pin, ball
+    line3([0, 0, DISK_F], [bx, by, ZB], '#8a909c', 3);
+    const pin = P(0, 0, DISK_F);
+    ctx.fillStyle = C.ink; ctx.beginPath(); ctx.arc(pin.x, pin.y, 5 * pin.s, 0, Math.PI * 2); ctx.fill();
+    const al = P(bx / 2 - 14 * Math.sin(st.theta), by / 2 + 14 * Math.cos(st.theta), DISK_F);
+    if (st.rA < 0.5) label('A', al.x, al.y, 'center', C.ink, 17, 700);
+    ctx.save(); ctx.shadowColor = 'rgba(28,34,48,0.3)'; ctx.shadowBlur = 8;
+    poly(ring([bx + 5, by - 7, DISK_F], [1, 0, 0], [0, 1, 0], 14, 24), 'rgba(28,34,48,0.16)');
+    ctx.restore();
+    const pb = P(bx, by, ZB), br = BALL * pb.s;
+    const bg = ctx.createRadialGradient(pb.x - br * 0.35, pb.y - br * 0.4, 1, pb.x, pb.y, br);
+    bg.addColorStop(0, '#ffc2a8'); bg.addColorStop(0.35, '#f26a43'); bg.addColorStop(1, '#a3321a');
+    ctx.fillStyle = bg; ctx.beginPath(); ctx.arc(pb.x, pb.y, br, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.beginPath(); ctx.ellipse(pb.x - br * 0.35, pb.y - br * 0.45, br * 0.26, br * 0.17, -0.6, 0, Math.PI * 2); ctx.fill();
+
+    // --- vectors: r from the center to the ball, v tangent with |v| = Aω
+    const co = Math.cos(st.theta), si = Math.sin(st.theta);
+    if (st.rA > 0.01 && st.vA > 0.01) {
+      // right-angle mark between r and v
+      ctx.globalAlpha = Math.min(st.rA, st.vA);
+      const q = 26, o = [bx - co * q, by - si * q, ZB], m = [bx - co * q - si * q, by - si * q + co * q, ZB], t = [bx - si * q, by + co * q, ZB];
+      path(ctx, [P(...o), P(...m), P(...t)], false);
+      ctx.strokeStyle = C.ink; ctx.lineWidth = 1.6; ctx.stroke();
+      const dl = P(bx - (co + si) * 44, by + (co - si) * 44, ZB);
+      label('90°', dl.x, dl.y, 'center', C.ink, 16, 700);
+      ctx.globalAlpha = 1;
+    }
+    if (st.rA > 0.01) {
+      ctx.globalAlpha = st.rA;
+      arrow3([0, 0, DISK_F], [bx, by, ZB], VR, 4);
+      const rl = P(bx * 0.62 + si * 18, by * 0.62 - co * 18, ZB);
+      vlabel('r', rl.x, rl.y, VR);
+      ctx.globalAlpha = 1;
+    }
+    if (st.vA > 0.01) {
+      ctx.globalAlpha = st.vA;
+      const L = st.A * st.w * PX * VSCALE;
+      const tip = [bx - si * L, by + co * L, ZB];
+      arrow3([bx, by, ZB], tip, VV, 4);
+      const vl = P(tip[0] - si * 16 + co * 14, tip[1] + co * 16 + si * 14, ZB);
+      vlabel('v', vl.x, vl.y, VV);
+      ctx.globalAlpha = 1;
+    }
+
+    // links between shadows and springs
+    if (sa > 0.01) {
+      ctx.globalAlpha = sa;
+      line3([SCR_X + 12, by, ZB], [VS_X - 18, by, ZB], C.accent, 1.5, [5, 6]);
+      ctx.globalAlpha = 1;
+    }
+    if (ta > 0.01) {
+      ctx.globalAlpha = ta;
+      line3([bx, FLR_Y - 12, ZB], [bx, HS_Y + 18, ZB], C.accent, 1.5, [5, 6]);
+      ctx.globalAlpha = 1;
+    }
+
+    for (const f of late) f();
+    ctx.globalAlpha = 1;
+    lampSide();
+    lampTop();
+  }
+
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let last = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (st.running) {
+      st.theta += st.w * dt; st.t += dt;
+      const Rr = st.A * PX;
+      const V = Rr * st.w * VSCALE; // velocity drawn at the same scale as the v arrow
+      st.hist.push({ t: st.t, x: Rr * Math.cos(st.theta), y: Rr * Math.sin(st.theta), vx: -V * Math.sin(st.theta), vy: V * Math.cos(st.theta) });
+      while (st.hist.length && st.t - st.hist[0].t > GLEN / GSPD + 0.2) st.hist.shift();
+    }
+    const k = reduce ? 1 : Math.min(1, dt * 6);
+    st.sideA += ((st.side ? 1 : 0) - st.sideA) * k;
+    st.topA += ((st.top ? 1 : 0) - st.topA) * k;
+    st.rA += ((st.vecR ? 1 : 0) - st.rA) * k;
+    st.vA += ((st.vecV ? 1 : 0) - st.vA) * k;
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  if (reduce) st.running = false;
+  sA.value = st.A; sW.value = st.w;
+  updateReadout(); updatePlay();
+  window.addEventListener('resize', fit);
+  fit();
+  requestAnimationFrame(loop);
+})();
+</script>
+
+</body>
+</html>
