@@ -169,16 +169,9 @@ import { getAuth, signInAnonymously, onAuthStateChanged }
 import { getFirestore, doc, collection, setDoc, onSnapshot, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js";
 
-/* ▼▼▼ 여기에 Firebase 콘솔에서 복사한 값을 붙여넣으세요 (index.html 과 같은 값) ▼▼▼ */
-const firebaseConfig = {
-  apiKey: "여기에_붙여넣기",
-  authDomain: "여기에_붙여넣기",
-  projectId: "여기에_붙여넣기",
-  storageBucket: "여기에_붙여넣기",
-  messagingSenderId: "여기에_붙여넣기",
-  appId: "여기에_붙여넣기"
-};
-/* ▲▲▲ 여기까지 ▲▲▲ */
+/* 설정값은 firebase-config.js 에 따로 있습니다.
+ * 이 파일을 새 버전으로 바꿔도 설정은 그대로 유지됩니다. */
+import { firebaseConfig } from "./firebase-config.js";
 
 const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
