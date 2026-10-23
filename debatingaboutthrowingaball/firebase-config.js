@@ -14,10 +14,10 @@
  * ═══════════════════════════════════════════════════════════ */
 
 export const firebaseConfig = {
-  apiKey: "여기에_붙여넣기",
-  authDomain: "여기에_붙여넣기",
-  projectId: "여기에_붙여넣기",
-  storageBucket: "여기에_붙여넣기",
-  messagingSenderId: "여기에_붙여넣기",
-  appId: "여기에_붙여넣기"
+  apiKey: "AIzaSyCJwS8qyO9Ew9MgXo9zLWqxI1jPmLqWxzg",
+  authDomain: "debating-about-throwing-a-ball.firebaseapp.com",
+  projectId: "debating-about-throwing-a-ball",
+  storageBucket: "debating-about-throwing-a-ball.firebasestorage.app",
+  messagingSenderId: "318859589063",
+  appId: "1:318859589063:web:2d4a83fe63384aaa92d5e2"
 };
