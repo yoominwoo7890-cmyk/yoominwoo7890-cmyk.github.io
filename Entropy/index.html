@@ -27,9 +27,7 @@
     <label for="inName">별명</label>
     <input id="inName" type="text" maxlength="10" autocomplete="off">
     <div id="teamBox" hidden>
-      <label>팀 색깔 고르기</label>
-      <div id="teamPick" class="teampick"></div>
-      <p class="hint">같은 색을 고른 친구들이 한 팀이 돼요. 누가 같은 팀인지는 선생님이 색깔을 공개할 때 알 수 있어요.</p>
+      <p class="hint">입장하면 빨강·파랑·초록·노랑 중 한 팀에 자동으로 배정돼요. 팀마다 인원이 고르게 나뉘고, 누가 같은 팀인지는 선생님이 색깔을 공개할 때 알 수 있어요.</p>
     </div>
     <div id="predictBox">
       <p id="sQuestion" class="question"></p>
@@ -84,7 +82,7 @@ const board = $("board");
 let db, uid, code, roomRef, choiceRef;
 let meta = null, results = {}, playerCount = 0, playerIds = [], prevChoices = null, my = null, pub = {};
 let myChoice = null, pending = null, allChoices = null, curKey = null, rolling = false, sendErr = "";
-let joinMeta = null, hasPriv = false, pickedTeam = "";
+let joinMeta = null, hasPriv = false;
 let cells = buildBoard(board, onCell);
 
 if (configReady()) {
@@ -100,12 +98,12 @@ $("btnFind").addEventListener("click", findRoom);
 $("btnJoin").addEventListener("click", join);
 $("btnLeave").addEventListener("click", () => { localStorage.removeItem("entropy_student"); location.reload(); });
 $("btnAct").addEventListener("click", onAct);
-TEAMS.forEach((t) => {
-  const b = document.createElement("button");
-  b.type = "button"; b.innerHTML = teamTag(t);
-  b.addEventListener("click", () => { pickedTeam = t; [...$("teamPick").children].forEach((x) => x.classList.toggle("on", x === b)); });
-  $("teamPick").appendChild(b);
-});
+// 팀 자동 배정: 입장 순번을 하나씩 올려(동시에 들어와도 겹치지 않게 트랜잭션 사용) 빨강→파랑→초록→노랑 순서로 돌아가며 배정한다
+async function assignTeam() {
+  const r = await roomRef.child("teamSeq").transaction((v) => (v || 0) + 1);
+  if (!r.committed) throw new Error("팀을 배정하지 못했어요");
+  return TEAMS[(r.snapshot.val() - 1) % TEAMS.length];
+}
 
 // 1단계: 방을 찾는다. 이미 입장했던 방이면 바로 들어간다.
 async function findRoom() {
@@ -144,19 +142,18 @@ function showSetup() {
     "0점부터 " + maxPredict() + "점 사이로 적으세요. 마지막에 예상과 실제의 차이가 가장 작은 사람이 1등이에요. 한 번 정하면 바꿀 수 없어요.";
 }
 
-// 2단계: 별명, 팀, 예상 점수를 저장하고 입장한다.
+// 2단계: 별명과 예상 점수를 저장하고(모둠 대항전이면 팀을 자동 배정) 입장한다.
 async function join() {
   const name = $("inName").value.trim(), teams = !!joinMeta.teams, raw = $("inPredict").value.trim(), predict = usePredict() ? Number(raw) : -1;
   const err = (m) => ($("setupErr").textContent = m);
   if (!name) return err("별명을 입력하세요.");
   if (!hasPriv) {
-    if (teams && !pickedTeam) return err("팀 색깔을 고르세요.");
     if (usePredict() && (raw === "" || !Number.isInteger(predict) || predict < 0 || predict > maxPredict())) return err("예상 점수를 0부터 " + maxPredict() + " 사이의 정수로 적으세요.");
   }
   $("btnJoin").disabled = true;
   try {
     await roomRef.child("players/" + uid).set({ name });
-    if (!hasPriv) await roomRef.child("private/" + uid).set(teams ? { team: pickedTeam, predict } : { predict });
+    if (!hasPriv) await roomRef.child("private/" + uid).set(teams ? { team: await assignTeam(), predict } : { predict });
     enter();
   } catch (e) {
     $("btnJoin").disabled = false;
