@@ -17,14 +17,20 @@ const topicOf = (meta) => (meta && meta.topic === "heat" ? "heat" : "gas");
 // 모둠 대항전
 const TEAMS = ["red", "blue", "green", "yellow"];
 const TEAM_NAME = { red: "빨강", blue: "파랑", green: "초록", yellow: "노랑" };
-const JACKPOT_MIN = 4, JACKPOT_BONUS = 100;   // 팀 분자가 4개 이상이고 모두 한쪽에 모이면 +100점
+const JACKPOT_MIN = 4, JACKPOT_BONUS = 50;   // 균형 보너스: 팀 분자가 4개 이상이고 양쪽에 가장 고르게 나뉘면 +50점
 
 function lnC(n, k) { let s = 0; for (let i = 1; i <= k; i++) s += Math.log(n - k + i) - Math.log(i); return s; }
-// 고르게 퍼지면 0점, 한쪽에 모두 몰리면 100점
+// 고르게 퍼질수록 높은 점수: 가장 고르게 나뉘면 100점, 한쪽에 모두 몰리면 0점
+// 점수 = 100 × ln W / ln W_max (W = 그 분포가 되는 경우의 수)
 function calcScore(n, nL) {
   const max = lnC(n, Math.floor(n / 2));
-  if (max === 0) return 100;
-  return Math.round(100 * (1 - lnC(n, nL) / max));
+  if (max === 0) return 0;   // 분자가 1개뿐이면 나눌 수 없으므로 0점
+  return Math.round(100 * lnC(n, nL) / max);
+}
+// 무작위로 고를 때 가장 고른 분포(반반, 홀수면 한 개 차이)가 나올 확률(%)
+function balancedProb(n) {
+  const k = Math.floor(n / 2), ways = Math.exp(lnC(n, k)) * (n % 2 ? 2 : 1);
+  return Math.round(ways / Math.pow(2, n) * 100);
 }
 function fmtWays(n, k) {
   const w = Math.exp(lnC(n, k));
@@ -161,7 +167,7 @@ function teamResults(choices, teamOf) {
     if (!n) return;
     const nL = cs.filter((x) => x <= HALF).length;
     const base = n < 2 ? 0 : calcScore(n, nL);   // 분자가 1개뿐인 팀은 0점
-    const jackpot = n >= JACKPOT_MIN && (nL === 0 || nL === n);
+    const jackpot = n >= JACKPOT_MIN && Math.abs(2 * nL - n) <= 1;   // 가장 고르게 나뉨
     out[t] = { n, nL, base, jackpot, score: base + (jackpot ? JACKPOT_BONUS : 0) };
   });
   return out;
@@ -190,8 +196,8 @@ function resultHTML(meta, r, results, myTeam) {
   if (mine) h += bigHTML("우리 팀(" + TEAM_NAME[myTeam] + ") 이번 점수", mine.score, "우리 팀 누적", tot[myTeam] || 0);
   else if (myTeam) h += '<p class="sub">이번 라운드에는 우리 팀이 제출한 ' + U + "가 없어요.</p>";
   TEAMS.forEach((t) => {
-    if (ts[t] && ts[t].jackpot) h += '<p class="jackpot">잭팟! ' + TEAM_NAME[t] + " 팀의 " + U + " " + ts[t].n + "개가 모두 한쪽에 모였어요. 무작위로는 " +
-      Math.pow(2, ts[t].n - 1) + "번에 한 번 나오는 일이에요. 보너스 +" + JACKPOT_BONUS + "점</p>";
+    if (ts[t] && ts[t].jackpot) h += '<p class="jackpot">균형 보너스! ' + TEAM_NAME[t] + " 팀의 " + U + " " + ts[t].n + "개가 양쪽에 가장 고르게 나뉘었어요. 무작위로 고르면 약 " +
+      balancedProb(ts[t].n) + "%의 확률로 나오는, 가장 흔한 분포예요. +" + JACKPOT_BONUS + "점</p>";
   });
   h += "<table><thead><tr><th>팀</th><th>왼쪽 : 오른쪽</th><th>이번 점수</th><th>누적</th></tr></thead><tbody>";
   TEAMS.forEach((t) => {
@@ -219,7 +225,7 @@ function historyHTML(meta, results, emptyText) {
     list.map((r) => "<tr><td>" + r.round + "</td><td>" + MODE_NAME[r.mode] + "</td>" +
       TEAMS.map((t) => "<td>" + (r.teams && r.teams[t] ? r.teams[t].score + (r.teams[t].jackpot ? " ★" : "") : "–") + "</td>").join("") + "</tr>").join("") +
     '<tr class="sum"><td colspan="2">누적</td>' + TEAMS.map((t) => "<td><b>" + (tot[t] === undefined ? "–" : tot[t]) + "</b></td>").join("") + "</tr></tbody></table>" +
-    '<p class="sub small">★은 잭팟(+' + JACKPOT_BONUS + "점)이에요.</p>";
+    '<p class="sub small">★은 균형 보너스(+' + JACKPOT_BONUS + "점)예요.</p>";
 }
 // 최종 순위: 예상 점수와 실제 점수의 차이가 작은 순서
 function buildFinal(meta, players, priv, results) {
