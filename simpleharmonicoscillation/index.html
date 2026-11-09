@@ -19,6 +19,7 @@
   --accent: #e4572e;
   --vr: #2563c9;
   --vv: #12915f;
+  --va: #8a3bd0;
   --sans: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
   color-scheme: light;
@@ -37,7 +38,23 @@ h1 span { color: var(--accent); }
 
 .main { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 20px; align-items: start; }
 .stage { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--bg); min-width: 0; }
-canvas { display: block; width: 100%; height: auto; aspect-ratio: 820 / 700; max-width: 100%; touch-action: manipulation; }
+canvas { display: block; width: 100%; height: auto; max-width: 100%; touch-action: manipulation; }
+#cv { aspect-ratio: 820 / 700; }
+#pcv { aspect-ratio: 1 / 1; }
+
+.tabs { display: inline-grid; grid-auto-flow: column; gap: 4px; padding: 4px; background: var(--soft); border: 1px solid var(--line); border-radius: 12px; justify-self: start; }
+.tabs button { font: inherit; font-size: 17px; font-weight: 500; border: 0; background: transparent; color: var(--muted); padding: 9px 18px; border-radius: 9px; cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--bg); color: var(--ink); box-shadow: 0 1px 3px rgba(28,34,48,.14); }
+[hidden] { display: none !important; }
+.view { display: grid; gap: 16px; }
+.vhead { display: grid; gap: 6px; }
+.lead { margin: 0; font-size: 16px; color: var(--muted); max-width: 62ch; }
+.pmain { grid-template-columns: minmax(0, 720px) 290px; justify-content: start; }
+.time { display: flex; justify-content: space-between; align-items: baseline; font-size: 18px; font-weight: 500; }
+.time .val { font-size: 34px; font-weight: 500; }
+.btngrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.btngrid .btn { font-size: 17px; padding: 11px 10px; }
+.btn:disabled { opacity: .4; cursor: default; }
 
 .panel { display: grid; border: 1px solid var(--line); border-radius: 14px; background: var(--bg); }
 .sec { display: grid; gap: 14px; padding: 18px 20px; border-top: 1px solid var(--line); }
@@ -45,6 +62,11 @@ canvas { display: block; width: 100%; height: auto; aspect-ratio: 820 / 700; max
 .sec h2 { margin: 0; font-size: 14px; font-weight: 700; color: var(--muted); letter-spacing: 0.06em; }
 
 .playrow { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.speed { display: grid; gap: 8px; }
+.speed-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 18px; font-weight: 500; }
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); border-radius: 10px; padding: 4px; background: var(--soft); gap: 4px; }
+.seg button { font: inherit; font-family: var(--mono); font-size: 16px; border: 0; background: transparent; color: var(--muted); padding: 8px 0; border-radius: 7px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--bg); color: var(--ink); box-shadow: 0 1px 3px rgba(28,34,48,.14); }
 .btn {
   font: inherit; font-size: 18px; font-weight: 500;
   border: 1px solid var(--line); background: var(--bg); color: var(--ink);
@@ -73,6 +95,7 @@ input[type=range] { width: 100%; height: 30px; margin: 0; accent-color: var(--ac
 }
 .sw .arrow { width: 30px; height: 12px; display: block; }
 .sw .name { font-size: 18px; font-weight: 500; }
+.sw .name small { font-family: Georgia, "Times New Roman", serif; font-style: italic; font-weight: 700; font-size: 17px; color: var(--muted); margin-left: 2px; }
 .sw .name i { font-family: Georgia, "Times New Roman", serif; font-weight: 700; }
 .track { width: 46px; height: 28px; border-radius: 14px; background: #d4d7de; position: relative; transition: background .15s; }
 .track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.2); transition: transform .15s; }
@@ -94,6 +117,12 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
 
 
 <div class="wrap">
+  <nav class="tabs" role="tablist" aria-label="페이지">
+    <button type="button" role="tab" data-view="sim" aria-selected="true">시뮬레이션</button>
+    <button type="button" role="tab" data-view="practice" aria-selected="false">좌표 읽기 연습</button>
+  </nav>
+
+  <section class="view" id="viewSim">
   <h1>원운동의 그림자는 <span>단진동</span>이다</h1>
 
   <div class="main">
@@ -105,6 +134,15 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
           <button type="button" class="btn primary" id="play"></button>
           <button type="button" class="btn" id="reset">처음으로</button>
         </div>
+        <div class="speed">
+          <div class="speed-head"><span>재생 속도</span></div>
+          <div class="seg" role="group" aria-label="재생 속도">
+            <button type="button" data-s="0.25">¼×</button>
+            <button type="button" data-s="0.5">½×</button>
+            <button type="button" data-s="1" aria-pressed="true">1×</button>
+            <button type="button" data-s="2">2×</button>
+          </div>
+        </div>
         <p class="hint">램프의 스위치를 눌러 빛을 켜 보세요.</p>
       </div>
 
@@ -112,11 +150,11 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
         <h2>원운동</h2>
         <div class="ctl">
           <div class="ctl-head"><label for="sA">반지름 A</label><span class="val" id="vA"></span></div>
-          <input type="range" id="sA" min="4" max="10" step="0.5" value="8">
+          <input type="range" id="sA" min="2" max="10" step="0.5" value="8">
         </div>
         <div class="ctl">
           <div class="ctl-head"><label for="sW">각속도 ω</label><span class="val" id="vW"></span></div>
-          <input type="range" id="sW" min="0.5" max="3" step="0.1" value="1.5">
+          <input type="range" id="sW" min="0.2" max="3" step="0.1" value="1.5">
         </div>
       </div>
 
@@ -130,9 +168,14 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
           <svg class="arrow" viewBox="0 0 30 12" aria-hidden="true"><path d="M1 6h21" stroke="var(--vv)" stroke-width="3" stroke-linecap="round"/><path d="M29 6l-9-5v10z" fill="var(--vv)"/></svg>
           <span class="name">속도 벡터 <i>v</i></span><span class="track"></span>
         </button>
+        <button type="button" class="sw" role="switch" id="swA" aria-checked="false">
+          <svg class="arrow" viewBox="0 0 30 12" aria-hidden="true"><path d="M1 6h21" stroke="var(--va)" stroke-width="3" stroke-linecap="round"/><path d="M29 6l-9-5v10z" fill="var(--va)"/></svg>
+          <span class="name">가속도 벡터 <i>a</i></span><span class="track"></span>
+        </button>
         <div class="mag">
           <div class="stat"><b>|<i>r</i>| = A</b><span class="val" id="vR"></span></div>
           <div class="stat"><b>|<i>v</i>| = Aω</b><span class="val" id="vV"></span></div>
+          <div class="stat"><b>|<i>a</i>| = Aω²</b><span class="val" id="vAc"></span></div>
         </div>
       </div>
 
@@ -145,6 +188,70 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
       </div>
     </aside>
   </div>
+  </section>
+
+  <section class="view" id="viewPractice" hidden>
+    <div class="vhead">
+      <h1>원운동 <span>좌표 읽기</span> 연습</h1>
+      <p class="lead">점이 같은 시간 간격 Δt마다 한 칸씩 움직여요. 각 시각의 x, y 좌표를 읽어 학습지의 t–x, t–y 그래프에 찍어 보세요.</p>
+    </div>
+
+    <div class="main pmain">
+      <div class="stage"><canvas id="pcv" aria-label="좌표평면 위의 등속 원운동. 다음 버튼이나 → 키로 한 칸씩 이동합니다."></canvas></div>
+
+      <aside class="panel">
+        <div class="sec">
+          <div class="time"><span>시간 t</span><b class="val" id="pTime">0 s</b></div>
+          <div class="hint" id="pStep"></div>
+          <div class="btngrid">
+            <button type="button" class="btn" id="pPrev">◀ 이전</button>
+            <button type="button" class="btn primary" id="pNext">다음 ▶</button>
+            <button type="button" class="btn" id="pPlay">자동 재생</button>
+            <button type="button" class="btn" id="pReset">처음으로</button>
+          </div>
+          <p class="hint">키보드 ← → 키로도 넘길 수 있어요.</p>
+        </div>
+
+        <div class="sec">
+          <h2>설정</h2>
+          <div class="ctl">
+            <div class="ctl-head"><label for="pA">반지름 A</label><span class="val" id="pAv"></span></div>
+            <input type="range" id="pA" min="2" max="10" step="0.5" value="8">
+          </div>
+          <div class="ctl">
+            <div class="ctl-head"><label for="pW">각속도 ω</label><span class="val" id="pWv"></span></div>
+            <input type="range" id="pW" min="0.2" max="3" step="0.1" value="1.5">
+          </div>
+          <div class="ctl">
+            <div class="ctl-head"><label for="pDt">시간 간격 Δt</label><span class="val" id="pDtv"></span></div>
+            <input type="range" id="pDt" min="0.05" max="2" step="0.05" value="0.25">
+          </div>
+        </div>
+
+        <div class="sec">
+          <h2>벡터</h2>
+          <button type="button" class="sw" role="switch" id="pSwR" aria-checked="false">
+            <svg class="arrow" viewBox="0 0 30 12" aria-hidden="true"><path d="M1 6h21" stroke="var(--vr)" stroke-width="3" stroke-linecap="round"/><path d="M29 6l-9-5v10z" fill="var(--vr)"/></svg>
+            <span class="name">위치 벡터 <i>r</i></span><span class="track"></span>
+          </button>
+          <button type="button" class="sw" role="switch" id="pSwV" aria-checked="false">
+            <svg class="arrow" viewBox="0 0 30 12" aria-hidden="true"><path d="M1 6h21" stroke="var(--vv)" stroke-width="3" stroke-linecap="round"/><path d="M29 6l-9-5v10z" fill="var(--vv)"/></svg>
+            <span class="name">속도 벡터 <i>v</i></span><span class="track"></span>
+          </button>
+          <button type="button" class="sw" role="switch" id="pSwA" aria-checked="false">
+            <svg class="arrow" viewBox="0 0 30 12" aria-hidden="true"><path d="M1 6h21" stroke="var(--va)" stroke-width="3" stroke-linecap="round"/><path d="M29 6l-9-5v10z" fill="var(--va)"/></svg>
+            <span class="name">가속도 벡터 <i>a</i></span><span class="track"></span>
+          </button>
+          <div class="mag">
+            <div class="stat"><b>|<i>r</i>| = A</b><span class="val" id="pMr"></span></div>
+            <div class="stat"><b>|<i>v</i>| = Aω</b><span class="val" id="pMv"></span></div>
+            <div class="stat"><b>|<i>a</i>| = Aω²</b><span class="val" id="pMa"></span></div>
+          </div>
+          <p class="hint" id="pShrunk" hidden>화살표가 길어서 화면에 맞게 줄여 그렸어요.</p>
+        </div>
+      </aside>
+    </div>
+  </section>
 </div>
 
 <script>
@@ -201,9 +308,10 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
   })();
 
   // ---------- state ----------
-  const st = { A: 8, w: 1.5, theta: 0, running: true, side: false, top: false, sideA: 0, topA: 0, vecR: false, vecV: false, rA: 0, vA: 0, t: 0, hist: [] };
-  const VR = '#2563c9', VV = '#12915f';
+  const st = { A: 8, w: 1.5, theta: 0, running: true, side: false, top: false, sideA: 0, topA: 0, vecR: false, vecV: false, vecA: false, rA: 0, vA: 0, aA: 0, t: 0, hist: [] };
+  const VR = '#2563c9', VV = '#12915f', VA = '#8a3bd0';
   const VSCALE = 0.45; // velocity arrow: 1 cm/s is drawn as 0.45 s worth of travel, so length ∝ Aω
+  const ASCALE = VSCALE * VSCALE; // acceleration arrow uses the same time scale squared, so length ∝ Aω²
   const SW = { side: { x: 0, y: 0 }, top: { x: 0, y: 0 } };
   const SW_W = 50, SW_H = 28;
   const $ = id => document.getElementById(id);
@@ -218,14 +326,22 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     $('vK').textContent = fmt(MASS * st.w * st.w, 2) + ' N/m';
     $('vR').textContent = fmt(st.A, 1) + ' cm';
     $('vV').textContent = fmt(st.A * st.w, 1) + ' cm/s';
+    $('vAc').textContent = fmt(st.A * st.w * st.w, 1) + ' cm/s²';
   }
   function updatePlay() { $('play').innerHTML = st.running ? ICON_PAUSE + '일시정지' : ICON_PLAY + '재생'; }
   sA.addEventListener('input', () => { st.A = +sA.value; st.hist = []; updateReadout(); });
   sW.addEventListener('input', () => { st.w = +sW.value; updateReadout(); });
   $('play').addEventListener('click', () => { st.running = !st.running; updatePlay(); });
   $('reset').addEventListener('click', () => { st.theta = 0; st.hist = []; });
+  // playback speed scales simulated time only; T and ω stay physical
+  let speed = 1;
+  document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => {
+    speed = +b.dataset.s;
+    document.querySelectorAll('.seg button').forEach(o => o.setAttribute('aria-pressed', o === b ? 'true' : 'false'));
+  }));
   $('swR').addEventListener('click', () => { st.vecR = !st.vecR; $('swR').setAttribute('aria-checked', st.vecR); });
   $('swV').addEventListener('click', () => { st.vecV = !st.vecV; $('swV').setAttribute('aria-checked', st.vecV); });
+  $('swA').addEventListener('click', () => { st.vecA = !st.vecA; $('swA').setAttribute('aria-checked', st.vecA); });
 
   function hit(e) {
     const r = cv.getBoundingClientRect();
@@ -339,6 +455,8 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
   }
 
   // position curve: orange by default, eases to the r-vector blue when that vector is on
+  // position curve hides while v or a is shown, unless r is also on
+  function posVis() { return 1 - Math.max(st.vA, st.aA) * (1 - st.rA); }
   function posColor() {
     const a = [228, 87, 46], b = [37, 99, 201], t = st.rA;
     return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(',')})`;
@@ -515,7 +633,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
       line3([-Rr, g0, ZB], [Rr, g0, ZB], '#c2c7d0', 1.2);
       line3([0, g0, ZB], [0, g0 - GLEN, ZB], '#c2c7d0', 1.2);
       line3([bx, HS_Y - 18, ZB], [bx, g0, ZB], C.line, 1.2, [3, 4]);
-      trace(h => [h.x, g0 - (st.t - h.t) * GSPD, ZB]);
+      ctx.globalAlpha = ta * posVis(); trace(h => [h.x, g0 - (st.t - h.t) * GSPD, ZB]); ctx.globalAlpha = ta;
       if (st.rA > 0.01) late.push(() => {
         ctx.globalAlpha = ta * st.rA;
         line3([0, HS_Y + 26, ZB + 18], [0, HS_Y + 42, ZB + 18], VR, 2);
@@ -527,7 +645,16 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
         const V = Rr * st.w * VSCALE, vx = -V * Math.sin(st.theta);
         late.push(() => { ctx.globalAlpha = ta * st.vA; arrow3([bx, HS_Y + 56, ZB + 18], [bx + vx, HS_Y + 56, ZB + 18], VV, 3.5); });
         const vl = P(-Math.max(Rr, V) - 10, g0 - 30, ZB); vsub('v', 'x', vl.x, vl.y, VV);
-        const pl = P(-Math.max(Rr, V) - 10, g0 - 4, ZB); vsub('x', '', pl.x, pl.y, posColor());
+        const pl = P(-Math.max(Rr, V) - 10, g0 - 4, ZB); ctx.globalAlpha = ta * st.vA * posVis(); vsub('x', '', pl.x, pl.y, posColor());
+        ctx.globalAlpha = ta;
+      }
+      if (st.aA > 0.01) {
+        ctx.globalAlpha = ta * st.aA;
+        trace(h => [h.ax, g0 - (st.t - h.t) * GSPD, ZB], VA, [2, 5]);
+        const Ac = Rr * st.w * st.w * ASCALE, ax = -Ac * Math.cos(st.theta);
+        late.push(() => { ctx.globalAlpha = ta * st.aA; arrow3([bx, HS_Y + 78, ZB + 18], [bx + ax, HS_Y + 78, ZB + 18], VA, 3.5); });
+        const M = Math.max(Rr, Rr * st.w * VSCALE, Ac);
+        const al = P(-M - 10, g0 - 56, ZB); vsub('a', 'x', al.x, al.y, VA);
         ctx.globalAlpha = ta;
       }
       const tl = P(0, g0 - GLEN, ZB); label('t', tl.x, tl.y + 14, 'center');
@@ -559,20 +686,32 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
       line3([g0, -Rr, ZB], [g0, Rr, ZB], '#c2c7d0', 1.2);
       line3([g0, 0, ZB], [g0 + GLEN, 0, ZB], '#c2c7d0', 1.2);
       line3([VS_X + 18, by, ZB], [g0, by, ZB], C.line, 1.2, [3, 4]);
-      trace(h => [g0 + (st.t - h.t) * GSPD, h.y, ZB]);
+      ctx.globalAlpha = sa * posVis(); trace(h => [g0 + (st.t - h.t) * GSPD, h.y, ZB]); ctx.globalAlpha = sa;
       if (st.rA > 0.01) {
         ctx.globalAlpha = sa * st.rA;
-        line3([VS_X - 44, 0, ZB + 18], [VS_X - 28, 0, ZB + 18], VR, 2);
-        arrow3([VS_X - 36, 0, ZB + 18], [VS_X - 36, by, ZB + 18], VR, 3.5);
+        late.push(() => {
+          ctx.globalAlpha = sa * st.rA;
+          line3([VS_X - 44, 0, ZB + 18], [VS_X - 28, 0, ZB + 18], VR, 2);
+          arrow3([VS_X - 36, 0, ZB + 18], [VS_X - 36, by, ZB + 18], VR, 3.5);
+        });
         ctx.globalAlpha = sa;
       }
       if (st.vA > 0.01) {
         ctx.globalAlpha = sa * st.vA;
         trace(h => [g0 + (st.t - h.t) * GSPD, h.vy, ZB], VV, [7, 5]);
         const V = Rr * st.w * VSCALE, vy = V * Math.cos(st.theta);
-        arrow3([VS_X - 58, by, ZB + 18], [VS_X - 58, by + vy, ZB + 18], VV, 3.5);
+        late.push(() => { ctx.globalAlpha = sa * st.vA; arrow3([VS_X - 58, by, ZB + 18], [VS_X - 58, by + vy, ZB + 18], VV, 3.5); });
         const vl = P(g0 + GLEN + 8, -Math.max(Rr, V) + 6, ZB); vsub('v', 'y', vl.x + 14, vl.y, VV);
-        const pl = P(g0 + GLEN + 8, Math.max(Rr, V) - 6, ZB); vsub('y', '', pl.x + 14, pl.y, posColor());
+        const pl = P(g0 + GLEN + 8, Math.max(Rr, V) - 6, ZB); ctx.globalAlpha = sa * st.vA * posVis(); vsub('y', '', pl.x + 14, pl.y, posColor());
+        ctx.globalAlpha = sa;
+      }
+      if (st.aA > 0.01) {
+        ctx.globalAlpha = sa * st.aA;
+        trace(h => [g0 + (st.t - h.t) * GSPD, h.ay, ZB], VA, [2, 5]);
+        const Ac = Rr * st.w * st.w * ASCALE, ay = -Ac * Math.sin(st.theta);
+        late.push(() => { ctx.globalAlpha = sa * st.aA; arrow3([VS_X - 80, by, ZB + 18], [VS_X - 80, by + ay, ZB + 18], VA, 3.5); });
+        const M = Math.max(Rr, Rr * st.w * VSCALE, Ac);
+        const al = P(g0 + GLEN + 8, -M - 22, ZB); vsub('a', 'y', al.x + 14, al.y, VA);
         ctx.globalAlpha = sa;
       }
       const tl = P(g0 + GLEN, 0, ZB); label('t', tl.x + 10, tl.y, 'left');
@@ -677,6 +816,16 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
       vlabel('v', vl.x, vl.y, VV);
       ctx.globalAlpha = 1;
     }
+    if (st.aA > 0.01) {
+      // centripetal: from the ball toward the center, |a| = Aω²
+      ctx.globalAlpha = st.aA;
+      const La = st.A * st.w * st.w * PX * ASCALE;
+      const tip = [bx - co * La, by - si * La, ZB];
+      arrow3([bx, by, ZB], tip, VA, 4);
+      const al = P(bx - co * La * 0.5 - si * 20, by - si * La * 0.5 + co * 20, ZB);
+      vlabel('a', al.x, al.y, VA);
+      ctx.globalAlpha = 1;
+    }
 
     // links between shadows and springs
     if (sa > 0.01) {
@@ -701,10 +850,11 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
   function loop(now) {
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
     if (st.running) {
-      st.theta += st.w * dt; st.t += dt;
+      st.theta += st.w * dt * speed; st.t += dt * speed;
       const Rr = st.A * PX;
       const V = Rr * st.w * VSCALE; // velocity drawn at the same scale as the v arrow
-      st.hist.push({ t: st.t, x: Rr * Math.cos(st.theta), y: Rr * Math.sin(st.theta), vx: -V * Math.sin(st.theta), vy: V * Math.cos(st.theta) });
+      st.hist.push({ t: st.t, x: Rr * Math.cos(st.theta), y: Rr * Math.sin(st.theta), vx: -V * Math.sin(st.theta), vy: V * Math.cos(st.theta),
+        ax: -st.w * st.w * ASCALE * Rr * Math.cos(st.theta), ay: -st.w * st.w * ASCALE * Rr * Math.sin(st.theta) });
       while (st.hist.length && st.t - st.hist[0].t > GLEN / GSPD + 0.2) st.hist.shift();
     }
     const k = reduce ? 1 : Math.min(1, dt * 6);
@@ -712,7 +862,8 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     st.topA += ((st.top ? 1 : 0) - st.topA) * k;
     st.rA += ((st.vecR ? 1 : 0) - st.rA) * k;
     st.vA += ((st.vecV ? 1 : 0) - st.vA) * k;
-    draw();
+    st.aA += ((st.vecA ? 1 : 0) - st.aA) * k;
+    if (!document.getElementById('viewSim').hidden) draw();
     requestAnimationFrame(loop);
   }
 
@@ -722,6 +873,341 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
   window.addEventListener('resize', fit);
   fit();
   requestAnimationFrame(loop);
+})();
+</script>
+
+<script>
+// ---------- page tabs ----------
+(() => {
+  const views = { sim: document.getElementById('viewSim'), practice: document.getElementById('viewPractice') };
+  const tabs = document.querySelectorAll('.tabs button');
+  function show(name) {
+    if (!views[name]) name = 'sim';
+    for (const k in views) views[k].hidden = k !== name;
+    tabs.forEach(t => t.setAttribute('aria-selected', t.dataset.view === name ? 'true' : 'false'));
+    try { history.replaceState(null, '', '#' + name); } catch (e) {}
+    window.dispatchEvent(new Event('resize'));
+  }
+  tabs.forEach(t => t.addEventListener('click', () => show(t.dataset.view)));
+  show((location.hash || '').slice(1));
+})();
+
+// ---------- practice: reading coordinates of uniform circular motion ----------
+(() => {
+  const $ = id => document.getElementById(id);
+  const cv = $('pcv'), ctx = cv.getContext('2d');
+  const view = $('viewPractice');
+  const C = {
+    ink: '#1c2230', muted: '#6b7280', major: '#dfe3e9', minor: '#f0f2f5', axis: '#8a909c',
+    shadow: '#3a3f4a', vr: '#2563c9', vv: '#12915f', va: '#8a3bd0'
+  };
+  const sw = { r: false, v: false, a: false };
+  const scr = { x: true, y: true }; // screens are always shown
+  let step = 0, timer = null;
+
+  const S = () => { const w = +$('pW').value; return { r: +$('pA').value, w, T: 2 * Math.PI / w, dt: +$('pDt').value }; };
+  // arrows use the same time scale as the simulation page: v × 0.45 s, a × (0.45 s)²
+  const VS = 0.45, AS = VS * VS;
+  const fmt = v => { const s = (Math.round(v * 100) / 100).toFixed(2); return s === '-0.00' ? '0.00' : s; };
+  const fmtT = v => (Math.round(v * 100) / 100).toString();
+
+  function arrow(x1, y1, x2, y2, color, { dash = false, shrink = 0, width = 3.5 } = {}) {
+    let l = Math.hypot(x2 - x1, y2 - y1);
+    if (l < 2) return null;
+    const ux = (x2 - x1) / l, uy = (y2 - y1) / l;
+    x2 -= ux * shrink; y2 -= uy * shrink; l -= shrink;
+    const hl = Math.min(15, l * 0.5), hw = hl * 0.55;
+    const ex = x2 - ux * hl, ey = y2 - uy * hl;
+    ctx.save(); ctx.lineCap = 'round';
+    if (dash) {
+      ctx.globalAlpha *= 0.75; ctx.setLineDash([6, 5]); ctx.lineWidth = 2;
+    } else {
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = width + 4;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(ex, ey); ctx.stroke();
+      ctx.lineWidth = width;
+    }
+    ctx.strokeStyle = color;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(ex + ux, ey + uy); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = color; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(x2, y2); ctx.lineTo(ex - uy * hw, ey + ux * hw); ctx.lineTo(ex + uy * hw, ey - ux * hw); ctx.closePath();
+    if (!dash) ctx.stroke();
+    ctx.fill();
+    ctx.restore();
+    return { x2, y2, ux, uy };
+  }
+  // italic vector letter with a small arrow over it (same as the simulation page)
+  function vlabel(t, x, y, color) {
+    ctx.font = 'italic 700 22px Georgia, "Times New Roman", serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.strokeText(t, x, y);
+    ctx.fillStyle = color; ctx.fillText(t, x, y);
+    ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.beginPath();
+    ctx.moveTo(x - 6, y - 15); ctx.lineTo(x + 6, y - 15); ctx.moveTo(x + 3, y - 18); ctx.lineTo(x + 6, y - 15); ctx.lineTo(x + 3, y - 12); ctx.stroke();
+  }
+  // coordinate tag on a white plate, pushed outward along (dx, dy)
+  // coordinate tag on a white plate; tries the outward side first, then turns around the anchor
+  // until it finds a spot that stays inside the plane and clear of the ball, arrow tips and other tags
+  const avoid = { circles: [], rects: [] };
+  function tag(cx, cy, dx, dy, text, color, W, size = 14) {
+    ctx.font = `500 ${size}px "IBM Plex Mono", ui-monospace, monospace`;
+    const tw = ctx.measureText(text).width, th = size + 5, pw = tw + 10, ph = th + 4, gap = 12;
+    const base = Math.atan2(dy, dx) || 0;
+    const hitsCircle = (x, y, c) => {
+      const nx = Math.max(x, Math.min(c.x, x + pw)), ny = Math.max(y, Math.min(c.y, y + ph));
+      return Math.hypot(c.x - nx, c.y - ny) < c.r;
+    };
+    const hitsRect = (x, y, q) => x < q.x + q.w && x + pw > q.x && y < q.y + q.h && y + ph > q.y;
+    let best = null;
+    for (const d of [0, 1, -1, 2, -2, 3, -3, 4]) {
+      for (const extra of [0, 16, 32]) {
+        const a = base + d * Math.PI / 4;
+        const ox = Math.cos(a), oy = Math.sin(a);
+        const x = cx + ox * (pw / 2 + gap + extra) - pw / 2;
+        const y = cy + oy * (ph / 2 + gap + extra) - ph / 2;
+        if (x < 4 || y < 4 || x + pw > W - 4 || y + ph > W - 4) continue;
+        if (avoid.circles.some(c => hitsCircle(x, y, c))) continue;
+        if (avoid.rects.some(q => hitsRect(x, y, q))) continue;
+        best = { x, y }; break;
+      }
+      if (best) break;
+    }
+    if (!best) best = { x: Math.min(Math.max(cx + gap, 4), W - pw - 4), y: Math.min(Math.max(cy - ph - gap, 4), W - ph - 4) };
+    avoid.rects.push({ x: best.x - 2, y: best.y - 2, w: pw + 4, h: ph + 4 });
+    ctx.fillStyle = 'rgba(255,255,255,.92)';
+    ctx.beginPath(); ctx.roundRect(best.x, best.y, pw, ph, 6); ctx.fill();
+    ctx.fillStyle = color; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, best.x + 5, best.y + ph / 2 + 1);
+  }
+
+  function pos(k) {
+    const { r, T, dt } = S();
+    const th = 2 * Math.PI * k * dt / T;
+    return { x: r * Math.cos(th), y: r * Math.sin(th) };
+  }
+
+  function size() {
+    const w = cv.clientWidth, d = Math.min(window.devicePixelRatio || 1, 2);
+    if (!w) return;
+    cv.width = w * d; cv.height = w * d;
+    ctx.setTransform(d, 0, 0, d, 0, 0);
+    draw();
+  }
+
+  function draw() {
+    const W = cv.clientWidth, { r, T, dt } = S();
+    const N = Math.max(1, Math.floor(T / dt + 1e-9));
+    const lim = 11, pad = 30;
+    if (!(W > pad * 2 + 20)) return;
+    const u = (W / 2 - pad) / lim;
+    const X = x => W / 2 + x * u, Y = y => W / 2 - y * u;
+    ctx.clearRect(0, 0, W, W);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, W);
+
+    // grid: 1 cm minor, 2 cm major
+    for (let i = -lim; i <= lim; i++) {
+      const v = i;
+      ctx.strokeStyle = i % 2 ? C.minor : C.major; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(X(v), Y(-lim)); ctx.lineTo(X(v), Y(lim)); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(X(-lim), Y(v)); ctx.lineTo(X(lim), Y(v)); ctx.stroke();
+    }
+    // axes
+    ctx.strokeStyle = C.axis; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(X(-lim), Y(0)); ctx.lineTo(X(lim), Y(0)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(X(0), Y(-lim)); ctx.lineTo(X(0), Y(lim)); ctx.stroke();
+    ctx.fillStyle = C.muted; ctx.font = '12px "IBM Plex Mono", ui-monospace, monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    for (let i = -lim + 1; i < lim; i++) if (i && i % 2 === 0) ctx.fillText(i, X(i), Y(0) + 5);
+    ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+    for (let i = -lim + 1; i < lim; i++) if (i && i % 2 === 0) ctx.fillText(i, X(0) - 6, Y(i));
+    ctx.textAlign = 'right'; ctx.textBaseline = 'top'; ctx.fillText('0', X(0) - 5, Y(0) + 5);
+    ctx.font = 'italic 17px Georgia, "Times New Roman", serif';
+    ctx.textAlign = 'right'; ctx.textBaseline = 'bottom'; ctx.fillText('x', X(lim) - 2, Y(0) - 5);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillText('y', X(0) + 7, Y(lim) + 2);
+
+    // orbit
+    ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.setLineDash([3, 5]);
+    ctx.beginPath(); ctx.arc(X(0), Y(0), r * u, 0, 2 * Math.PI); ctx.stroke(); ctx.setLineDash([]);
+
+    const dotR = N > 100 ? 2.5 : N > 40 ? 3.5 : 4.5;
+    const done = Math.min(step, N);
+    // points already passed
+    ctx.fillStyle = '#e4572e'; ctx.globalAlpha = .28;
+    for (let i = 0; i < done; i++) {
+      const q = pos(step - done + i);
+      ctx.beginPath(); ctx.arc(X(q.x), Y(q.y), dotR, 0, 2 * Math.PI); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    const p = pos(step);
+    // screens placed as in the simulation: x on a floor screen below, y on a wall screen at the right
+    const SX = lim - 0.35, SY = -(lim - 0.35);
+    if (scr.x) {
+      ctx.fillStyle = '#e9ecf1'; ctx.beginPath(); ctx.roundRect(X(-lim), Y(SY), X(lim) - X(-lim), 10, 3); ctx.fill();
+      ctx.strokeStyle = '#d3d8e0'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.strokeStyle = C.axis; ctx.lineWidth = 1.2; ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(X(p.x), Y(p.y)); ctx.lineTo(X(p.x), Y(SY)); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (scr.y) {
+      ctx.fillStyle = '#e9ecf1'; ctx.beginPath(); ctx.roundRect(X(SX) - 10, Y(lim), 10, Y(-lim) - Y(lim), 3); ctx.fill();
+      ctx.strokeStyle = '#d3d8e0'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.strokeStyle = C.axis; ctx.lineWidth = 1.2; ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(X(p.x), Y(p.y)); ctx.lineTo(X(SX) - 10, Y(p.y)); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // radius arm when the r vector is off
+    if (!sw.r) {
+      ctx.strokeStyle = C.axis; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(X(0), Y(0)); ctx.lineTo(X(p.x), Y(p.y)); ctx.stroke();
+    }
+
+    // swept angle ωt from the +x axis, as on the simulation disk
+    const sweep = ((2 * Math.PI * step * dt / T) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+    const ARC = 30, wlx = X(0) + (ARC + 16) * Math.cos(sweep / 2), wly = Y(0) - (ARC + 16) * Math.sin(sweep / 2);
+    if (sweep > 0.001) {
+      ctx.strokeStyle = '#e4572e'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(X(0), Y(0), ARC, 0, -sweep, true); ctx.stroke();
+    }
+    ctx.font = '700 16px "IBM Plex Sans KR", "Apple SD Gothic Neo", sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.strokeText('ωt', wlx, wly);
+    ctx.fillStyle = '#e4572e'; ctx.fillText('ωt', wlx, wly);
+
+    // vectors (arrow length capped to fit the plane)
+    const w = 2 * Math.PI / T;
+    const vMag = w * r, aMag = w * w * r, LIM = lim - 0.5;
+    const sv = Math.min(VS, LIM / vMag), sa = Math.min(AS, LIM / aMag);
+    const ang = k => 2 * Math.PI * k * dt / T;
+    const Vk = k => ({ x: -vMag * Math.sin(ang(k)), y: vMag * Math.cos(ang(k)) });
+    const Ak = k => ({ x: -aMag * Math.cos(ang(k)), y: -aMag * Math.sin(ang(k)) });
+    const tags = [];
+
+    // copies with their tails at the origin (dashed) and the tips already passed
+    [[sw.v, Vk, sv, C.vv, 'v'], [sw.a, Ak, sa, C.va, 'a']].forEach(([on, F, s, col, nm]) => {
+      if (!on) return;
+      ctx.fillStyle = col; ctx.globalAlpha = .28;
+      for (let i = 0; i < done; i++) {
+        const q = F(step - done + i);
+        ctx.beginPath(); ctx.arc(X(q.x * s), Y(q.y * s), dotR, 0, 2 * Math.PI); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      const q = F(step);
+      arrow(X(0), Y(0), X(q.x * s), Y(q.y * s), col, { dash: true });
+      tags.push([X(q.x * s), Y(q.y * s), q.x, -q.y, `${nm} (${fmt(q.x)}, ${fmt(q.y)})`, col, W, 13]);
+    });
+
+    if (sw.r) {
+      arrow(X(0), Y(0), X(p.x), Y(p.y), C.vr, { shrink: 10 });
+      const len = Math.hypot(p.x, p.y) || 1;
+      vlabel('r', X(p.x * 0.55) - (p.y / len) * 18, Y(p.y * 0.55) - (p.x / len) * 18, C.vr);
+    }
+    if (sw.v) {
+      const q = Vk(step), a = arrow(X(p.x), Y(p.y), X(p.x + q.x * sv), Y(p.y + q.y * sv), C.vv);
+      if (a) vlabel('v', a.x2 + a.ux * 16, a.y2 + a.uy * 16, C.vv);
+    }
+    if (sw.a) {
+      const q = Ak(step), a = arrow(X(p.x), Y(p.y), X(p.x + q.x * sa), Y(p.y + q.y * sa), C.va);
+      if (a) vlabel('a', (X(p.x) + a.x2) / 2 + a.uy * 16, (Y(p.y) + a.y2) / 2 - a.ux * 16, C.va);
+    }
+
+    // components cast on the screens: r along the screen from its zero mark, v and a in rows just inside it
+    const comps = [];
+    if (sw.v) { const q = Vk(step); comps.push([q.x * sv, q.y * sv, C.vv, 1]); }
+    if (sw.a) { const q = Ak(step); comps.push([q.x * sa, q.y * sa, C.va, sw.v ? 2 : 1]); }
+    const ROW = 16;
+    if (scr.x) {
+      const sy = Y(SY);
+      ctx.strokeStyle = C.ink; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(X(0), sy - 4); ctx.lineTo(X(0), sy + 14); ctx.stroke();
+      for (const [dx, dy, col, row] of comps) {
+        const yy = sy - row * ROW;
+        ctx.save(); ctx.strokeStyle = col; ctx.globalAlpha = 0.55; ctx.lineWidth = 1.2; ctx.setLineDash([3, 4]);
+        ctx.beginPath(); ctx.moveTo(X(p.x + dx), Y(p.y + dy)); ctx.lineTo(X(p.x + dx), yy); ctx.stroke();
+        ctx.restore();
+        arrow(X(p.x), yy, X(p.x + dx), yy, col, { width: 3 });
+      }
+      if (sw.r) arrow(X(0), sy + 5, X(p.x), sy + 5, C.vr, { width: 3.5, shrink: 4 });
+      ctx.fillStyle = C.shadow; ctx.beginPath(); ctx.roundRect(X(p.x) - 9, sy, 18, 10, 3); ctx.fill();
+    }
+    if (scr.y) {
+      const sx = X(SX) - 10;
+      ctx.strokeStyle = C.ink; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(sx - 4, Y(0)); ctx.lineTo(sx + 14, Y(0)); ctx.stroke();
+      for (const [dx, dy, col, row] of comps) {
+        const xx = sx - row * ROW;
+        ctx.save(); ctx.strokeStyle = col; ctx.globalAlpha = 0.55; ctx.lineWidth = 1.2; ctx.setLineDash([3, 4]);
+        ctx.beginPath(); ctx.moveTo(X(p.x + dx), Y(p.y + dy)); ctx.lineTo(xx, Y(p.y + dy)); ctx.stroke();
+        ctx.restore();
+        arrow(xx, Y(p.y), xx, Y(p.y + dy), col, { width: 3 });
+      }
+      if (sw.r) arrow(sx + 5, Y(0), sx + 5, Y(p.y), C.vr, { width: 3.5, shrink: 4 });
+      ctx.fillStyle = C.shadow; ctx.beginPath(); ctx.roundRect(sx, Y(p.y) - 9, 10, 18, 3); ctx.fill();
+    }
+
+    // the moving point, drawn like the ball in the simulation
+    const bx = X(p.x), by = Y(p.y), br = 9;
+    const g = ctx.createRadialGradient(bx - br * 0.35, by - br * 0.4, 1, bx, by, br);
+    g.addColorStop(0, '#ffc2a8'); g.addColorStop(0.35, '#f26a43'); g.addColorStop(1, '#a3321a');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(bx, by, br, 0, 2 * Math.PI); ctx.fill();
+
+    // keep labels off the ball and off the tips of the arrows that start at it
+    avoid.circles = [{ x: bx, y: by, r: br + 6 }];
+    avoid.rects = [{ x: wlx - 16, y: wly - 12, w: 32, h: 24 }];
+    if (sw.v) { const q = Vk(step); avoid.circles.push({ x: X(p.x + q.x * sv), y: Y(p.y + q.y * sv), r: 14 }); }
+    if (sw.a) { const q = Ak(step); avoid.circles.push({ x: X(p.x + q.x * sa), y: Y(p.y + q.y * sa), r: 14 }); }
+    tag(bx, by, p.x, -p.y, `(${fmt(p.x)}, ${fmt(p.y)})`, C.ink, W, 15);
+    tags.forEach(t => tag(...t));
+
+    // readouts
+    const stepDeg = 360 * dt / T, deg = (step * stepDeg) % 360;
+    $('pTime').textContent = fmtT(step * dt) + ' s';
+    $('pAv').textContent = r.toFixed(1) + ' cm';
+    $('pWv').textContent = w.toFixed(1) + ' rad/s';
+    $('pDtv').textContent = fmtT(dt) + ' s';
+    $('pStep').textContent = `${step}번째 이동 · 회전각 ${fmtT(deg)}°`;
+    $('pMr').textContent = fmt(r) + ' cm';
+    $('pMv').textContent = fmt(vMag) + ' cm/s';
+    $('pMa').textContent = fmt(aMag) + ' cm/s²';
+    $('pShrunk').hidden = !((sw.v && sv < VS) || (sw.a && sa < AS));
+    $('pPrev').disabled = step === 0;
+  }
+
+  function go(d) { step = Math.max(0, step + d); draw(); }
+  function stop() { clearInterval(timer); timer = null; $('pPlay').textContent = '자동 재생'; }
+  $('pNext').onclick = () => go(1);
+  $('pPrev').onclick = () => go(-1);
+  $('pReset').onclick = () => { stop(); step = 0; draw(); };
+  $('pPlay').onclick = () => {
+    if (timer) return stop();
+    timer = setInterval(() => go(1), Math.max(50, S().dt * 1000));
+    $('pPlay').textContent = '정지';
+  };
+  [['pSwR', 'r'], ['pSwV', 'v'], ['pSwA', 'a']].forEach(([id, k]) => $(id).addEventListener('click', () => {
+    sw[k] = !sw[k]; $(id).setAttribute('aria-checked', sw[k]); draw();
+  }));
+  $('pDt').addEventListener('input', () => { stop(); step = 0; draw(); });
+  // A and ω are shared with the simulation page: either slider moves both
+  [['pA', 'sA'], ['pW', 'sW']].forEach(([mine, theirs]) => {
+    $(mine).addEventListener('input', () => {
+      $(theirs).value = $(mine).value;
+      $(theirs).dispatchEvent(new Event('input'));
+    });
+    $(theirs).addEventListener('input', () => {
+      $(mine).value = $(theirs).value;
+      stop(); step = 0; draw();
+    });
+  });
+  document.addEventListener('keydown', e => {
+    if (view.hidden || e.target.tagName === 'INPUT') return;
+    if (e.key === 'ArrowRight') { e.preventDefault(); go(1); }
+    if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); }
+  });
+  window.addEventListener('resize', size);
+  if (window.ResizeObserver) new ResizeObserver(size).observe(cv);
+  if (document.fonts) document.fonts.ready.then(draw);
+  size();
 })();
 </script>
 
