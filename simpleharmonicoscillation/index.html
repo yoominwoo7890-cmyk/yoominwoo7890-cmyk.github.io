@@ -34,7 +34,7 @@ body {
 }
 .wrap { max-width: 1120px; margin: 0 auto; display: grid; gap: 16px; }
 /* widen the page only while the practice tab shows its graph paper */
-.wrap:has(#viewPractice:not([hidden]) .pmain:not(.nopaper)) { max-width: 1480px; }
+.wrap:has(#viewPractice:not([hidden]) .pmain:not(.nopaper):not(.onlyx)) { max-width: 1480px; }
 h1 { font-size: 28px; font-weight: 700; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
 h1 span { color: var(--accent); }
 
@@ -53,8 +53,8 @@ canvas { display: block; width: 100%; height: auto; max-width: 100%; touch-actio
 .lead { margin: 0; font-size: 16px; color: var(--muted); max-width: 62ch; }
 .pmain { grid-template-columns: minmax(0, 1fr) 290px; }
 .board { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-content: start; min-width: 0; }
-.pmain.nopaper { grid-template-columns: minmax(0, 1fr) 290px; }
-.pmain.nopaper .board { grid-template-columns: minmax(0, 1fr); }
+.pmain.nopaper, .pmain.onlyx { grid-template-columns: minmax(0, 1fr) 290px; }
+.pmain.nopaper .board, .pmain.onlyx .board { grid-template-columns: minmax(0, 1fr); }
 #paperY, #paperX { aspect-ratio: 1 / 1; }
 .btn.wide { width: 100%; }
 .sw:disabled { opacity: .45; cursor: default; }
@@ -121,11 +121,11 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
   h1 { font-size: 23px; }
 }
 @media (max-width: 1180px) {
-  .pmain:not(.nopaper) { grid-template-columns: minmax(0, 1fr); }
+  .pmain:not(.nopaper):not(.onlyx) { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 860px) {
-  .board, .pmain.nopaper .board { grid-template-columns: minmax(0, 1fr); }
-  .pmain, .pmain.nopaper { grid-template-columns: minmax(0, 1fr); }
+  .board, .pmain.nopaper .board, .pmain.onlyx .board { grid-template-columns: minmax(0, 1fr); }
+  .pmain, .pmain.nopaper, .pmain.onlyx { grid-template-columns: minmax(0, 1fr); }
 }
 @media print {
   @page { size: A4 portrait; margin: 12mm; }
@@ -286,9 +286,13 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
 
         <div class="sec">
           <h2>모눈종이</h2>
-          <button type="button" class="sw" role="switch" id="pPaper" aria-checked="true">
-            <svg class="arrow" viewBox="0 0 30 12" aria-hidden="true"><path d="M1 1h28M1 6h28M1 11h28M5 0v12M12 0v12M19 0v12M26 0v12" stroke="#c3c8d1" stroke-width="1"/><circle cx="12" cy="4" r="2" fill="#3a3f4a"/><circle cx="19" cy="8" r="2" fill="#3a3f4a"/></svg>
-            <span class="name">모눈종이</span><span class="track"></span>
+          <button type="button" class="sw" role="switch" id="pPaperY" aria-checked="true">
+            <svg class="arrow" viewBox="0 0 30 12" aria-hidden="true"><rect x="0.5" y="0.5" width="11" height="11" fill="none" stroke="#c3c8d1"/><rect x="15.5" y="0.5" width="14" height="11" fill="#f0f2f5" stroke="#3a3f4a"/><path d="M15.5 6h14" stroke="#3a3f4a"/></svg>
+            <span class="name"><i>y</i> 모눈종이</span><span class="track"></span>
+          </button>
+          <button type="button" class="sw" role="switch" id="pPaperX" aria-checked="true">
+            <svg class="arrow" viewBox="0 0 30 12" aria-hidden="true"><rect x="9.5" y="0.5" width="6" height="5" fill="none" stroke="#c3c8d1"/><rect x="9.5" y="6.5" width="6" height="5" fill="#f0f2f5" stroke="#3a3f4a"/><path d="M12.5 6.5v5" stroke="#3a3f4a"/></svg>
+            <span class="name"><i>x</i> 모눈종이</span><span class="track"></span>
           </button>
           <button type="button" class="sw" role="switch" id="pHide" aria-checked="false">
             <svg class="arrow" viewBox="0 0 30 12" aria-hidden="true"><circle cx="9" cy="6" r="3" fill="none" stroke="#3a3f4a" stroke-width="1.5" stroke-dasharray="2 2"/><circle cx="21" cy="6" r="3" fill="none" stroke="#3a3f4a" stroke-width="1.5" stroke-dasharray="2 2"/></svg>
@@ -1162,22 +1166,11 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
       if (a) vlabel('a', (X(p.x) + a.x2) / 2 + a.uy * 16, (Y(p.y) + a.y2) / 2 - a.ux * 16, C.va);
     }
 
-    // components cast on the screens: r along the screen from its zero mark, v and a in rows just inside it
-    const comps = [];
-    if (sw.v) { const q = Vk(step); comps.push([q.x * sv, q.y * sv, C.vv, 1]); }
-    if (sw.a) { const q = Ak(step); comps.push([q.x * sa, q.y * sa, C.va, sw.v ? 2 : 1]); }
-    const ROW = 16;
+    // shadows on the screens, with the r component along each screen from its zero mark
     if (scr.x) {
       const sy = Y(SY);
       ctx.strokeStyle = C.ink; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(X(0), sy - 4); ctx.lineTo(X(0), sy + 14); ctx.stroke();
-      for (const [dx, dy, col, row] of comps) {
-        const yy = sy - row * ROW;
-        ctx.save(); ctx.strokeStyle = col; ctx.globalAlpha = 0.55; ctx.lineWidth = 1.2; ctx.setLineDash([3, 4]);
-        ctx.beginPath(); ctx.moveTo(X(p.x + dx), Y(p.y + dy)); ctx.lineTo(X(p.x + dx), yy); ctx.stroke();
-        ctx.restore();
-        arrow(X(p.x), yy, X(p.x + dx), yy, col, { width: 3 });
-      }
       if (sw.r) arrow(X(0), sy + 5, X(p.x), sy + 5, C.vr, { width: 3.5, shrink: 4 });
       ctx.fillStyle = C.shadow; ctx.beginPath(); ctx.roundRect(X(p.x) - 9, sy, 18, 10, 3); ctx.fill();
     }
@@ -1185,25 +1178,21 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
       const sx = X(SX) - 10;
       ctx.strokeStyle = C.ink; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(sx - 4, Y(0)); ctx.lineTo(sx + 14, Y(0)); ctx.stroke();
-      for (const [dx, dy, col, row] of comps) {
-        const xx = sx - row * ROW;
-        ctx.save(); ctx.strokeStyle = col; ctx.globalAlpha = 0.55; ctx.lineWidth = 1.2; ctx.setLineDash([3, 4]);
-        ctx.beginPath(); ctx.moveTo(X(p.x + dx), Y(p.y + dy)); ctx.lineTo(xx, Y(p.y + dy)); ctx.stroke();
-        ctx.restore();
-        arrow(xx, Y(p.y), xx, Y(p.y + dy), col, { width: 3 });
-      }
       if (sw.r) arrow(sx + 5, Y(0), sx + 5, Y(p.y), C.vr, { width: 3.5, shrink: 4 });
       ctx.fillStyle = C.shadow; ctx.beginPath(); ctx.roundRect(sx, Y(p.y) - 9, 10, 18, 3); ctx.fill();
     }
 
     // with the graph paper on, the tips of the v and a copies at the origin are carried out of the plane
     // (right edge → t–y sheet, bottom edge → t–x sheet), so each paper point links back to its vector
-    if (opt.paper && !opt.hide) {
+    if ((opt.py || opt.px) && !opt.hide) {
       for (const [on, q, s, col] of [[sw.v, Vk(step), sv, C.vv], [sw.a, Ak(step), sa, C.va]]) {
         if (!on) continue;
         const tx = X(q.x * s), ty = Y(q.y * s);
         ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = col; ctx.globalAlpha = 0.6; ctx.lineWidth = 1.2;
-        ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(W, ty); ctx.moveTo(tx, ty); ctx.lineTo(tx, W); ctx.stroke();
+        ctx.beginPath();
+        if (opt.py) { ctx.moveTo(tx, ty); ctx.lineTo(W, ty); }
+        if (opt.px) { ctx.moveTo(tx, ty); ctx.lineTo(tx, W); }
+        ctx.stroke();
         ctx.restore();
       }
     }
@@ -1274,7 +1263,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
   // like the graphs beside the springs in the simulation.
   const paperY = $('paperY'), paperX = $('paperX');
   const yctx = paperY.getContext('2d'), xctx = paperX.getContext('2d');
-  const opt = { paper: true, hide: false };
+  const opt = { py: true, px: true, hide: false };
   const LIM = 11, PAD = 30, MINOR = '#f0f2f5', MAJOR = '#dfe3e9', INK = '#1c2230', MUTED = '#6b7280';
 
   function timeline() {
@@ -1401,10 +1390,10 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
   }
 
   function renderPaper() {
-    if (!opt.paper) return;
     const Wc = cv.clientWidth;
     if (!Wc) return;
-    for (const [el, c, f] of [[paperY, yctx, sheetY], [paperX, xctx, sheetX]]) {
+    for (const [el, c, f, on] of [[paperY, yctx, sheetY, opt.py], [paperX, xctx, sheetX, opt.px]]) {
+      if (!on) continue;
       const Z = el.clientWidth;
       if (Z) f(c, Z, Z / Wc, !opt.hide);
     }
@@ -1420,14 +1409,19 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     renderPaper();
   }
 
-  $('pPaper').addEventListener('click', () => {
-    opt.paper = !opt.paper;
-    $('pPaper').setAttribute('aria-checked', opt.paper);
-    $('ypBox').hidden = $('xpBox').hidden = !opt.paper;
-    $('pmain').classList.toggle('nopaper', !opt.paper);
-    $('pHide').disabled = !opt.paper;
+  // each sheet can be shown on its own; the layout keeps every shown sheet aligned with the circle
+  function layoutPaper() {
+    $('pPaperY').setAttribute('aria-checked', opt.py);
+    $('pPaperX').setAttribute('aria-checked', opt.px);
+    $('ypBox').hidden = !opt.py;
+    $('xpBox').hidden = !opt.px;
+    $('pmain').classList.toggle('nopaper', !opt.py && !opt.px);
+    $('pmain').classList.toggle('onlyx', opt.px && !opt.py);
+    $('pHide').disabled = !opt.py && !opt.px;
     requestAnimationFrame(() => { size(); sizePaper(); });
-  });
+  }
+  $('pPaperY').addEventListener('click', () => { opt.py = !opt.py; layoutPaper(); });
+  $('pPaperX').addEventListener('click', () => { opt.px = !opt.px; layoutPaper(); });
   $('pHide').addEventListener('click', () => {
     opt.hide = !opt.hide;
     $('pHide').setAttribute('aria-checked', opt.hide);
@@ -1440,20 +1434,24 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     const { r, w, T, dt } = S();
     const Wc = cv.clientWidth || 600, Z = 1200;
     const mk = f => { const o = document.createElement('canvas'); o.width = o.height = Z; f(o.getContext('2d'), Z, Z / Wc, !opt.hide, 1.5); return o.toDataURL('image/png'); };
+    // circle top-left; t–y to its right, t–x under it; the instructions fill the free cell
+    const steps = `<ol class="ps-steps">
+          <li>물체는 Δt마다 원을 따라 한 칸씩 움직여요.</li>
+          <li>${[opt.py ? '오른쪽 스크린에 비친 그림자의 y를 오른쪽 모눈종이에' : '', opt.px ? '아래 스크린에 비친 그림자의 x를 아래 모눈종이에' : ''].filter(Boolean).join(', ')} 시각 t마다 점으로 찍어요.</li>
+          <li>모눈종이의 칸은 원운동 좌표평면과 같은 크기라서, 그림자 위치를 그대로 옮겨 찍으면 돼요.</li>
+          <li>점들을 매끄럽게 이어 보세요. 그래프는 어떤 모양인가요?</li>
+        </ol>`;
+    const img = src => `<img alt="" src="${src}">`;
+    const cells = [img(cv.toDataURL('image/png'))];
+    if (opt.py) cells.push(img(mk(sheetY))); else cells.push(steps);
+    if (opt.px) cells.push(img(mk(sheetX)));
+    if (opt.py) cells.push(steps);
     const sheet = $('printSheet');
     sheet.innerHTML = `
       <div class="ps-head"><h1>원운동 좌표 읽기 학습지</h1><div class="ps-id">반 ______ 번호 ______ 이름 ______________</div></div>
       <p class="ps-cond">반지름 A = ${r.toFixed(1)} cm · 각속도 ω = ${w.toFixed(1)} rad/s · 주기 T = ${fmt(T)} s · 시간 간격 Δt = ${fmtT(dt)} s</p>
       <div class="ps-grid">
-        <img alt="" src="${cv.toDataURL('image/png')}">
-        <img alt="" src="${mk(sheetY)}">
-        <img alt="" src="${mk(sheetX)}">
-        <ol class="ps-steps">
-          <li>물체는 Δt마다 원을 따라 한 칸씩 움직여요.</li>
-          <li>오른쪽 스크린에 비친 그림자의 y를 오른쪽 모눈종이에, 아래 스크린에 비친 그림자의 x를 아래 모눈종이에 시각 t마다 점으로 찍어요.</li>
-          <li>모눈종이의 칸은 원운동 좌표평면과 같은 크기라서, 그림자 위치를 그대로 옮겨 찍으면 돼요.</li>
-          <li>점들을 매끄럽게 이어 보세요. 두 그래프는 어떤 모양이고, 서로 어떻게 다른가요?</li>
-        </ol>
+        ${cells.join('')}
       </div>`;
     try { await Promise.all([...sheet.querySelectorAll('img')].map(im => im.decode())); } catch (e) {}
     window.print();
