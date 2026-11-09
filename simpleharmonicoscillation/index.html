@@ -52,7 +52,8 @@ canvas { display: block; width: 100%; height: auto; max-width: 100%; touch-actio
 .vhead { display: grid; gap: 6px; }
 .lead { margin: 0; font-size: 16px; color: var(--muted); max-width: 62ch; }
 .pmain { grid-template-columns: minmax(0, 1fr) 290px; }
-.board { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-content: start; min-width: 0; }
+.board { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-content: start; min-width: 0; position: relative; }
+#links { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
 .pmain.nopaper, .pmain.onlyx { grid-template-columns: minmax(0, 1fr) 290px; }
 .pmain.nopaper .board, .pmain.onlyx .board { grid-template-columns: minmax(0, 1fr); }
 #paperY, #paperX { aspect-ratio: 1 / 1; }
@@ -227,7 +228,8 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     </div>
 
     <div class="main pmain" id="pmain">
-      <div class="board">
+      <div class="board" id="board">
+        <canvas id="links" aria-hidden="true"></canvas>
         <div class="stage"><canvas id="pcv" aria-label="좌표평면 위의 등속 원운동. 다음 버튼이나 → 키로 한 칸씩 이동합니다."></canvas></div>
         <div class="stage" id="ypBox"><canvas id="paperY" aria-label="오른쪽 스크린의 y를 시간에 따라 기록하는 모눈종이. 원운동 좌표평면과 같은 높이와 축척입니다."></canvas></div>
         <div class="stage" id="xpBox"><canvas id="paperX" aria-label="아래 스크린의 x를 시간에 따라 기록하는 모눈종이. 시간은 아래로 흐르고, 원운동 좌표평면과 같은 가로 위치와 축척입니다."></canvas></div>
@@ -1182,21 +1184,6 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
       ctx.fillStyle = C.shadow; ctx.beginPath(); ctx.roundRect(sx, Y(p.y) - 9, 10, 18, 3); ctx.fill();
     }
 
-    // with the graph paper on, the tips of the v and a copies at the origin are carried out of the plane
-    // (right edge → t–y sheet, bottom edge → t–x sheet), so each paper point links back to its vector
-    if ((opt.py || opt.px) && !opt.hide) {
-      for (const [on, q, s, col] of [[sw.v, Vk(step), sv, C.vv], [sw.a, Ak(step), sa, C.va]]) {
-        if (!on) continue;
-        const tx = X(q.x * s), ty = Y(q.y * s);
-        ctx.save(); ctx.setLineDash([4, 4]); ctx.strokeStyle = col; ctx.globalAlpha = 0.6; ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        if (opt.py) { ctx.moveTo(tx, ty); ctx.lineTo(W, ty); }
-        if (opt.px) { ctx.moveTo(tx, ty); ctx.lineTo(tx, W); }
-        ctx.stroke();
-        ctx.restore();
-      }
-    }
-
     // the moving point, drawn like the ball in the simulation
     const bx = X(p.x), by = Y(p.y), br = 9;
     const g = ctx.createRadialGradient(bx - br * 0.35, by - br * 0.4, 1, bx, by, br);
@@ -1275,7 +1262,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
   }
 
   // Z: sheet size in px, k: sheet size / circle size (so padding and text scale with it)
-  function sheetY(c, Z, k, show, tb = 1) {
+  function sheetY(c, Z, k, show, tb = 1, guides = false) {
     const { r, w, dt, N, k0, t0, span } = timeline();
     const pad = PAD * k, u = (Z / 2 - pad) / LIM;
     const V = v => Z / 2 - v * u;                        // same vertical mapping as the circle
@@ -1304,11 +1291,11 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     c.fillText('오른쪽 스크린', Z - pad, V(LIM) - 12 * k);
     const ser = series('y');
     legend(c, ser, Z - pad - c.measureText('오른쪽 스크린').width - 14 * k, V(LIM) - 12 * k, k, tb, 'right');
-    if (show) plot(c, ser, k0, (i, v) => [Tm(i * dt), V(v)], (v) => line(c, 0, V(v), Tm(step * dt), V(v)), k);
+    if (show) plot(c, ser, k0, (i, v) => [Tm(i * dt), V(v)], guides && (v => line(c, 0, V(v), Tm(step * dt), V(v))), k);
     c.restore();
   }
 
-  function sheetX(c, Z, k, show, tb = 1) {
+  function sheetX(c, Z, k, show, tb = 1, guides = false) {
     const { r, w, dt, N, k0, t0, span } = timeline();
     const pad = PAD * k, u = (Z / 2 - pad) / LIM;
     const X = v => Z / 2 + v * u;                        // same horizontal mapping as the circle
@@ -1335,7 +1322,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     c.textAlign = 'right'; c.textBaseline = 'middle'; c.fillText('아래 스크린', X(LIM), Z - pad + 10 * k);
     const ser = series('x');
     legend(c, ser, X(-LIM), Z - pad + 10 * k, k, tb, 'left');
-    if (show) plot(c, ser, k0, (i, v) => [X(v), Tm(i * dt)], (v) => line(c, X(v), 0, X(v), Tm(step * dt)), k);
+    if (show) plot(c, ser, k0, (i, v) => [X(v), Tm(i * dt)], guides && (v => line(c, X(v), 0, X(v), Tm(step * dt))), k);
     c.restore();
   }
 
@@ -1360,10 +1347,12 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
   }
   function plot(c, ser, k0, at, guideAt, k) {
     for (const s of ser) {
-      // dashed guide continuing the line that leaves the circle plane (gray for the shadow, vector colour for v and a)
-      c.save(); c.setLineDash([4 * k, 4 * k]); c.lineWidth = 1.2 * k;
-      c.strokeStyle = s.guide ? '#8a909c' : s.color; c.globalAlpha = s.guide ? 1 : 0.6;
-      guideAt(s.f(step)); c.restore();
+      // printed sheets carry their own short guide from the edge (on screen the overlay draws the whole line)
+      if (guideAt) {
+        c.save(); c.setLineDash([4 * k, 4 * k]); c.lineWidth = 1.2 * k;
+        c.strokeStyle = s.guide ? '#8a909c' : s.color; c.globalAlpha = s.guide ? 1 : 0.6;
+        guideAt(s.f(step)); c.restore();
+      }
       for (let i = k0; i <= step; i++) { const [x, y] = at(i, s.f(i)); dot(c, x, y, i === step, k, s.color); }
     }
   }
@@ -1397,6 +1386,47 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
       const Z = el.clientWidth;
       if (Z) f(c, Z, Z / Wc, !opt.hide);
     }
+    drawLinks();
+  }
+
+  // one overlay over the circle and both sheets, so every dashed link runs unbroken across the gaps:
+  // shadow (gray) from the ball, v and a from the tips of their copies at the origin, to today's point on each sheet
+  const links = $('links'), lctx = links.getContext('2d'), board = $('board');
+  function drawLinks() {
+    const d = Math.min(window.devicePixelRatio || 1, 2);
+    const B = board.getBoundingClientRect();
+    if (links.width !== Math.round(B.width * d) || links.height !== Math.round(B.height * d)) {
+      links.width = Math.round(B.width * d); links.height = Math.round(B.height * d);
+    }
+    lctx.setTransform(d, 0, 0, d, 0, 0);
+    lctx.clearRect(0, 0, B.width, B.height);
+    if (opt.hide || !(opt.py || opt.px)) return;
+    const Wc = cv.clientWidth;
+    if (!Wc) return;
+    const cR = cv.getBoundingClientRect(), u = (Wc / 2 - PAD) / LIM;
+    const cX = v => cR.left - B.left + Wc / 2 + v * u, cY = v => cR.top - B.top + Wc / 2 - v * u;
+    const { dt, N, t0, span } = timeline();
+    const sx = series('x'), sy = series('y');
+    lctx.lineWidth = 1.3;
+    sy.forEach((s, i) => {
+      const fx = sx[i].f(step), fy = s.f(step);
+      // starting point on the circle: the ball for the shadow, the arrow tip for v and a
+      const x0 = cX(fx), y0 = cY(fy), off = s.guide ? 11 : 0;
+      lctx.save(); lctx.setLineDash([4, 4]);
+      lctx.strokeStyle = s.guide ? '#8a909c' : s.color; lctx.globalAlpha = s.guide ? 1 : 0.7;
+      lctx.beginPath();
+      if (opt.py) {
+        const R = paperY.getBoundingClientRect(), Z = paperY.clientWidth, k = Z / Wc, pad = PAD * k;
+        const tx = R.left - B.left + pad + (step * dt - t0) / span * (Z - 2 * pad);
+        lctx.moveTo(x0 + off, y0); lctx.lineTo(tx, y0);
+      }
+      if (opt.px) {
+        const R = paperX.getBoundingClientRect(), Z = paperX.clientWidth, k = Z / Wc, pad = PAD * k;
+        const ty = R.top - B.top + pad + (step * dt - t0) / span * (Z - 2 * pad);
+        lctx.moveTo(x0, y0 + off); lctx.lineTo(x0, ty);
+      }
+      lctx.stroke(); lctx.restore();
+    });
   }
   function sizePaper() {
     const d = Math.min(window.devicePixelRatio || 1, 2);
@@ -1433,7 +1463,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
   $('pPrint').addEventListener('click', async () => {
     const { r, w, T, dt } = S();
     const Wc = cv.clientWidth || 600, Z = 1200;
-    const mk = f => { const o = document.createElement('canvas'); o.width = o.height = Z; f(o.getContext('2d'), Z, Z / Wc, !opt.hide, 1.5); return o.toDataURL('image/png'); };
+    const mk = f => { const o = document.createElement('canvas'); o.width = o.height = Z; f(o.getContext('2d'), Z, Z / Wc, !opt.hide, 1.5, true); return o.toDataURL('image/png'); };
     // circle top-left; t–y to its right, t–x under it; the instructions fill the free cell
     const steps = `<ol class="ps-steps">
           <li>물체는 Δt마다 원을 따라 한 칸씩 움직여요.</li>
