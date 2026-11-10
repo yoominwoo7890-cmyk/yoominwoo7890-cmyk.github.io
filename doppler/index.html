@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>도플러 녹음 분석기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: 참고 코드(운동 분석기)의 체계 — 흰 종이 + 회색 무대, 오른쪽 단계 레일, 단계별 콘솔, 아래 결과 블록.
+   의도적으로 밝은 단일 테마. 파랑 = 접근(청색편이), 빨강 = 후퇴(적색편이). */
+:root{
+  --paper:#ffffff;
+  --surface:#f7f8fa;
+  --surface2:#eef1f5;
+  --rule:#dde2ea;
+  --rule-soft:#ebeef3;
+  --ink:#141922;
+  --body:#3e4653;
+  --muted:#7b8492;
+  --faint:#a6adb9;
+  --red:#d13c36;
+  --red-soft:#fdf0ef;
+  --blue:#2b57b5;
+  --blue-soft:#eef2fb;
+  --blue-line:#d5dff5;
+  --green:#1b8358;
+  --green-soft:#edf7f2;
+  --amber-soft:#fdf6e8;
+  --amber-ink:#7d5606;
+  --ui:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,-apple-system,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  --shadow:0 1px 2px rgba(20,25,34,.04),0 4px 12px rgba(20,25,34,.05);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+[hidden]{display:none!important}
+img{max-width:100%}
+body{
+  margin:0;background:var(--paper);color:var(--body);font-family:var(--ui);
+  font-size:14.5px;line-height:1.6;-webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{color:var(--ink);margin:0}
+
+header{border-bottom:1px solid var(--rule);background:var(--paper)}
+.hd{max-width:1200px;margin:0 auto;padding-block:16px;
+  padding-left:max(22px,env(safe-area-inset-left,0px));padding-right:max(22px,env(safe-area-inset-right,0px))}
+.brand{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap}
+.brand h1{font-size:19px;font-weight:700;letter-spacing:-.02em}
+.brand span{font-size:12.5px;color:var(--muted)}
+
+.shell{
+  display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:26px;
+  max-width:1200px;margin:0 auto;align-items:start;padding-block:20px 90px;
+  padding-left:max(22px,env(safe-area-inset-left,0px));padding-right:max(22px,env(safe-area-inset-right,0px));
+}
+main{min-width:0}
+
+.rail{position:sticky;top:calc(env(safe-area-inset-top,0px) + 18px);display:flex;flex-direction:column;border-left:2px solid var(--rule)}
+.rail .rt{font-size:10.5px;font-weight:700;letter-spacing:.14em;color:var(--faint);padding:0 0 9px 16px;text-transform:uppercase}
+.rail button{
+  position:relative;display:flex;align-items:center;gap:11px;width:100%;
+  background:none;border:0;padding:12px 12px 12px 16px;cursor:pointer;text-align:left;
+  font-family:var(--ui);font-size:13.5px;font-weight:600;color:var(--faint);
+  transition:.15s;min-height:52px;border-radius:0 7px 7px 0;
+}
+.rail button::before{content:'';position:absolute;left:-2px;top:50%;transform:translateY(-50%);width:8px;height:1px;background:var(--rule);transition:.15s}
+.rail button b{
+  flex:0 0 auto;width:27px;height:27px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:11px;font-weight:600;border:1px solid var(--rule);color:var(--faint);background:var(--paper);transition:.15s;
+}
+.rail button:not(:disabled):hover{color:var(--body);background:var(--surface)}
+.rail button.done{color:var(--muted)}
+.rail button.done b{border-color:#bfd0ec;color:var(--blue);background:var(--blue-soft)}
+.rail button.on{color:var(--blue);background:var(--blue-soft)}
+.rail button.on b{background:var(--blue);border-color:var(--blue);color:#fff}
+.rail button.on::before{width:15px;height:3px;background:var(--blue);border-radius:2px}
+.rail button:disabled{opacity:.4;cursor:not-allowed}
+@media(max-width:900px){
+  .shell{grid-template-columns:minmax(0,1fr);gap:14px;padding-block:16px 80px;
+    padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .hd{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .rail{position:static;order:-1;flex-direction:row;overflow-x:auto;border-left:0;border-bottom:2px solid var(--rule)}
+  .rail::-webkit-scrollbar{height:0}
+  .rail .rt{display:none}
+  .rail button{flex:0 0 auto;width:auto;min-height:46px;border-radius:7px 7px 0 0;padding:8px 13px;font-size:13px}
+  .rail button::before{left:50%;top:auto;bottom:-2px;transform:translateX(-50%);width:8px;height:1px}
+  .rail button.on::before{width:100%;height:3px}
+}
+
+.guide{display:flex;gap:13px;align-items:flex-start;background:var(--blue-soft);border:1px solid var(--blue-line);border-radius:7px;padding:13px 15px;margin-bottom:16px}
+.guide .n{flex:0 0 auto;width:23px;height:23px;border-radius:50%;background:var(--blue);color:#fff;font-family:var(--mono);font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-top:2px}
+.guide strong{display:block;color:var(--ink);font-size:14.5px;font-weight:600;margin-bottom:1px}
+.guide strong{font-size:15px}
+.guide ol{margin:8px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;counter-reset:g}
+.guide li{counter-increment:g;display:flex;gap:9px;align-items:flex-start;font-size:13.5px;color:var(--body);line-height:1.5}
+.guide li::before{content:counter(g);flex:0 0 auto;width:19px;height:19px;border-radius:5px;background:var(--paper);border:1px solid var(--blue-line);color:var(--blue);font-family:var(--mono);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.guide li b{color:var(--ink);font-weight:700}
+.guide li b.a{color:var(--blue)} .guide li b.r{color:var(--red)}
+.guide li code{font-family:var(--mono);font-size:12.5px;color:var(--ink);background:var(--paper);border:1px solid var(--blue-line);border-radius:4px;padding:0 5px}
+ul.nlist{margin:10px 0 0;padding:0 0 0 18px;display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);line-height:1.55}
+ul.nlist b{color:var(--body)}
+
+.stage{position:relative;background:var(--surface2);border:1px solid var(--rule);border-radius:8px 8px 0 0;overflow:hidden}
+.stage.solo{border-radius:8px}
+#mainCanvas{display:block;width:100%;touch-action:none;background:var(--paper)}
+.empty{
+  min-height:320px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:28px;
+  background-image:linear-gradient(var(--rule-soft) 1px,transparent 1px),linear-gradient(90deg,var(--rule-soft) 1px,transparent 1px);
+  background-size:22px 22px;background-color:#fbfcfd;
+}
+.empty h3{font-size:17px;font-weight:700}
+.empty p{margin:0;font-size:13px;color:var(--muted);max-width:420px;line-height:1.6}
+.empty .row{justify-content:center}
+.empty.drag{background-color:var(--blue-soft)}
+.badge{position:absolute;top:10px;left:62px;font-family:var(--mono);font-size:11px;background:rgba(255,255,255,.94);border:1px solid var(--rule);color:var(--body);padding:3px 9px;border-radius:4px;pointer-events:none;box-shadow:var(--shadow);max-width:calc(100% - 80px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badge.demo{border-color:#f0e3c2;background:var(--amber-soft);color:var(--amber-ink)}
+.hint{position:absolute;bottom:10px;left:62px;right:10px;font-size:12.5px;background:rgba(255,255,255,.95);border:1px solid var(--rule);border-radius:5px;padding:7px 11px;pointer-events:none;color:var(--body);box-shadow:var(--shadow)}
+@media(max-width:600px){.hint{display:none}}
+.spin{position:absolute;inset:0;background:rgba(255,255,255,.9);display:none;align-items:center;justify-content:center;flex-direction:column;gap:11px;z-index:5}
+.spin.on{display:flex}
+.spin .t{font-size:13px;font-weight:600;color:var(--ink)}
+.bar{width:210px;max-width:70%;height:4px;background:var(--surface2);border-radius:2px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--blue);width:0%;transition:width .12s}
+
+.console{background:var(--surface);border:1px solid var(--rule);border-top:0;border-radius:0 0 8px 8px;padding:15px 16px}
+.panel{display:none;flex-direction:column;gap:13px}
+.panel.on{display:flex}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row.end{margin-top:2px;padding-top:12px;border-top:1px solid var(--rule-soft)}
+label.f{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--body);white-space:nowrap}
+.k{color:var(--muted);font-size:12.5px}
+
+button.b{
+  font-family:var(--ui);font-size:14px;font-weight:600;background:var(--paper);color:var(--ink);border:1px solid var(--rule);
+  padding:11px 17px;min-height:46px;border-radius:7px;cursor:pointer;transition:.13s;box-shadow:var(--shadow);touch-action:manipulation;
+}
+button.b:hover:not(:disabled){border-color:#c3cbd8;background:#fdfdfe}
+button.b:active:not(:disabled){transform:translateY(1px)}
+button.b:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
+button.b.pri{background:var(--blue);color:#fff;border-color:var(--blue)}
+button.b.pri:hover:not(:disabled){background:#2449a0;border-color:#2449a0}
+button.b.sm{font-size:13px;padding:8px 13px;min-height:40px}
+button.b.sm.sel{background:var(--ink);color:#fff;border-color:var(--ink)}
+input[type=number],select{
+  font-family:var(--mono);font-size:14px;background:var(--paper);color:var(--ink);
+  border:1px solid var(--rule);border-radius:6px;padding:10px 11px;width:96px;min-height:44px;
+}
+select{font-family:var(--ui);width:auto;min-width:150px;cursor:pointer}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.val{font-family:var(--mono);font-size:12.5px;color:var(--ink);font-variant-numeric:tabular-nums}
+.val.q{color:var(--muted)}
+.note{font-size:12.5px;color:var(--muted);line-height:1.55}
+.note b{color:var(--body)}
+.callout{font-size:12.5px;border-radius:6px;padding:9px 12px;line-height:1.55;background:var(--amber-soft);border:1px solid #f0e3c2;color:var(--amber-ink)}
+.callout.ok{background:var(--green-soft);border-color:#cfe8dd;color:#14663f}
+.grp{border:1px solid var(--rule);background:var(--paper);border-radius:6px;padding:10px 12px;display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.grp .tag{font-size:12px;color:var(--muted);font-weight:600;margin-right:2px}
+.adv{display:none;flex-direction:column;gap:11px;border-left:2px solid var(--rule);padding-left:12px;margin-left:2px}
+.adv.on{display:flex}
+button.link{background:none;border:0;box-shadow:none;padding:2px 0;cursor:pointer;font-family:var(--ui);font-size:12.5px;font-weight:600;color:var(--blue);align-self:flex-start}
+button.link:hover{text-decoration:underline}
+
+.block{margin-top:30px}
+.blockhd{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--rule);padding-bottom:8px;margin-bottom:12px}
+.blockhd h2{font-size:15px;font-weight:700;letter-spacing:-.01em}
+.blockhd .meta{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+
+.sum{background:var(--paper);border:1px solid var(--rule);border-radius:8px;box-shadow:var(--shadow);display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.5fr);overflow:hidden}
+.vbox{padding:20px 22px;display:flex;flex-direction:column;justify-content:center;gap:4px;border-right:1px solid var(--rule-soft)}
+.lab{font-size:12.5px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:7px}
+.vbox .big{display:flex;align-items:baseline;gap:8px}
+.vbox .big strong{font-family:var(--mono);font-size:46px;font-weight:500;color:var(--ink);line-height:1.1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.vbox .big span{font-size:15px;color:var(--muted)}
+.vbox .pm{font-family:var(--mono);font-size:13px;color:var(--body)}
+.vbox .pm.q{color:var(--muted);font-family:var(--ui);font-size:12.5px}
+.stats{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.stat{padding:15px 20px;display:flex;flex-direction:column;gap:3px;border-bottom:1px solid var(--rule-soft);min-width:0}
+.stat:nth-child(odd){border-right:1px solid var(--rule-soft)}
+.stat:nth-last-child(-n+2){border-bottom:0}
+.stat b{font-family:var(--mono);font-size:21px;font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.stat b small{font-size:12.5px;font-weight:400;color:var(--muted);margin-left:5px}
+.dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:var(--faint)}
+.dot.a{background:var(--blue)} .dot.r{background:var(--red)}
+.calc{grid-column:1/-1;border-top:1px solid var(--rule);background:var(--surface);padding:11px 20px;display:flex;gap:14px;align-items:baseline;overflow-x:auto}
+.calc .k{flex:0 0 auto;font-size:12px;font-weight:600}
+.calc code{font-family:var(--mono);font-size:13.5px;color:var(--ink);white-space:nowrap}
+@media(max-width:720px){
+  .sum{grid-template-columns:minmax(0,1fr)}
+  .vbox{border-right:0;border-bottom:1px solid var(--rule-soft)}
+  .stat{padding:13px 16px}
+  .calc{padding:11px 16px}
+}
+.a{color:var(--blue)!important} .r{color:var(--red)!important}
+
+.twrap{width:100%;overflow-x:auto;border:1px solid var(--rule);border-radius:8px;box-shadow:var(--shadow)}
+table.rt{width:100%;border-collapse:collapse;font-size:14px;background:var(--paper)}
+.rt th{font-family:var(--ui);font-size:12.5px;font-weight:600;color:var(--body);background:var(--surface);padding:9px 16px;text-align:right;white-space:nowrap}
+.rt th small{font-family:var(--mono);font-size:11px;font-weight:400;color:var(--muted);margin-left:4px}
+.rt thead tr:last-child th{border-bottom:1px solid var(--rule)}
+.rt thead tr.g th{padding-bottom:0;text-align:center}
+.rt thead tr.g th span{display:block;padding-bottom:6px;border-bottom:2px solid currentColor}
+.rt th.ga{color:var(--blue)} .rt th.gr{color:var(--red)}
+.rt td{font-family:var(--mono);padding:11px 16px;text-align:right;border-bottom:1px solid var(--rule-soft);color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums}
+.rt th:first-child,.rt td:first-child{text-align:center;width:4.5em}
+.rt td:first-child{font-family:var(--ui);color:var(--muted)}
+.rt td.t{color:var(--muted)}
+.rt .sl{border-left:1px solid var(--rule-soft)}
+.rt td.v{font-weight:600}
+.rt tbody tr:nth-child(even) td{background:#fbfcfd}
+.rt tbody tr:hover td{background:var(--blue-soft)}
+.rt tfoot td{background:var(--surface);font-weight:600;border-top:1px solid var(--rule);border-bottom:0}
+.rt tfoot td:first-child{color:var(--ink);font-weight:700}
+.rt tfoot small{font-weight:400;color:var(--muted);font-size:12px;margin-left:5px}
+.rt td.emptyrow{text-align:center;color:var(--faint);padding:26px 0;font-family:var(--ui);font-size:13px;width:auto}
+
+.scopebox{background:var(--paper);border:1px solid var(--rule);border-radius:7px;padding:10px 11px 8px;box-shadow:var(--shadow)}
+.scopebox .cap{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;padding:0 1px 7px}
+.scopebox .cap b{font-size:13px;font-weight:600;color:var(--ink)}
+.scopebox .cap span{font-family:var(--mono);font-size:11px;color:var(--muted)}
+#scopeCanvas{display:block;width:100%}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="hd">
+    <div class="brand">
+      <h1>도플러 녹음 분석기</h1>
+      <span>녹음 파일로 음원의 진동수 변화와 속도 측정</span>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+<main>
+  <div class="guide">
+    <div class="n" id="gNum">1</div>
+    <div><strong id="gTitle"></strong><ol id="gList"></ol></div>
+  </div>
+
+  <div class="stage solo" id="stage">
+    <div class="empty" id="empty">
+      <h3>녹음 파일을 선택하세요</h3>
+      <p>휴대폰 기본 녹음 앱으로 녹음한 m4a, wav, mp3 파일을 쓸 수 있습니다.<br>파일은 이 기기 안에서만 분석되며 어디로도 전송되지 않습니다.</p>
+      <div class="callout ok" style="max-width:440px;text-align:left"><b>권장 길이 5~15초</b> · 회전이 일정한 부분만 남기기</div>
+      <div class="row">
+        <button class="b pri" id="pick">녹음 파일 선택</button>
+        <button class="b" id="demo">예시 녹음으로 해 보기</button>
+      </div>
+      <p>파일을 이 영역에 끌어 놓아도 됩니다.</p>
+    </div>
+    <canvas id="mainCanvas" hidden></canvas>
+    <div class="badge" id="badge" hidden></div>
+    <div class="hint" id="hint" hidden></div>
+    <div class="spin" id="spin"><div class="t" id="spinT">분석 중</div><div class="bar"><i id="spinB"></i></div></div>
+  </div>
+
+  <div class="console" id="console" hidden>
+    <div class="panel" id="p-open">
+      <div class="row">
+        <button class="b pri" id="pick2">다른 녹음 열기</button>
+        <button class="b" id="demo2">예시 녹음 열기</button>
+        <button class="b" id="resume">이어서 하기</button>
+      </div>
+      <div class="note">다른 파일을 열면 지금까지 고른 구간과 결과는 지워지고 처음부터 다시 시작합니다.</div>
+    </div>
+
+    <div class="panel" id="p-sel">
+      <div class="row">
+        <button class="b sm" id="selAll">전체 구간</button>
+        <span class="val" id="selV">—</span>
+      </div>
+      <div class="callout" id="lenInfo" hidden></div>
+      <button class="link adv-t" data-t="adv-sel">＋ 세부 설정 (분석 창 길이, 음원 진동수)</button>
+      <div class="adv" id="adv-sel">
+        <div class="row">
+          <label class="f"><span class="k">분석 창 길이</span>
+            <select id="win"><option value="0.05">0.05초 (빠른 변화)</option><option value="0.1" selected>0.10초 (권장)</option><option value="0.2">0.20초 (잡음 많을 때)</option></select>
+          </label>
+          <label class="f"><span class="k">음원 진동수</span><input type="number" id="fguess" min="50" max="12000" step="1" placeholder="자동"><span class="k">Hz</span></label>
+        </div>
+        <div class="note">음원 진동수는 비워 두면 자동으로 찾습니다. 다른 소리가 더 크게 잡힐 때만 직접 적으세요.</div>
+      </div>
+      <div class="row end"><button class="b pri" id="toTrack">다음 — 진동수 분석</button></div>
+    </div>
+
+    <div class="panel" id="p-track">
+      <div class="grp">
+        <span class="tag">세로축</span>
+        <button class="b sm sel" id="showF">진동수 f (Hz)</button>
+        <button class="b sm" id="showT">주기 T (μs)</button>
+      </div>
+      <div class="callout ok" id="trackInfo" hidden></div>
+      <div class="scopebox">
+        <div class="cap"><b>파형 확대</b><span id="scopeCap">그래프를 클릭하세요</span></div>
+        <canvas id="scopeCanvas"></canvas>
+      </div>
+      <div class="row end">
+        <button class="b" id="backSel">구간 다시 고르기</button>
+        <button class="b pri" id="toResult">다음 — 속도 계산</button>
+      </div>
+    </div>
+
+    <div class="panel" id="p-result">
+      <div class="grp">
+        <span class="tag">실험 조건</span>
+        <label class="f"><span class="k">실내 온도</span><input type="number" id="temp" step="0.1" value="22"><span class="k">°C</span></label>
+      </div>
+      <div class="callout" id="resWarn" hidden></div>
+      <div class="row end">
+        <button class="b" id="backSel2">구간 다시 고르기</button>
+        <button class="b" id="copyCsv">결과 표 복사</button>
+        <button class="b pri" id="saveCsv" hidden>CSV 저장</button>
+        <span class="val q" id="csvMsg"></span>
+      </div>
+    </div>
+  </div>
+
+  <div id="resBlock" hidden>
+    <div class="block">
+      <div class="blockhd"><h2>속도 계산</h2><span class="meta" id="resMeta"></span></div>
+      <div class="sum">
+        <div class="vbox">
+          <span class="lab">도플러로 구한 음원 속도</span>
+          <div class="big"><strong id="vMain">—</strong><span>m/s</span></div>
+          <span class="pm" id="vSig"></span>
+        </div>
+        <div class="stats">
+          <div class="stat"><span class="lab"><i class="dot a"></i>f₁ 접근 (최댓값 평균)</span><b id="f1Out">—</b></div>
+          <div class="stat"><span class="lab"><i class="dot r"></i>f₂ 후퇴 (최솟값 평균)</span><b id="f2Out">—</b></div>
+          <div class="stat"><span class="lab">Δf = f₁ − f₂</span><b id="dfOut">—</b></div>
+          <div class="stat"><span class="lab"><i class="dot"></i>f₀ 전체 평균</span><b id="f0Out">—</b></div>
+        </div>
+        <div class="calc"><span class="k">계산</span><code id="calcLine">—</code></div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="blockhd"><h2>바퀴별 측정값</h2><span class="meta" id="tblMeta"></span></div>
+      <div class="twrap">
+        <table class="rt">
+          <thead>
+            <tr class="g"><th rowspan="2">바퀴</th><th colspan="2" class="ga sl"><span>접근 · 진동수 최대</span></th><th colspan="2" class="gr sl"><span>후퇴 · 진동수 최소</span></th><th rowspan="2" class="sl">Δf<small>Hz</small></th><th rowspan="2">속도 v<small>m/s</small></th></tr>
+            <tr><th class="sl">시각<small>s</small></th><th>f₁<small>Hz</small></th><th class="sl">시각<small>s</small></th><th>f₂<small>Hz</small></th></tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+          <tfoot id="tfoot"></tfoot>
+        </table>
+      </div>
+      <ul class="nlist">
+        <li><b>진동수 최대</b> = 음원이 센서 쪽으로 곧장 다가오는 순간</li>
+        <li><b>진동수 최소</b> = 음원이 센서에서 곧장 멀어지는 순간</li>
+        <li>평균 행의 <b>±</b> = 바퀴별 값의 표준오차</li>
+      </ul>
+    </div>
+  </div>
+</main>
+
+<nav class="rail" id="rail" aria-label="진행 단계">
+  <div class="rt">진행 단계</div>
+  <button data-s="0" class="on"><b>01</b>녹음 열기</button>
+  <button data-s="1" disabled><b>02</b>구간 고르기</button>
+  <button data-s="2" disabled><b>03</b>진동수 분석</button>
+  <button data-s="3" disabled><b>04</b>속도 계산</button>
+</nav>
+</div>
+
+<input type="file" id="file" accept="audio/*,.m4a,.wav,.mp3,.aac,.ogg,.webm" hidden>
+
+<script>
+"use strict";
+(() => {
+const $ = (s) => document.querySelector(s), $$ = (s) => [...document.querySelectorAll(s)];
+const COL = { ink:"#141922", body:"#3e4653", muted:"#7b8492", faint:"#a6adb9", rule:"#dde2ea", soft:"#ebeef3", blue:"#2b57b5", red:"#d13c36", selFill:"rgba(43,87,181,.10)", paper:"#ffffff" };
+const MONO = '"IBM Plex Mono",ui-monospace,monospace';
+
+const S = { x:null, fs:0, name:"", demo:false, env:null, fpeak:0, track:null, sel:null, scopeT:null, showT:false, result:null, step:0, maxStep:0, drag:null };
+
+// each step: [title, items]; an item is a list of parts — plain text, {b:"bold"}, {b:"..", c:"a"|"r"}, or {code:".."}
+const GUIDE = [
+  ["녹음 파일을 엽니다", [
+    ["다른 기기에서 ", {b:"2000~4000 Hz 사인파"}, "를 틀고 줄에 묶어 돌립니다"],
+    ["휴대폰을 ", {b:"고정"}, "한 채 기본 녹음 앱으로 녹음합니다 · ", {b:"음성 강조·잡음 제거는 끄기"}],
+    ["회전이 일정한 부분만 ", {b:"5~15초"}, "로 잘라서 올립니다"],
+  ]],
+  ["분석할 구간을 고릅니다", [
+    ["그래프는 ", {b:"시간에 따른 소리 크기"}, "입니다"],
+    [{b:"회전이 일정한 부분"}, "을 드래그해 고릅니다 · 시작·멈춤 순간은 빼기"],
+    ["구간은 ", {b:"5~15초"}, "가 가장 좋습니다 · 미리 잘라 둔 파일이면 ", {b:"전체 구간"}, " 그대로"],
+  ]],
+  ["시간에 따른 진동수를 확인합니다", [
+    ["다가올 때 ", {b:"진동수 ↑", c:"a"}, ", 멀어질 때 ", {b:"진동수 ↓", c:"r"}],
+    ["원운동이면 그래프가 ", {b:"규칙적인 물결"}, " 모양이어야 합니다"],
+    ["그래프를 ", {b:"클릭"}, "하면 그 시점의 실제 파형이 아래에 나옵니다"],
+  ]],
+  ["음원 속도를 계산합니다", [
+    [{b:"파란 점", c:"a"}, " = 바퀴마다 진동수 최대 (접근, f₁)"],
+    [{b:"빨간 점", c:"r"}, " = 바퀴마다 진동수 최소 (후퇴, f₂)"],
+    [{code:"v = c·(f₁ − f₂)/(f₁ + f₂)"}, " 로 계산 · 결과는 ", {b:"아래 표"}, "에서 확인"],
+  ]],
+];
+function renderGuide(title, items){
+  $("#gTitle").textContent = title;
+  const ol = $("#gList"); ol.innerHTML = "";
+  for (const parts of items){
+    const li = document.createElement("li"), span = document.createElement("span");
+    for (const p of parts){
+      if (typeof p === "string"){ span.appendChild(document.createTextNode(p)); continue; }
+      const el = document.createElement(p.code ? "code" : "b");
+      el.textContent = p.code || p.b; if (p.c) el.className = p.c; span.appendChild(el);
+    }
+    li.appendChild(span); ol.appendChild(li);
+  }
+}
+const HINT = [null, "드래그해서 분석 구간 선택 · 클릭하면 그 시점 파형 보기", "클릭하면 그 시점의 실제 파형을 아래에서 보여줍니다", "파란 점 = 바퀴별 최댓값(접근) · 빨간 점 = 최솟값(후퇴)"];
+
+// ---------- FFT & signal ----------
+const twCache = new Map();
+function fft(re, im){
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++){ let bit = n >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit;
+    if (i < j){ let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+  let tw = twCache.get(n);
+  if (!tw){ tw = { c:new Float64Array(n/2), s:new Float64Array(n/2) }; for (let k = 0; k < n/2; k++){ tw.c[k] = Math.cos(-2*Math.PI*k/n); tw.s[k] = Math.sin(-2*Math.PI*k/n); } twCache.set(n, tw); }
+  for (let len = 2; len <= n; len <<= 1){ const half = len >> 1, step = n/len;
+    for (let i = 0; i < n; i += len) for (let k = 0; k < half; k++){
+      const wr = tw.c[k*step], wi = tw.s[k*step], a = i + k, b = a + half;
+      const xr = re[b]*wr - im[b]*wi, xi = re[b]*wi + im[b]*wr;
+      re[b] = re[a] - xr; im[b] = im[a] - xi; re[a] += xr; im[a] += xi; } }
+}
+const nextPow2 = (n) => 1 << Math.ceil(Math.log2(Math.max(2, n)));
+const hann = (n) => { const w = new Float64Array(n); for (let i = 0; i < n; i++) w[i] = 0.5 - 0.5*Math.cos(2*Math.PI*i/(n-1)); return w; };
+function peakInBand(mag, i0, i1){
+  let k = i0; for (let i = i0; i <= i1; i++) if (mag[i] > mag[k]) k = i;
+  let p = 0;
+  if (k > 0 && k < mag.length - 1){ const a = Math.log(mag[k-1]+1e-20), b = Math.log(mag[k]+1e-20), c = Math.log(mag[k+1]+1e-20), d = a - 2*b + c; if (d < 0) p = 0.5*(a-c)/d; }
+  return { k, p, m:mag[k], edge:k === i0 || k === i1 };
+}
+function detectPeak(x, fs){
+  const N = 1 << Math.floor(Math.log2(Math.min(x.length, 65536)));
+  const start = Math.max(0, Math.floor(x.length/2 - N/2));
+  const re = new Float64Array(N), im = new Float64Array(N), w = hann(N);
+  for (let i = 0; i < N; i++) re[i] = x[start+i]*w[i];
+  fft(re, im);
+  const mag = new Float64Array(N/2); for (let i = 0; i < N/2; i++) mag[i] = Math.hypot(re[i], im[i]);
+  const lo = Math.ceil(80*N/fs), hi = Math.min(N/2-2, Math.floor(Math.min(12000, fs/2.2)*N/fs));
+  const pk = peakInBand(mag, lo, hi); return (pk.k + pk.p)*fs/N;
+}
+function decimate(x, fs, fp){
+  const D = Math.max(1, Math.floor(fs/Math.max(6*fp, 1500)));
+  if (D === 1) return { y:x, fs2:fs };
+  const L = 8*D + 1, fc = 0.42/D, h = new Float64Array(L), M = (L-1)/2; let sum = 0;
+  for (let i = 0; i < L; i++){ const n = i - M, s = n === 0 ? 2*fc : Math.sin(2*Math.PI*fc*n)/(Math.PI*n);
+    h[i] = s*(0.42 - 0.5*Math.cos(2*Math.PI*i/(L-1)) + 0.08*Math.cos(4*Math.PI*i/(L-1))); sum += h[i]; }
+  for (let i = 0; i < L; i++) h[i] /= sum;
+  const n2 = Math.floor(x.length/D), y = new Float32Array(n2);
+  for (let j = 0; j < n2; j++){ const c = j*D; let acc = 0; for (let i = 0; i < L; i++){ const k = c + i - M; if (k >= 0 && k < x.length) acc += x[k]*h[i]; } y[j] = acc; }
+  return { y, fs2:fs/D };
+}
+function envelope(x, fs){
+  const hop = Math.max(1, Math.round(fs*0.01)), n = Math.floor(x.length/hop), e = new Float32Array(n);
+  for (let j = 0; j < n; j++){ let s = 0; for (let i = j*hop; i < (j+1)*hop; i++) s += x[i]*x[i]; e[j] = Math.sqrt(s/hop); }
+  return { e, hop:hop/fs };
+}
+const tick = () => new Promise((r) => setTimeout(r, 0));
+async function track(x, fs, fp, winSec, onProgress){
+  const { y, fs2 } = decimate(x, fs, fp);
+  const hopSec = Math.max(0.01, x.length/fs/3000);
+  const W = Math.max(32, Math.round(winSec*fs2)), hop = Math.max(1, Math.round(hopSec*fs2));
+  const N = Math.max(1024, nextPow2(W*8)), w = hann(W);
+  const lo = Math.max(1, Math.floor(fp*0.9*N/fs2)), hi = Math.min(N/2-2, Math.ceil(fp*1.1*N/fs2));
+  const frames = Math.max(0, Math.floor((y.length - W)/hop) + 1);
+  const t = new Float64Array(frames), f = new Float64Array(frames), mag = new Float64Array(frames), edge = new Uint8Array(frames);
+  const re = new Float64Array(N), im = new Float64Array(N), m = new Float64Array(N/2);
+  for (let j = 0; j < frames; j++){
+    re.fill(0); im.fill(0);
+    const o = j*hop; let mean = 0; for (let i = 0; i < W; i++) mean += y[o+i]; mean /= W;
+    for (let i = 0; i < W; i++) re[i] = (y[o+i] - mean)*w[i];
+    fft(re, im);
+    for (let i = lo-1; i <= hi+1; i++) m[i] = Math.hypot(re[i], im[i]);
+    const pk = peakInBand(m, lo, hi);
+    t[j] = (o + W/2)/fs2; f[j] = (pk.k + pk.p)*fs2/N; mag[j] = pk.m; edge[j] = pk.edge ? 1 : 0;
+    if (j % 300 === 299){ onProgress(j/frames); await tick(); }
+  }
+  const sorted = Array.from(mag).sort((a,b) => a-b), med = sorted[Math.floor(sorted.length/2)] || 0;
+  const valid = new Uint8Array(frames);
+  for (let j = 0; j < frames; j++) valid[j] = !edge[j] && mag[j] > 0.25*med ? 1 : 0;
+  const f3 = Float64Array.from(f);
+  for (let j = 1; j < frames-1; j++) if (valid[j-1] && valid[j] && valid[j+1]){ const a = [f[j-1], f[j], f[j+1]].sort((p,q) => p-q); f3[j] = a[1]; }
+  return { t, f:f3, valid, hop:hopSec };
+}
+
+// ---------- analysis ----------
+const totalDur = () => S.x ? S.x.length/S.fs : 0;
+const selRange = () => S.sel || [0, totalDur()];
+function analyzeSel(){
+  const tr = S.track; if (!tr){ S.result = null; return; }
+  const [ta, tb] = selRange();
+  const idx = []; for (let j = 0; j < tr.t.length; j++) if (tr.t[j] >= ta && tr.t[j] <= tb) idx.push(j);
+  const vi = idx.filter((j) => tr.valid[j]);
+  const res = {};
+  if (vi.length < 10){ res.err = "선택 구간에 진동수가 잡힌 점이 너무 적습니다. 구간을 넓히거나 녹음 음량을 확인하세요."; S.result = res; return; }
+  const fv = vi.map((j) => tr.f[j]), mean = fv.reduce((a,b) => a+b, 0)/fv.length;
+  res.f0 = mean;
+  const ser = new Float64Array(idx.length); let last = mean;
+  idx.forEach((j, i) => { if (tr.valid[j]) last = tr.f[j]; ser[i] = last - mean; });
+  const dt = tr.hop, maxLag = Math.min(Math.floor(5/dt), Math.floor(ser.length/2)), minLag = Math.ceil(0.25/dt);
+  let rot = null;
+  if (maxLag > minLag + 2){
+    let e0 = 0; for (let i = 0; i < ser.length; i++) e0 += ser[i]*ser[i];
+    const ac = new Float64Array(maxLag+1);
+    for (let L = minLag; L <= maxLag; L++){ let s = 0; for (let i = 0; i + L < ser.length; i++) s += ser[i]*ser[i+L]; ac[L] = s/e0*ser.length/(ser.length - L); }
+    let g = -1; for (let L = minLag; L <= maxLag; L++) g = Math.max(g, ac[L]);
+    if (g > 0.3) for (let L = minLag+1; L < maxLag; L++) if (ac[L] >= ac[L-1] && ac[L] >= ac[L+1] && ac[L] > 0.8*g){
+      const d = ac[L-1] - 2*ac[L] + ac[L+1], p = d < 0 ? 0.5*(ac[L-1] - ac[L+1])/d : 0; rot = (L + p)*dt; break; }
+  }
+  res.rot = rot;
+  if (rot && (tb - ta) >= 2*rot){
+    const maxes = [], mins = [];
+    for (let s = ta; s + rot <= tb + 1e-9; s += rot){
+      let bx = null, bn = null;
+      for (const j of vi){ if (tr.t[j] < s || tr.t[j] >= s + rot) continue;
+        if (!bx || tr.f[j] > bx.f) bx = { t:tr.t[j], f:tr.f[j] };
+        if (!bn || tr.f[j] < bn.f) bn = { t:tr.t[j], f:tr.f[j] }; }
+      if (bx && bn){ maxes.push(bx); mins.push(bn); }
+    }
+    const stat = (a) => { const m = a.reduce((p,q) => p+q, 0)/a.length; const sd = a.length > 1 ? Math.sqrt(a.reduce((p,q) => p + (q-m)**2, 0)/(a.length-1)) : NaN; return { m, se:sd/Math.sqrt(a.length) }; };
+    const s1 = stat(maxes.map((p) => p.f)), s2 = stat(mins.map((p) => p.f));
+    Object.assign(res, { f1:s1.m, sf1:s1.se, f2:s2.m, sf2:s2.se, maxes, mins, method:`바퀴별 평균 · ${maxes.length}바퀴` });
+  } else {
+    const s = [...fv].sort((a,b) => a-b), q = (p) => s[Math.min(s.length-1, Math.max(0, Math.round(p*(s.length-1))))];
+    Object.assign(res, { f1:q(0.97), f2:q(0.03), sf1:NaN, sf2:NaN, method:"상·하위 3% 값", noRot:true });
+  }
+  S.result = res;
+}
+
+// ---------- canvas helpers ----------
+const CAN = $("#mainCanvas"), SC = $("#scopeCanvas");
+function sizeCanvas(cv, h){
+  const dpr = window.devicePixelRatio || 1, w = cv.clientWidth || cv.parentElement.clientWidth || 800;
+  if (cv.width !== Math.round(w*dpr) || cv.height !== Math.round(h*dpr)){ cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); }
+  cv.style.height = h + "px";
+  const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return { ctx, w, h };
+}
+function niceTicks(a, b, n){
+  const span = b - a || 1, raw = span/n, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1,2,5,10].map((m) => m*mag).find((s) => span/s <= n) || 10*mag;
+  const out = []; for (let v = Math.ceil(a/step)*step; v <= b + 1e-9; v += step) out.push(+v.toFixed(10));
+  return { out, step };
+}
+const PAD = { l:62, r:16, t:46, b:34 };
+function axes(ctx, w, h, x0, x1, y0, y1, yLabel, pad){
+  const P = pad || PAD;
+  const X = (v) => P.l + (v - x0)/(x1 - x0)*(w - P.l - P.r), Y = (v) => h - P.b - (v - y0)/(y1 - y0)*(h - P.t - P.b);
+  ctx.fillStyle = COL.paper; ctx.fillRect(0, 0, w, h);
+  ctx.font = `11px ${MONO}`; ctx.lineWidth = 1;
+  const yt = niceTicks(y0, y1, 5), ydec = Math.max(0, -Math.floor(Math.log10(yt.step)));
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  for (const v of yt.out){ const y = Y(v); ctx.strokeStyle = COL.soft; ctx.beginPath(); ctx.moveTo(P.l, y); ctx.lineTo(w - P.r, y); ctx.stroke(); ctx.fillStyle = COL.muted; ctx.fillText(v.toFixed(ydec), P.l - 8, y); }
+  const xt = niceTicks(x0, x1, Math.max(3, Math.floor((w - P.l)/95))), xdec = Math.max(0, -Math.floor(Math.log10(xt.step)));
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  for (const v of xt.out){ const x = X(v); ctx.strokeStyle = COL.soft; ctx.beginPath(); ctx.moveTo(x, P.t); ctx.lineTo(x, h - P.b); ctx.stroke(); ctx.fillStyle = COL.muted; ctx.fillText(v.toFixed(xdec), x, h - P.b + 7); }
+  ctx.strokeStyle = COL.rule; ctx.beginPath(); ctx.moveTo(P.l, P.t); ctx.lineTo(P.l, h - P.b); ctx.lineTo(w - P.r, h - P.b); ctx.stroke();
+  ctx.fillStyle = COL.muted; ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.fillText("시간 (s)", w - P.r, h - 2);
+  ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.font = `600 11px ${MONO}`; ctx.fillStyle = COL.body; ctx.fillText(yLabel, 10, P.t - 12);
+  return { X, Y, P };
+}
+const mainH = () => Math.round(Math.min(420, Math.max(260, (CAN.clientWidth || 800)*0.46)));
+
+function drawOverview(){
+  const { ctx, w, h } = sizeCanvas(CAN, mainH());
+  const dur = totalDur(), e = S.env.e; let mx = 0; for (const v of e) mx = Math.max(mx, v);
+  const { X, Y, P } = axes(ctx, w, h, 0, dur, 0, (mx || 1)*1.12, "소리 크기 (RMS)");
+  const [ta, tb] = selRange();
+  if (S.sel){ ctx.fillStyle = COL.selFill; ctx.fillRect(X(ta), P.t, X(tb) - X(ta), h - P.t - P.b);
+    ctx.strokeStyle = COL.blue; ctx.lineWidth = 2; [ta, tb].forEach((t) => { ctx.beginPath(); ctx.moveTo(X(t), P.t); ctx.lineTo(X(t), h - P.b); ctx.stroke(); }); }
+  ctx.fillStyle = "rgba(43,87,181,.55)"; ctx.beginPath(); ctx.moveTo(X(0), Y(0));
+  for (let j = 0; j < e.length; j++) ctx.lineTo(X(j*S.env.hop), Y(e[j]));
+  ctx.lineTo(X(dur), Y(0)); ctx.closePath(); ctx.fill();
+  if (S.drag){ const a = Math.min(S.drag.a, S.drag.b), b = Math.max(S.drag.a, S.drag.b);
+    ctx.setLineDash([5,4]); ctx.strokeStyle = COL.blue; ctx.lineWidth = 1.5; ctx.strokeRect(X(a), P.t, X(b) - X(a), h - P.t - P.b); ctx.setLineDash([]); }
+  if (S.scopeT != null){ ctx.strokeStyle = COL.ink; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(S.scopeT), P.t); ctx.lineTo(X(S.scopeT), h - P.b); ctx.stroke(); }
+  CAN._map = { x0:0, x1:dur, P, w };
+}
+
+function drawTrack(withExtremes){
+  const { ctx, w, h } = sizeCanvas(CAN, mainH());
+  const tr = S.track, [ta, tb] = selRange(), r = S.result || {};
+  const conv = (f) => S.showT ? 1e6/f : f;
+  const vals = []; for (let j = 0; j < tr.t.length; j++) if (tr.valid[j] && tr.t[j] >= ta && tr.t[j] <= tb) vals.push(conv(tr.f[j]));
+  if (!vals.length){ axes(ctx, w, h, ta, tb, 0, 1, ""); CAN._map = null; return; }
+  vals.sort((a,b) => a-b);
+  let y0 = vals[Math.floor(vals.length*0.005)], y1 = vals[Math.ceil(vals.length*0.995) - 1];
+  const pad = Math.max((y1 - y0)*0.18, S.showT ? 2 : 0.5); y0 -= pad; y1 += pad;
+  const { X, Y, P } = axes(ctx, w, h, ta, tb, y0, y1, S.showT ? "주기 T (μs)" : "진동수 f (Hz)");
+  ctx.save(); ctx.beginPath(); ctx.rect(P.l, P.t, w - P.l - P.r, h - P.t - P.b); ctx.clip();
+  if (withExtremes){
+    const hl = (f, col) => { if (!Number.isFinite(f)) return; ctx.strokeStyle = col; ctx.setLineDash([6,4]); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(P.l, Y(conv(f))); ctx.lineTo(w - P.r, Y(conv(f))); ctx.stroke(); ctx.setLineDash([]); };
+    hl(r.f0, COL.faint); hl(r.f1, COL.blue); hl(r.f2, COL.red);
+  }
+  ctx.strokeStyle = COL.ink; ctx.lineWidth = 1.5; ctx.lineJoin = "round"; ctx.beginPath();
+  let pen = false;
+  for (let j = 0; j < tr.t.length; j++){
+    if (tr.t[j] < ta || tr.t[j] > tb) continue;
+    if (!tr.valid[j]){ pen = false; continue; }
+    const x = X(tr.t[j]), y = Y(conv(tr.f[j])); if (pen) ctx.lineTo(x, y); else { ctx.moveTo(x, y); pen = true; }
+  }
+  ctx.stroke();
+  if (withExtremes){
+    const dot = (p, col) => { ctx.fillStyle = col; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X(p.t), Y(conv(p.f)), 5.5, 0, Math.PI*2); ctx.fill(); ctx.stroke(); };
+    (r.maxes || []).forEach((p) => dot(p, COL.blue)); (r.mins || []).forEach((p) => dot(p, COL.red));
+  }
+  if (S.step === 2 && S.scopeT != null && S.scopeT >= ta && S.scopeT <= tb){ ctx.strokeStyle = COL.muted; ctx.lineWidth = 1; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(X(S.scopeT), P.t); ctx.lineTo(X(S.scopeT), h - P.b); ctx.stroke(); ctx.setLineDash([]); }
+  ctx.restore();
+  if (withExtremes && w > 520){
+    ctx.font = `600 11px ${MONO}`; ctx.textBaseline = "bottom"; ctx.textAlign = "right";
+    let xx = w - P.r;
+    for (const [c, t] of [[COL.red, "f₂ 후퇴"], [COL.blue, "f₁ 접근"], [COL.faint, "f₀ 평균"]]){
+      ctx.fillStyle = c; ctx.fillText(t, xx, P.t - 12); const tw = ctx.measureText(t).width;
+      ctx.strokeStyle = c; ctx.setLineDash([5,3]); ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(xx - tw - 24, P.t - 17); ctx.lineTo(xx - tw - 6, P.t - 17); ctx.stroke(); ctx.setLineDash([]);
+      xx -= tw + 40; }
+  }
+  CAN._map = { x0:ta, x1:tb, P, w };
+}
+
+function drawScope(){
+  const { ctx, w, h } = sizeCanvas(SC, 190);
+  if (!S.x || S.scopeT == null){ ctx.fillStyle = COL.paper; ctx.fillRect(0, 0, w, h); ctx.fillStyle = COL.faint; ctx.font = `13px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("위 그래프를 클릭하면 파형이 나타납니다", w/2, h/2); return; }
+  const fs = S.fs, i0 = Math.max(0, Math.floor((S.scopeT - 0.01)*fs)), i1 = Math.min(S.x.length - 1, Math.ceil((S.scopeT + 0.01)*fs));
+  let mn = Infinity, mx = -Infinity; for (let i = i0; i <= i1; i++){ mn = Math.min(mn, S.x[i]); mx = Math.max(mx, S.x[i]); }
+  const pad = (mx - mn)*0.12 || 0.01;
+  const { X, Y, P } = axes(ctx, w, h, i0/fs, i1/fs, mn - pad, mx + pad, "음압 (상대값)", { l:62, r:16, t:30, b:34 });
+  ctx.save(); ctx.beginPath(); ctx.rect(P.l, P.t, w - P.l - P.r, h - P.t - P.b); ctx.clip();
+  ctx.strokeStyle = COL.blue; ctx.lineWidth = 1.5; ctx.beginPath();
+  for (let i = i0; i <= i1; i++){ const x = X(i/fs), y = Y(S.x[i]); if (i === i0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+  ctx.stroke(); ctx.restore();
+  let cap = `${S.scopeT.toFixed(3)} s 전후 20 ms · ${Math.round(fs)} Hz 샘플링`;
+  const tr = S.track;
+  if (tr){ let best = -1, bd = Infinity; for (let j = 0; j < tr.t.length; j++){ const d = Math.abs(tr.t[j] - S.scopeT); if (d < bd){ bd = d; best = j; } }
+    if (best >= 0 && tr.valid[best]) cap += ` · f ≈ ${tr.f[best].toFixed(1)} Hz, T ≈ ${(1e6/tr.f[best]).toFixed(1)} μs`; }
+  $("#scopeCap").textContent = cap;
+}
+
+function render(){
+  if (!S.x) return;
+  if (S.step <= 1 || !S.track) drawOverview();
+  else drawTrack(S.step === 3);
+  if (S.step === 2) drawScope();
+  const [ta, tb] = selRange();
+  $("#selV").textContent = `${ta.toFixed(2)} → ${tb.toFixed(2)} s (${(tb - ta).toFixed(2)}초)`;
+}
+
+// ---------- results ----------
+const fmtF = (f) => Number.isFinite(f) ? f.toFixed(1) : "—";
+function numInto(el, main, unit, pm){
+  el.textContent = main;
+  if (main === "—") return;
+  const sm = document.createElement("small"); sm.textContent = (pm ? `± ${pm} ` : "") + unit; el.appendChild(sm);
+}
+function cell(tr, text, cls){ const td = document.createElement("td"); td.textContent = text; if (cls) td.className = cls; tr.appendChild(td); return td; }
+function renderResults(){
+  const T = parseFloat($("#temp").value), c = Number.isFinite(T) ? 331.3 + 0.606*T : NaN;
+  const r = S.result || {};
+  const has = Number.isFinite(r.f1), hasSe = Number.isFinite(r.sf1) && Number.isFinite(r.sf2);
+  numInto($("#f1Out"), fmtF(r.f1), "Hz", hasSe ? r.sf1.toFixed(1) : null);
+  numInto($("#f2Out"), fmtF(r.f2), "Hz", hasSe ? r.sf2.toFixed(1) : null);
+  numInto($("#dfOut"), has ? (r.f1 - r.f2).toFixed(1) : "—", "Hz");
+  numInto($("#f0Out"), fmtF(r.f0), "Hz");
+  const [ta, tb] = selRange();
+  $("#resMeta").textContent = `구간 ${ta.toFixed(2)}–${tb.toFixed(2)} s` + (r.rot ? ` · 회전 주기 ${r.rot.toFixed(3)} s` : "") + ` · ${r.method || "—"}`;
+  let v = NaN;
+  const sig = $("#vSig");
+  if (has && Number.isFinite(c)){
+    v = c*(r.f1 - r.f2)/(r.f1 + r.f2); $("#vMain").textContent = v.toFixed(2);
+    if (hasSe){ const sv = 2*c*Math.sqrt((r.f2*r.sf1)**2 + (r.f1*r.sf2)**2)/(r.f1 + r.f2)**2; sig.textContent = `± ${sv.toFixed(2)} m/s`; sig.className = "pm"; }
+    else { sig.textContent = "회전 주기를 찾지 못해 불확도는 생략했습니다"; sig.className = "pm q"; }
+    $("#calcLine").textContent = `v = c·(f₁ − f₂)/(f₁ + f₂) = ${c.toFixed(1)} × (${r.f1.toFixed(1)} − ${r.f2.toFixed(1)}) / (${r.f1.toFixed(1)} + ${r.f2.toFixed(1)}) = ${v.toFixed(2)} m/s  (음속 c, ${T} °C)`;
+  } else {
+    $("#vMain").textContent = "—"; sig.textContent = Number.isFinite(c) ? "" : "실내 온도를 입력하세요"; sig.className = "pm q";
+    $("#calcLine").textContent = "—";
+  }
+  const warn = $("#resWarn");
+  const msg = r.err || (r.noRot ? "회전 주기를 찾지 못했습니다. 원운동이 아니거나 구간에 2바퀴 미만이 들어 있습니다. 상·하위 3% 값으로 대신 계산했습니다."
+    : (has && r.f1 - r.f2 < 2 ? "Δf가 매우 작습니다. 음원 진동수를 2000~4000 Hz로 올리거나 더 빠르게 돌려 보세요." : ""));
+  warn.hidden = !msg; warn.textContent = msg;
+  const body = $("#tbody"), foot = $("#tfoot"); body.innerHTML = ""; foot.innerHTML = "";
+  if (r.maxes && r.maxes.length && Number.isFinite(c)){
+    r.maxes.forEach((p, i) => { const q = r.mins[i], vv = c*(p.f - q.f)/(p.f + q.f);
+      const tr = document.createElement("tr");
+      cell(tr, `${i + 1}`); cell(tr, p.t.toFixed(3), "t sl"); cell(tr, p.f.toFixed(1), "a");
+      cell(tr, q.t.toFixed(3), "t sl"); cell(tr, q.f.toFixed(1), "r"); cell(tr, (p.f - q.f).toFixed(1), "sl"); cell(tr, vv.toFixed(2), "v");
+      body.appendChild(tr); });
+    const tr = document.createElement("tr");
+    cell(tr, "평균"); cell(tr, "", "sl");
+    const c1 = cell(tr, r.f1.toFixed(1), "a"); if (hasSe){ const sm = document.createElement("small"); sm.textContent = `± ${r.sf1.toFixed(1)}`; c1.appendChild(sm); }
+    cell(tr, "", "sl");
+    const c2 = cell(tr, r.f2.toFixed(1), "r"); if (hasSe){ const sm = document.createElement("small"); sm.textContent = `± ${r.sf2.toFixed(1)}`; c2.appendChild(sm); }
+    cell(tr, (r.f1 - r.f2).toFixed(1), "sl"); cell(tr, Number.isFinite(v) ? v.toFixed(2) : "—", "v");
+    foot.appendChild(tr);
+    $("#tblMeta").textContent = `${r.maxes.length}바퀴`;
+  } else {
+    const tr = document.createElement("tr"), td = cell(tr, "회전이 2바퀴 이상 들어가면 바퀴별 값이 채워집니다", "emptyrow");
+    td.colSpan = 7; body.appendChild(tr); $("#tblMeta").textContent = "";
+  }
+}
+
+// ---------- steps ----------
+function busy(on, txt, pct){ $("#spin").classList.toggle("on", !!on); if (txt) $("#spinT").textContent = txt; $("#spinB").style.width = (pct || 0) + "%"; }
+function setHint(t){ const h = $("#hint"); h.hidden = !t; if (t) h.textContent = t; }
+function syncRail(){
+  $$("#rail button").forEach((b) => { const i = +b.dataset.s;
+    b.classList.toggle("on", i === S.step); b.classList.toggle("done", i !== S.step && i <= S.maxStep); b.disabled = i > S.maxStep; });
+}
+function setStep(n){
+  S.step = n; S.maxStep = Math.max(S.maxStep, n);
+  syncRail();
+  ["open","sel","track","result"].forEach((k, i) => $("#p-" + k).classList.toggle("on", i === n));
+  $("#gNum").textContent = n + 1; renderGuide(GUIDE[n][0], GUIDE[n][1]);
+  const loaded = !!S.x;
+  $("#empty").hidden = loaded; CAN.hidden = !loaded; $("#console").hidden = !loaded; $("#stage").classList.toggle("solo", !loaded);
+  $("#badge").hidden = !loaded;
+  setHint(loaded ? HINT[n] : null);
+  $("#resBlock").hidden = !(n === 3 && S.result);
+  CAN.style.cursor = n === 1 ? "col-resize" : n === 2 ? "crosshair" : "default";
+  if (n === 3) renderResults();
+  render();
+}
+function invalidateTrack(){ S.track = null; S.result = null; S.maxStep = Math.min(S.maxStep, 1); syncRail(); }
+
+let job = 0;
+async function runTrack(){
+  const my = ++job;
+  const g = parseFloat($("#fguess").value);
+  S.fpeak = Number.isFinite(g) && g > 0 ? g : detectPeak(S.x, S.fs);
+  const label = `진동수 분석 중 · 음원 약 ${S.fpeak.toFixed(0)} Hz`;
+  busy(true, label, 0);
+  await tick();
+  const tr = await track(S.x, S.fs, S.fpeak, parseFloat($("#win").value), (p) => { if (my === job) busy(true, label, p*100); });
+  if (my !== job) return false;
+  busy(false);
+  S.track = tr;
+  const [ta, tb] = selRange();
+  let nv = 0, nt = 0; for (let j = 0; j < tr.t.length; j++) if (tr.t[j] >= ta && tr.t[j] <= tb){ nt++; nv += tr.valid[j]; }
+  const pct = nt ? nv/nt*100 : 0, low = S.fpeak < 1000, weak = pct < 60;
+  const info = $("#trackInfo"); info.hidden = false; info.className = "callout" + (low || weak ? "" : " ok");
+  info.textContent = `음원 약 ${S.fpeak.toFixed(1)} Hz · 진동수가 잡힌 구간 ${pct.toFixed(0)}%` +
+    (weak ? " · 잡히지 않은 구간이 많습니다. 음량을 키우거나 분석 창을 0.2초로 늘려 보세요." : "") +
+    (low ? " · 음원이 1000 Hz보다 낮아 변화가 작습니다. 2000~4000 Hz를 권장합니다." : "");
+  if (S.scopeT == null || S.scopeT < ta || S.scopeT > tb) S.scopeT = (ta + tb)/2;
+  analyzeSel();
+  return true;
+}
+
+function setAudio(x, fs, name, demo){
+  job++; busy(false);
+  S.x = x; S.fs = fs; S.name = name; S.demo = demo; S.env = envelope(x, fs);
+  S.sel = demo ? [2.2, 7.85] : null; S.scopeT = null; S.track = null; S.result = null; S.maxStep = 0;
+  $("#trackInfo").hidden = true;
+  const dur = x.length/fs, li = $("#lenInfo");
+  if (demo){ li.hidden = true; }
+  else {
+    li.hidden = false;
+    const d = dur.toFixed(1);
+    if (dur < 3){ li.className = "callout"; li.textContent = `녹음이 ${d}초로 너무 짧습니다. 회전이 최소 3바퀴 들어가도록 5~15초로 다시 녹음하거나 덜 잘라 주세요.`; }
+    else if (dur < 5){ li.className = "callout"; li.textContent = `녹음이 ${d}초입니다. 계산은 되지만 바퀴 수가 적어 오차(±)가 커질 수 있습니다. 권장 길이는 5~15초입니다.`; }
+    else if (dur <= 15){ li.className = "callout ok"; li.textContent = `녹음 길이 ${d}초 · 권장 길이(5~15초)입니다.`; }
+    else if (dur <= 30){ li.className = "callout ok"; li.textContent = `녹음 길이 ${d}초 · 분석은 정밀하게 되지만, 회전이 일정한 5~15초 구간만 골라 주세요.`; }
+    else { li.className = "callout"; li.textContent = `녹음이 ${d}초로 깁니다. 30초를 넘으면 진동수 계산 간격이 넓어져 정밀도가 떨어집니다. 회전이 일정한 5~15초만 남기고 잘라서 다시 올리는 것을 권장합니다.`; }
+  }
+  const badge = $("#badge"); badge.className = "badge" + (demo ? " demo" : "");
+  badge.textContent = demo ? "합성 예시 · 3000 Hz · 1.13초/바퀴 · 5.0 m/s" : `${name} · ${(x.length/fs).toFixed(2)} s · ${Math.round(fs)} Hz`;
+  setStep(1);
+}
+
+async function loadFile(file){
+  const fresh = !S.x;
+  if (fresh){ $("#empty").hidden = true; CAN.hidden = false; }
+  busy(true, "파일 읽는 중", 10);
+  try {
+    const buf = await file.arrayBuffer();
+    const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const ac = new Ctx(1, 1, 48000);
+    const ab = await new Promise((res, rej) => { const p = ac.decodeAudioData(buf, res, rej); if (p && p.then) p.then(res, rej); });
+    const n = ab.length, x = new Float32Array(n);
+    for (let c = 0; c < ab.numberOfChannels; c++){ const d = ab.getChannelData(c); for (let i = 0; i < n; i++) x[i] += d[i]/ab.numberOfChannels; }
+    const maxLen = Math.min(n, Math.round(ab.sampleRate*90));
+    busy(false);
+    setAudio(maxLen < n ? x.subarray(0, maxLen) : x, ab.sampleRate, file.name + (maxLen < n ? " (앞 90초)" : ""), false);
+  } catch (e) {
+    busy(false);
+    if (fresh){ $("#empty").hidden = false; CAN.hidden = true; }
+    renderGuide("이 파일을 읽지 못했습니다", [
+      ["파일 형식이 ", {b:"m4a, wav, mp3"}, "인지 확인하세요"],
+      ["아이폰 음성 메모는 ", {b:"공유 → 파일에 저장"}, "으로 m4a 파일을 꺼낼 수 있습니다"],
+      ["녹음이 아주 길면 읽지 못할 수 있습니다 · ", {b:"5~15초"}, "로 잘라서 다시 올리세요"],
+    ]);
+  }
+}
+
+// synthetic demo: 3000 Hz source on a 0.90 m circle, 1.13 s per turn, mic 2 m from centre, starts turning at 1.6 s
+function makeDemo(){
+  const fs = 48000, dur = 9, n = fs*dur, x = new Float32Array(n);
+  const c = 331.3 + 0.606*22, f0 = 3000, r = 0.9, Trot = 1.13, D = 2.0, om = 2*Math.PI/Trot;
+  let seed = 12345; const rnd = () => { seed = (seed*1664525 + 1013904223) >>> 0; return seed/4294967296; };
+  let ph = 0;
+  for (let i = 0; i < n; i++){
+    const t = i/fs, moving = t >= 1.6, ang = om*Math.max(0, t - 1.6);
+    const sx = r*Math.cos(ang), sy = r*Math.sin(ang);
+    const vx = moving ? -r*om*Math.sin(ang) : 0, vy = moving ? r*om*Math.cos(ang) : 0;
+    const dx = D - sx, dy = -sy, dist = Math.hypot(dx, dy), vr = (vx*dx + vy*dy)/dist;
+    ph += 2*Math.PI*(f0*c/(c - vr))/fs;
+    const fade = t < 0.3 ? t/0.3 : t > dur - 0.6 ? Math.max(0, (dur - t)/0.6) : 1;
+    x[i] = fade*0.35*(1.2/dist)*Math.sin(ph) + 0.06*(rnd() - 0.5);
+  }
+  return { x, fs };
+}
+function loadDemo(){ const d = makeDemo(); setAudio(d.x, d.fs, "합성 예시 녹음", true); }
+
+// ---------- events ----------
+$("#pick").onclick = $("#pick2").onclick = () => $("#file").click();
+$("#demo").onclick = $("#demo2").onclick = loadDemo;
+$("#resume").onclick = () => setStep(Math.max(1, S.maxStep));
+$("#file").onchange = (e) => { const f = e.target.files[0]; if (f) loadFile(f); e.target.value = ""; };
+const stage = $("#stage");
+stage.addEventListener("dragover", (e) => { e.preventDefault(); $("#empty").classList.add("drag"); });
+stage.addEventListener("dragleave", () => $("#empty").classList.remove("drag"));
+stage.addEventListener("drop", (e) => { e.preventDefault(); $("#empty").classList.remove("drag"); const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) loadFile(f); });
+$$("#rail button").forEach((b) => b.onclick = () => { const n = +b.dataset.s; if (n >= 2 && !S.track) return; setStep(n); });
+$$(".adv-t").forEach((b) => b.onclick = () => { const el = document.getElementById(b.dataset.t); el.classList.toggle("on"); b.textContent = (el.classList.contains("on") ? "－" : "＋") + b.textContent.slice(1); });
+$("#selAll").onclick = () => { S.sel = null; if (S.track) analyzeSel(); render(); };
+$("#win").onchange = $("#fguess").onchange = () => invalidateTrack();
+$("#toTrack").onclick = async () => { if (!S.track){ if (!(await runTrack())) return; } else analyzeSel(); setStep(2); };
+$("#backSel").onclick = $("#backSel2").onclick = () => setStep(1);
+$("#toResult").onclick = () => { analyzeSel(); setStep(3); };
+$("#showF").onclick = () => { S.showT = false; $("#showF").classList.add("sel"); $("#showT").classList.remove("sel"); render(); };
+$("#showT").onclick = () => { S.showT = true; $("#showT").classList.add("sel"); $("#showF").classList.remove("sel"); render(); };
+$("#temp").addEventListener("input", renderResults);
+
+const tAt = (e) => { const m = CAN._map; if (!m) return null; const r = CAN.getBoundingClientRect(), px = e.clientX - r.left; const f = (px - m.P.l)/(m.w - m.P.l - m.P.r); return m.x0 + Math.min(1, Math.max(0, f))*(m.x1 - m.x0); };
+CAN.addEventListener("pointerdown", (e) => {
+  const t = tAt(e); if (!S.x || t == null) return;
+  if (S.step === 1){ S.drag = { a:t, b:t }; CAN.setPointerCapture(e.pointerId); }
+  else if (S.step === 2){ S.scopeT = t; render(); }
+});
+CAN.addEventListener("pointermove", (e) => { if (S.drag){ const t = tAt(e); if (t != null){ S.drag.b = t; drawOverview(); } } });
+CAN.addEventListener("pointerup", (e) => {
+  if (!S.drag) return;
+  const a = S.drag.a, b = tAt(e) ?? S.drag.b; S.drag = null;
+  if (Math.abs(b - a) > 0.3){ S.sel = [Math.min(a, b), Math.max(a, b)]; if (S.track) analyzeSel(); }
+  else S.scopeT = b;
+  render();
+});
+
+// ---------- CSV ----------
+function csvText(){
+  const tr = S.track; if (!tr) return "";
+  const lines = ["time_s,f_Hz,T_us,valid"];
+  for (let j = 0; j < tr.t.length; j++) lines.push(`${tr.t[j].toFixed(4)},${tr.f[j].toFixed(3)},${(1e6/tr.f[j]).toFixed(2)},${tr.valid[j]}`);
+  return lines.join("\n");
+}
+$("#copyCsv").onclick = () => {
+  const t = csvText(); if (!t) return;
+  const done = (m) => $("#csvMsg").textContent = m;
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(() => done("복사했습니다. 엑셀에 붙여넣으세요."), () => done("복사가 막혀 있습니다. CSV 저장을 이용하세요."));
+  else done("복사가 막혀 있습니다.");
+};
+(async () => {
+  try {
+    const dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null;
+    const btn = $("#saveCsv"); btn.hidden = false;
+    if (!dl){
+      btn.onclick = () => { const t = csvText(); if (!t) return;
+        const url = URL.createObjectURL(new Blob(["\ufeff" + t], { type:"text/csv;charset=utf-8" }));
+        const a = document.createElement("a"); a.href = url; a.download = "doppler_f_t.csv"; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 2000); $("#csvMsg").textContent = "저장했습니다."; };
+      return;
+    }
+    btn.onclick = async () => { const t = csvText(); if (!t) return;
+      try { await dl.save({ filename:"doppler_f_t.csv", data:t }); $("#csvMsg").textContent = "저장했습니다."; }
+      catch (e) { if (e && (e.code === "unavailable" || e.code === "not_granted")) btn.hidden = true; else if (e && e.code !== "declined") $("#csvMsg").textContent = "저장하지 못했습니다. 결과 표 복사를 이용하세요."; } };
+  } catch (e) {}
+})();
+
+let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(render, 120); });
+
+// open in a working state: the demo recording analysed through to the result
+(async () => {
+  setStep(0);
+  loadDemo();
+  if (await runTrack()){ S.maxStep = 3; setStep(3); }
+})();
+})();
+</script>
+</body>
+</html>
