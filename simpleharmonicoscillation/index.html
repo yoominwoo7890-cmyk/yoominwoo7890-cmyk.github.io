@@ -140,11 +140,13 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
   .pmain, .pmain.nopaper, .pmain.onlyx { grid-template-columns: minmax(0, 1fr); }
 }
 @media print {
-  @page { size: A4 portrait; margin: 12mm; }
-  html, body { background: #fff !important; }
+  /* zero page margin: the browser then prints no date/title/URL/page-number lines; the sheet keeps its own margin */
+  @page { size: A4 portrait; margin: 0; }
+  html, body { background: #fff !important; height: auto !important; margin: 0 !important; }
   body { padding: 0 !important; }
-  .wrap { display: none !important; }
-  #printSheet { display: block !important; color: #000; font-family: var(--sans); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body::before { display: none !important; }
+  body > *:not(#printSheet) { display: none !important; }
+  #printSheet { display: block !important; box-sizing: border-box; width: 210mm; max-height: 296mm; overflow: hidden; padding: 12mm; break-after: avoid; page-break-after: avoid; color: #000; font-family: var(--sans); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .ps-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; border-bottom: 1.5px solid #000; padding-bottom: 6px; }
   .ps-head h1 { font-size: 20px; margin: 0; }
   .ps-id { font-size: 13px; white-space: nowrap; }
@@ -235,7 +237,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
   <section class="view" id="viewPractice" hidden>
     <div class="vhead">
       <h1>원운동 <span>좌표 읽기</span> 연습</h1>
-      <p class="lead">점이 같은 시간 간격 Δt마다 한 칸씩 움직여요. 각 시각의 x, y 좌표를 읽어 학습지의 t–x, t–y 그래프에 찍어 보세요.</p>
+      <div><button type="button" class="btn" id="pPrint">학습지 인쇄</button></div>
     </div>
 
     <div class="main pmain" id="pmain">
@@ -311,12 +313,6 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
             <div class="stat"><b>|<i>a</i>| = Aω²</b><span class="val" id="pMa"></span></div>
           </div>
           <p class="hint" id="pShrunk" hidden>화살표가 길어서 화면에 맞게 줄여 그렸어요.</p>
-        </div>
-
-        <div class="sec">
-          <h2>학습지</h2>
-          <button type="button" class="btn wide" id="pPrint">학습지 인쇄</button>
-          <p class="hint">켜 둔 벡터의 성분도 같은 색 점으로 찍혀요. 점을 가린 채 인쇄하면 빈 학습지가 돼요.</p>
         </div>
       </aside>
     </div>
