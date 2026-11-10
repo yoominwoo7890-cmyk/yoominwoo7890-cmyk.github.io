@@ -52,10 +52,20 @@ canvas { display: block; width: 100%; height: auto; max-width: 100%; touch-actio
 .vhead { display: grid; gap: 6px; }
 .lead { margin: 0; font-size: 16px; color: var(--muted); max-width: 62ch; }
 .pmain { grid-template-columns: minmax(0, 1fr) 290px; }
-.board { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-content: start; min-width: 0; position: relative; }
+.board { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "c y" "x ."; gap: 16px; align-content: start; min-width: 0; position: relative; }
+#circBox { grid-area: c; position: relative; } #ypBox { grid-area: y; } #xpBox { grid-area: x; }
 #links { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
+/* paper and hide-points switches: small, always in the circle's top-left corner (outside any orbit) */
+#hideWrap { position: absolute; top: 8px; left: 8px; z-index: 3; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.sw.hidesw { width: auto; grid-template-columns: auto auto; gap: 8px; padding: 4px 6px 4px 9px; border-radius: 8px; background: rgba(255,255,255,.94); box-shadow: 0 1px 3px rgba(28,34,48,.1); }
+.sw.hidesw .arrow { display: none; }
+.sw.hidesw .name { font-size: 13px; white-space: nowrap; }
+.sw.hidesw .track { width: 30px; height: 18px; border-radius: 9px; }
+.sw.hidesw .track::after { top: 2px; left: 2px; width: 14px; height: 14px; }
+.sw.hidesw[aria-checked="true"] .track::after { transform: translateX(12px); }
 .pmain.nopaper, .pmain.onlyx { grid-template-columns: minmax(0, 1fr) 290px; }
-.pmain.nopaper .board, .pmain.onlyx .board { grid-template-columns: minmax(0, 1fr); }
+.pmain.nopaper .board { grid-template-columns: minmax(0, 1fr); grid-template-areas: "c"; }
+.pmain.onlyx .board { grid-template-columns: minmax(0, 1fr); grid-template-areas: "c" "x"; }
 #paperY, #paperX { aspect-ratio: 1 / 1; }
 .btn.wide { width: 100%; }
 .sw:disabled { opacity: .45; cursor: default; }
@@ -125,7 +135,8 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
   .pmain:not(.nopaper):not(.onlyx) { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 860px) {
-  .board, .pmain.nopaper .board, .pmain.onlyx .board { grid-template-columns: minmax(0, 1fr); }
+  .board, .pmain.onlyx .board, .pmain.onlyy .board { grid-template-columns: minmax(0, 1fr); grid-template-areas: "c" "y" "x"; }
+  .pmain.nopaper .board { grid-template-columns: minmax(0, 1fr); grid-template-areas: "c"; }
   .pmain, .pmain.nopaper, .pmain.onlyx { grid-template-columns: minmax(0, 1fr); }
 }
 @media print {
@@ -230,7 +241,23 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     <div class="main pmain" id="pmain">
       <div class="board" id="board">
         <canvas id="links" aria-hidden="true"></canvas>
-        <div class="stage"><canvas id="pcv" aria-label="좌표평면 위의 등속 원운동. 다음 버튼이나 → 키로 한 칸씩 이동합니다."></canvas></div>
+        <div class="stage" id="circBox">
+          <canvas id="pcv" aria-label="좌표평면 위의 등속 원운동. 다음 버튼이나 → 키로 한 칸씩 이동합니다."></canvas>
+          <div id="hideWrap">
+            <button type="button" class="sw hidesw" role="switch" id="pPaperY" aria-checked="true">
+              <svg class="arrow" viewBox="0 0 30 12" aria-hidden="true"><rect x="0.5" y="0.5" width="11" height="11" fill="none" stroke="#c3c8d1"/><rect x="15.5" y="0.5" width="14" height="11" fill="#f0f2f5" stroke="#3a3f4a"/><path d="M15.5 6h14" stroke="#3a3f4a"/></svg>
+              <span class="name"><i>y</i> 모눈종이</span><span class="track"></span>
+            </button>
+            <button type="button" class="sw hidesw" role="switch" id="pPaperX" aria-checked="true">
+              <svg class="arrow" viewBox="0 0 30 12" aria-hidden="true"><rect x="9.5" y="0.5" width="6" height="5" fill="none" stroke="#c3c8d1"/><rect x="9.5" y="6.5" width="6" height="5" fill="#f0f2f5" stroke="#3a3f4a"/><path d="M12.5 6.5v5" stroke="#3a3f4a"/></svg>
+              <span class="name"><i>x</i> 모눈종이</span><span class="track"></span>
+            </button>
+            <button type="button" class="sw hidesw" role="switch" id="pHide" aria-checked="false">
+              <svg class="arrow" viewBox="0 0 30 12" aria-hidden="true"><circle cx="9" cy="6" r="3" fill="none" stroke="#3a3f4a" stroke-width="1.5" stroke-dasharray="2 2"/><circle cx="21" cy="6" r="3" fill="none" stroke="#3a3f4a" stroke-width="1.5" stroke-dasharray="2 2"/></svg>
+              <span class="name">점 가리기</span><span class="track"></span>
+            </button>
+          </div>
+        </div>
         <div class="stage" id="ypBox"><canvas id="paperY" aria-label="오른쪽 스크린의 y를 시간에 따라 기록하는 모눈종이. 원운동 좌표평면과 같은 높이와 축척입니다."></canvas></div>
         <div class="stage" id="xpBox"><canvas id="paperX" aria-label="아래 스크린의 x를 시간에 따라 기록하는 모눈종이. 시간은 아래로 흐르고, 원운동 좌표평면과 같은 가로 위치와 축척입니다."></canvas></div>
       </div>
@@ -287,19 +314,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
         </div>
 
         <div class="sec">
-          <h2>모눈종이</h2>
-          <button type="button" class="sw" role="switch" id="pPaperY" aria-checked="true">
-            <svg class="arrow" viewBox="0 0 30 12" aria-hidden="true"><rect x="0.5" y="0.5" width="11" height="11" fill="none" stroke="#c3c8d1"/><rect x="15.5" y="0.5" width="14" height="11" fill="#f0f2f5" stroke="#3a3f4a"/><path d="M15.5 6h14" stroke="#3a3f4a"/></svg>
-            <span class="name"><i>y</i> 모눈종이</span><span class="track"></span>
-          </button>
-          <button type="button" class="sw" role="switch" id="pPaperX" aria-checked="true">
-            <svg class="arrow" viewBox="0 0 30 12" aria-hidden="true"><rect x="9.5" y="0.5" width="6" height="5" fill="none" stroke="#c3c8d1"/><rect x="9.5" y="6.5" width="6" height="5" fill="#f0f2f5" stroke="#3a3f4a"/><path d="M12.5 6.5v5" stroke="#3a3f4a"/></svg>
-            <span class="name"><i>x</i> 모눈종이</span><span class="track"></span>
-          </button>
-          <button type="button" class="sw" role="switch" id="pHide" aria-checked="false">
-            <svg class="arrow" viewBox="0 0 30 12" aria-hidden="true"><circle cx="9" cy="6" r="3" fill="none" stroke="#3a3f4a" stroke-width="1.5" stroke-dasharray="2 2"/><circle cx="21" cy="6" r="3" fill="none" stroke="#3a3f4a" stroke-width="1.5" stroke-dasharray="2 2"/></svg>
-            <span class="name">점 가리기</span><span class="track"></span>
-          </button>
+          <h2>학습지</h2>
           <button type="button" class="btn wide" id="pPrint">학습지 인쇄</button>
           <p class="hint">켜 둔 벡터의 성분도 같은 색 점으로 찍혀요. 점을 가린 채 인쇄하면 빈 학습지가 돼요.</p>
         </div>
@@ -1192,7 +1207,8 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
 
     // keep labels off the ball and off the tips of the arrows that start at it
     avoid.circles = [{ x: bx, y: by, r: br + 6 }];
-    avoid.rects = [{ x: wlx - 16, y: wly - 12, w: 32, h: 24 }];
+    const hw = $('hideWrap').getBoundingClientRect(), cb = cv.getBoundingClientRect();
+    avoid.rects = [{ x: wlx - 16, y: wly - 12, w: 32, h: 24 }, { x: hw.left - cb.left - 4, y: hw.top - cb.top - 4, w: hw.width + 8, h: hw.height + 8 }];
     if (sw.v) { const q = Vk(step); avoid.circles.push({ x: X(p.x + q.x * sv), y: Y(p.y + q.y * sv), r: 14 }); }
     if (sw.a) { const q = Ak(step); avoid.circles.push({ x: X(p.x + q.x * sa), y: Y(p.y + q.y * sa), r: 14 }); }
     tag(bx, by, p.x, -p.y, `(${fmt(p.x)}, ${fmt(p.y)})`, C.ink, W, 15);
@@ -1291,6 +1307,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     c.fillText('오른쪽 스크린', Z - pad, V(LIM) - 12 * k);
     const ser = series('y');
     legend(c, ser, Z - pad - c.measureText('오른쪽 스크린').width - 14 * k, V(LIM) - 12 * k, k, tb, 'right');
+    if (!guides) timeMarks(c, k0, i => [Tm(i * dt), V(0)], k);
     if (show) plot(c, ser, k0, (i, v) => [Tm(i * dt), V(v)], guides && (v => line(c, 0, V(v), Tm(step * dt), V(v))), k);
     c.restore();
   }
@@ -1322,6 +1339,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     c.textAlign = 'right'; c.textBaseline = 'middle'; c.fillText('아래 스크린', X(LIM), Z - pad + 10 * k);
     const ser = series('x');
     legend(c, ser, X(-LIM), Z - pad + 10 * k, k, tb, 'left');
+    if (!guides) timeMarks(c, k0, i => [X(0), Tm(i * dt)], k);
     if (show) plot(c, ser, k0, (i, v) => [X(v), Tm(i * dt)], guides && (v => line(c, X(v), 0, X(v), Tm(step * dt))), k);
     c.restore();
   }
@@ -1370,6 +1388,16 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
       c.font = fm; c.fillText(s.name, tx, y); tx += c.measureText(s.name).width + 1;
       if (s.sub) { c.font = fs; c.fillText(s.sub, tx, y + 5 * k); }
       cx += width(s) + gap;
+    }
+    c.restore();
+  }
+  // every step taken so far is marked on the t-axis with the same orange dot (screen only, not on printed sheets)
+  function timeMarks(c, k0, at, k) {
+    c.save(); c.strokeStyle = '#ffffff'; c.lineWidth = 1.5 * k;
+    for (let i = k0; i <= step; i++) {
+      const [x, y] = at(i);
+      c.fillStyle = '#e4572e';
+      c.beginPath(); c.arc(x, y, 5 * k, 0, Math.PI * 2); c.fill(); c.stroke();
     }
     c.restore();
   }
@@ -1447,6 +1475,8 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     $('xpBox').hidden = !opt.px;
     $('pmain').classList.toggle('nopaper', !opt.py && !opt.px);
     $('pmain').classList.toggle('onlyx', opt.px && !opt.py);
+    $('pmain').classList.toggle('onlyy', opt.py && !opt.px);
+    $('pHide').hidden = !opt.py && !opt.px;
     $('pHide').disabled = !opt.py && !opt.px;
     requestAnimationFrame(() => { size(); sizePaper(); });
   }
