@@ -1303,7 +1303,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     c.fillText('오른쪽 스크린', Z - pad, V(LIM) - 12 * k);
     const ser = series('y');
     legend(c, ser, Z - pad - c.measureText('오른쪽 스크린').width - 14 * k, V(LIM) - 12 * k, k, tb, 'right');
-    if (!guides) timeMarks(c, k0, i => [Tm(i * dt), V(0)], k);
+    timeMarks(c, k0, i => [Tm(i * dt), V(0)], k);
     if (show) plot(c, ser, k0, (i, v) => [Tm(i * dt), V(v)], guides && (v => line(c, 0, V(v), Tm(step * dt), V(v))), k);
     c.restore();
   }
@@ -1335,7 +1335,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     c.textAlign = 'right'; c.textBaseline = 'middle'; c.fillText('아래 스크린', X(LIM), Z - pad + 10 * k);
     const ser = series('x');
     legend(c, ser, X(-LIM), Z - pad + 10 * k, k, tb, 'left');
-    if (!guides) timeMarks(c, k0, i => [X(0), Tm(i * dt)], k);
+    timeMarks(c, k0, i => [X(0), Tm(i * dt)], k);
     if (show) plot(c, ser, k0, (i, v) => [X(v), Tm(i * dt)], guides && (v => line(c, X(v), 0, X(v), Tm(step * dt))), k);
     c.restore();
   }
@@ -1387,7 +1387,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     }
     c.restore();
   }
-  // every step taken so far is marked on the t-axis with the same orange dot (screen only, not on printed sheets)
+  // every step taken so far is marked on the t-axis with the same orange dot (on screen and on printed sheets)
   function timeMarks(c, k0, at, k) {
     c.save(); c.strokeStyle = '#ffffff'; c.lineWidth = 1.5 * k;
     for (let i = k0; i <= step; i++) {
