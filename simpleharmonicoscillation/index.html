@@ -1098,9 +1098,10 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
 
     const dotR = N > 100 ? 2.5 : N > 40 ? 3.5 : 4.5;
     const done = Math.min(step, N);
-    // points already passed
-    ctx.fillStyle = '#e4572e'; ctx.globalAlpha = .28;
-    for (let i = 0; i < done; i++) {
+    // points already passed: orange trail with no vectors, blue (position colour) while r is on,
+    // none while only v or a is shown
+    ctx.fillStyle = sw.r ? C.vr : '#e4572e'; ctx.globalAlpha = .28;
+    if (sw.r || !(sw.v || sw.a)) for (let i = 0; i < done; i++) {
       const q = pos(step - done + i);
       ctx.beginPath(); ctx.arc(X(q.x), Y(q.y), dotR, 0, 2 * Math.PI); ctx.fill();
     }
