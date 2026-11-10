@@ -1491,18 +1491,11 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     const { r, w, T, dt } = S();
     const Wc = cv.clientWidth || 600, Z = 1200;
     const mk = f => { const o = document.createElement('canvas'); o.width = o.height = Z; f(o.getContext('2d'), Z, Z / Wc, !opt.hide, 1.5, true); return o.toDataURL('image/png'); };
-    // circle top-left; t–y to its right, t–x under it; the instructions fill the free cell
-    const steps = `<ol class="ps-steps">
-          <li>물체는 Δt마다 원을 따라 한 칸씩 움직여요.</li>
-          <li>${[opt.py ? '오른쪽 스크린에 비친 그림자의 y를 오른쪽 모눈종이에' : '', opt.px ? '아래 스크린에 비친 그림자의 x를 아래 모눈종이에' : ''].filter(Boolean).join(', ')} 시각 t마다 점으로 찍어요.</li>
-          <li>모눈종이의 칸은 원운동 좌표평면과 같은 크기라서, 그림자 위치를 그대로 옮겨 찍으면 돼요.</li>
-          <li>점들을 매끄럽게 이어 보세요. 그래프는 어떤 모양인가요?</li>
-        </ol>`;
+    // circle top-left; t–y to its right, t–x under it (an empty cell keeps t–x under the circle)
     const img = src => `<img alt="" src="${src}">`;
     const cells = [img(cv.toDataURL('image/png'))];
-    if (opt.py) cells.push(img(mk(sheetY))); else cells.push(steps);
+    if (opt.py) cells.push(img(mk(sheetY))); else if (opt.px) cells.push('<div></div>');
     if (opt.px) cells.push(img(mk(sheetX)));
-    if (opt.py) cells.push(steps);
     const sheet = $('printSheet');
     sheet.innerHTML = `
       <div class="ps-head"><h1>원운동 좌표 읽기 학습지</h1><div class="ps-id">반 ______ 번호 ______ 이름 ______________</div></div>
