@@ -1100,7 +1100,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     const done = Math.min(step, N);
     // points already passed: orange trail with no vectors, blue (position colour) while r is on,
     // none while only v or a is shown
-    ctx.fillStyle = sw.r ? C.vr : '#e4572e'; ctx.globalAlpha = .28;
+    ctx.fillStyle = sw.r ? C.vr : '#e4572e'; ctx.globalAlpha = .75;
     if (sw.r || !(sw.v || sw.a)) for (let i = 0; i < done; i++) {
       const q = pos(step - done + i);
       ctx.beginPath(); ctx.arc(X(q.x), Y(q.y), dotR, 0, 2 * Math.PI); ctx.fill();
@@ -1155,7 +1155,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     // copies with their tails at the origin (dashed) and the tips already passed
     [[sw.v, Vk, sv, C.vv, 'v'], [sw.a, Ak, sa, C.va, 'a']].forEach(([on, F, s, col, nm]) => {
       if (!on) return;
-      ctx.fillStyle = col; ctx.globalAlpha = .28;
+      ctx.fillStyle = col; ctx.globalAlpha = .75;
       for (let i = 0; i < done; i++) {
         const q = F(step - done + i);
         ctx.beginPath(); ctx.arc(X(q.x * s), Y(q.y * s), dotR, 0, 2 * Math.PI); ctx.fill();
@@ -1302,6 +1302,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     c.textAlign = 'right'; c.fillText('t (s)', Z - 4 * k, V(0) - 14 * k);
     c.font = `500 ${12 * k * tb}px "IBM Plex Sans KR", "Apple SD Gothic Neo", sans-serif`; c.fillStyle = MUTED;
     c.fillText('오른쪽 스크린', Z - pad, V(LIM) - 12 * k);
+    stepNumbers(c, N, colpx, k, tb, i => [Tm(t0 + i * dt), V(0) + 11 * k], 'center', 'top');
     const ser = series('y');
     legend(c, ser, Z - pad - c.measureText('오른쪽 스크린').width - 14 * k, V(LIM) - 12 * k, k, tb, 'right');
     timeMarks(c, k0, i => [Tm(i * dt), V(0)], k);
@@ -1334,6 +1335,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillText('t (s)', X(0) + 10 * k, Z - pad + 8 * k);
     c.font = `500 ${12 * k * tb}px "IBM Plex Sans KR", "Apple SD Gothic Neo", sans-serif`; c.fillStyle = MUTED;
     c.textAlign = 'right'; c.textBaseline = 'middle'; c.fillText('아래 스크린', X(LIM), Z - pad + 10 * k);
+    stepNumbers(c, N, colpx, k, tb, i => [X(0) + 9 * k, Tm(t0 + i * dt)], 'left', 'middle');
     const ser = series('x');
     legend(c, ser, X(-LIM), Z - pad + 10 * k, k, tb, 'left');
     timeMarks(c, k0, i => [X(0), Tm(i * dt)], k);
@@ -1341,6 +1343,77 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     c.restore();
   }
 
+  // printable circle: drawn fresh instead of copying the screen. Grid, screens, the orbit and one dot per Δt
+  // over a full period, numbered around the outside (thinned when crowded), plus a small arrow for the direction.
+  function circleSheet(c, Z, k) {
+    const { r, w, T, dt } = S();
+    const pad = PAD * k, u = (Z / 2 - pad) / LIM;
+    const X = v => Z / 2 + v * u, Y = v => Z / 2 - v * u;
+    c.save();
+    c.fillStyle = '#ffffff'; c.fillRect(0, 0, Z, Z);
+    c.lineWidth = k;
+    for (let v = -LIM; v <= LIM; v++) {
+      c.strokeStyle = v % 2 ? '#e3e7ed' : '#c9d0da';
+      line(c, X(v), Y(-LIM), X(v), Y(LIM)); line(c, X(-LIM), Y(v), X(LIM), Y(v));
+    }
+    c.strokeStyle = '#6b7280'; c.lineWidth = 1.5 * k;
+    line(c, X(-LIM), Y(0), X(LIM), Y(0)); line(c, X(0), Y(-LIM), X(0), Y(LIM));
+    c.font = `${11 * k * 1.5}px "IBM Plex Mono", ui-monospace, monospace`; c.fillStyle = MUTED;
+    c.textAlign = 'center'; c.textBaseline = 'top';
+    for (let v = -LIM + 1; v < LIM; v++) if (v && v % 2 === 0) c.fillText(String(v), X(v), Y(0) + 5 * k);
+    c.textAlign = 'right'; c.textBaseline = 'middle';
+    for (let v = -LIM + 1; v < LIM; v++) if (v && v % 2 === 0) c.fillText(String(v), X(0) - 6 * k, Y(v));
+    c.font = `italic ${17 * k * 1.3}px Georgia, "Times New Roman", serif`; c.fillStyle = INK;
+    c.textAlign = 'right'; c.textBaseline = 'bottom'; c.fillText('x', X(LIM) - 2 * k, Y(0) - 5 * k);
+    c.textAlign = 'left'; c.textBaseline = 'top'; c.fillText('y', X(0) + 7 * k, Y(LIM) + 2 * k);
+    // screens, as on the page (no shadows: the sheet is for every time step, not one moment)
+    const SX = LIM - 0.35, SY = -(LIM - 0.35);
+    c.fillStyle = '#e3e6eb';
+    c.fillRect(X(-LIM), Y(SY), X(LIM) - X(-LIM), 10 * k);
+    c.fillRect(X(SX) - 10 * k, Y(LIM), 10 * k, Y(-LIM) - Y(LIM));
+    // orbit
+    c.strokeStyle = INK; c.lineWidth = 1.4 * k; c.setLineDash([3 * k, 5 * k]);
+    c.beginPath(); c.arc(X(0), Y(0), r * u, 0, Math.PI * 2); c.stroke(); c.setLineDash([]);
+    // one dot per Δt over one period
+    const n = Math.max(1, Math.ceil(T / dt - 1e-9));
+    const step_px = r * u * w * dt;                         // arc length between neighbouring dots
+    const every = Math.max(1, Math.ceil(26 * k / step_px));
+    c.font = `600 ${12 * k * 1.4}px "IBM Plex Sans KR", "Apple SD Gothic Neo", sans-serif`;
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    for (let i = 0; i < n; i++) {
+      const th = w * i * dt, cx = X(r * Math.cos(th)), cy = Y(r * Math.sin(th));
+      c.fillStyle = INK; c.beginPath(); c.arc(cx, cy, 4.2 * k, 0, Math.PI * 2); c.fill();
+      if (i % every === 0 && !(i > 0 && n - i < every * 0.6)) {
+        const lr = r * u + 16 * k;
+        const lx = X(0) + lr * Math.cos(th), ly = Y(0) - lr * Math.sin(th);
+        c.lineWidth = 4 * k; c.strokeStyle = '#ffffff'; c.strokeText(String(i), lx, ly);
+        c.fillStyle = INK; c.fillText(String(i), lx, ly);
+      }
+    }
+    // direction of motion: a short arc just inside the orbit after dot 0
+    const ar = r * u - 18 * k, a0 = 0.12, a1 = Math.min(0.7, 0.12 + 46 * k / Math.max(ar, 1));
+    c.strokeStyle = '#e4572e'; c.fillStyle = '#e4572e'; c.lineWidth = 2 * k;
+    c.beginPath(); c.arc(X(0), Y(0), ar, -a0, -a1, true); c.stroke();
+    const hx = X(0) + ar * Math.cos(a1), hy = Y(0) - ar * Math.sin(a1), tx = -Math.sin(a1), ty = -Math.cos(a1);
+    c.beginPath(); c.moveTo(hx + tx * 9 * k, hy + ty * 9 * k);
+    c.lineTo(hx - ty * 5 * k, hy + tx * 5 * k); c.lineTo(hx + ty * 5 * k, hy - tx * 5 * k); c.closePath(); c.fill();
+    c.restore();
+  }
+
+  // step numbers 0, 1, 2 … beside the t-axis, matching the numbered dots of the printed circle
+  // (thinned to every few columns when the columns are narrow)
+  function stepNumbers(c, N, colpx, k, tb, at, align, base) {
+    const every = Math.max(1, Math.ceil(16 * k * tb / colpx));
+    c.save();
+    c.font = `600 ${10 * k * tb}px "IBM Plex Sans KR", "Apple SD Gothic Neo", sans-serif`;
+    c.textAlign = align; c.textBaseline = base;
+    for (let i = 0; i < N; i += every) {  // same numbers as the circle: 0 … N−1 (N would be the start again)
+      const [x, y] = at(i);
+      c.lineWidth = 3 * k; c.strokeStyle = '#ffffff'; c.strokeText(String(i), x, y);
+      c.fillStyle = INK; c.fillText(String(i), x, y);
+    }
+    c.restore();
+  }
   function line(c, x1, y1, x2, y2) { c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke(); }
   function head(c, x, y, dx, dy, k) {
     const h = 9 * k, s = 4.5 * k;
@@ -1493,7 +1566,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     const mk = f => { const o = document.createElement('canvas'); o.width = o.height = Z; f(o.getContext('2d'), Z, Z / Wc, !opt.hide, 1.5, true); return o.toDataURL('image/png'); };
     // circle top-left; t–y to its right, t–x under it (an empty cell keeps t–x under the circle)
     const img = src => `<img alt="" src="${src}">`;
-    const cells = [img(cv.toDataURL('image/png'))];
+    const cells = [img(mk(circleSheet))];
     if (opt.py) cells.push(img(mk(sheetY))); else if (opt.px) cells.push('<div></div>');
     if (opt.px) cells.push(img(mk(sheetX)));
     const sheet = $('printSheet');
