@@ -1380,9 +1380,11 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     const every = Math.max(1, Math.ceil(26 * k / step_px));
     c.font = `600 ${12 * k * 1.4}px "IBM Plex Sans KR", "Apple SD Gothic Neo", sans-serif`;
     c.textAlign = 'center'; c.textBaseline = 'middle';
-    for (let i = 0; i < n; i++) {
+    // position dots follow the screen: orange with no vectors, blue with r, none when only v or a is on
+    const showPos = sw.r || !(sw.v || sw.a);
+    for (let i = 0; showPos && i < n; i++) {
       const th = w * i * dt, cx = X(r * Math.cos(th)), cy = Y(r * Math.sin(th));
-      // each Δt position as a small orange dot, like the trail on screen
+      // each Δt position as a small dot, like the trail on screen
       c.fillStyle = sw.r ? 'rgba(37, 99, 201, 0.75)' : 'rgba(228, 87, 46, 0.75)'; c.beginPath(); c.arc(cx, cy, 4.5 * k, 0, Math.PI * 2); c.fill();
       if (i % every === 0 && !(i > 0 && n - i < every * 0.6)) {
         const lr = r * u + 18 * k;
