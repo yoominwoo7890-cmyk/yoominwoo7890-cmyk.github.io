@@ -1391,6 +1391,30 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
         c.fillStyle = INK; c.fillText(String(i), lx, ly);
       }
     }
+    // v and a play the same role as the position dots: the tip of each origin copy at every Δt,
+    // on its own dotted ring, numbered with the same step numbers in the vector's colour
+    {
+      const vMag = w * r, aMag = w * w * r, cap = LIM - 0.5;
+      const rings = [];
+      if (sw.v) rings.push({ R: vMag * Math.min(VS, cap / vMag), ph: Math.PI / 2, col: C.vv, dot: 'rgba(18, 145, 95, 0.75)' });
+      if (sw.a) rings.push({ R: aMag * Math.min(AS, cap / aMag), ph: Math.PI, col: C.va, dot: 'rgba(138, 59, 208, 0.75)' });
+      for (const g of rings) {
+        c.strokeStyle = g.col; c.globalAlpha = 0.5; c.lineWidth = 1.2 * k; c.setLineDash([3 * k, 5 * k]);
+        c.beginPath(); c.arc(X(0), Y(0), g.R * u, 0, Math.PI * 2); c.stroke(); c.setLineDash([]); c.globalAlpha = 1;
+        const ev = Math.max(1, Math.ceil(36 * k / (g.R * u * w * dt)));  // inner rings are tighter: number fewer dots
+        c.font = `600 ${11 * k * 1.4}px "IBM Plex Sans KR", "Apple SD Gothic Neo", sans-serif`;
+        c.textAlign = 'center'; c.textBaseline = 'middle';
+        for (let i = 0; i < n; i++) {
+          const th = w * i * dt + g.ph, cx = X(g.R * Math.cos(th)), cy = Y(g.R * Math.sin(th));
+          c.fillStyle = g.dot; c.beginPath(); c.arc(cx, cy, 4 * k, 0, Math.PI * 2); c.fill();
+          if (i % ev === 0 && !(i > 0 && n - i < ev * 0.6)) {
+            const lr = g.R * u + 14 * k, lx = X(0) + lr * Math.cos(th), ly = Y(0) - lr * Math.sin(th);
+            c.lineWidth = 4 * k; c.strokeStyle = '#ffffff'; c.strokeText(String(i), lx, ly);
+            c.fillStyle = g.col; c.fillText(String(i), lx, ly);
+          }
+        }
+      }
+    }
     // the object where it stands now, with its radius and the swept angle ωt, as on screen
     const thNow = w * step * dt, ox = X(r * Math.cos(thNow)), oy = Y(r * Math.sin(thNow));
     c.strokeStyle = '#8a909c'; c.lineWidth = 2 * k; line(c, X(0), Y(0), ox, oy);
