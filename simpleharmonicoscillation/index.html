@@ -708,7 +708,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
       });
       if (st.vA > 0.01) {
         ctx.globalAlpha = ta * st.vA;
-        trace(h => [h.vx, g0 - (st.t - h.t) * GSPD, ZB], VV, [7, 5]);
+        trace(h => [h.vx, g0 - (st.t - h.t) * GSPD, ZB], VV);
         const V = Rr * st.w * VSCALE, vx = -V * Math.sin(st.theta);
         late.push(() => { ctx.globalAlpha = ta * st.vA; arrow3([bx, HS_Y + 56, ZB + 18], [bx + vx, HS_Y + 56, ZB + 18], VV, 3.5); });
         const vl = P(-Math.max(Rr, V) - 10, g0 - 30, ZB); vsub('v', 'x', vl.x, vl.y, VV);
@@ -717,7 +717,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
       }
       if (st.aA > 0.01) {
         ctx.globalAlpha = ta * st.aA;
-        trace(h => [h.ax, g0 - (st.t - h.t) * GSPD, ZB], VA, [2, 5]);
+        trace(h => [h.ax, g0 - (st.t - h.t) * GSPD, ZB], VA);
         const Ac = Rr * st.w * st.w * ASCALE, ax = -Ac * Math.cos(st.theta);
         late.push(() => { ctx.globalAlpha = ta * st.aA; arrow3([bx, HS_Y + 78, ZB + 18], [bx + ax, HS_Y + 78, ZB + 18], VA, 3.5); });
         const M = Math.max(Rr, Rr * st.w * VSCALE, Ac);
@@ -765,7 +765,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
       }
       if (st.vA > 0.01) {
         ctx.globalAlpha = sa * st.vA;
-        trace(h => [g0 + (st.t - h.t) * GSPD, h.vy, ZB], VV, [7, 5]);
+        trace(h => [g0 + (st.t - h.t) * GSPD, h.vy, ZB], VV);
         const V = Rr * st.w * VSCALE, vy = V * Math.cos(st.theta);
         late.push(() => { ctx.globalAlpha = sa * st.vA; arrow3([VS_X - 58, by, ZB + 18], [VS_X - 58, by + vy, ZB + 18], VV, 3.5); });
         const vl = P(g0 + GLEN + 8, -Math.max(Rr, V) + 6, ZB); vsub('v', 'y', vl.x + 14, vl.y, VV);
@@ -774,7 +774,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
       }
       if (st.aA > 0.01) {
         ctx.globalAlpha = sa * st.aA;
-        trace(h => [g0 + (st.t - h.t) * GSPD, h.ay, ZB], VA, [2, 5]);
+        trace(h => [g0 + (st.t - h.t) * GSPD, h.ay, ZB], VA);
         const Ac = Rr * st.w * st.w * ASCALE, ay = -Ac * Math.sin(st.theta);
         late.push(() => { ctx.globalAlpha = sa * st.aA; arrow3([VS_X - 80, by, ZB + 18], [VS_X - 80, by + ay, ZB + 18], VA, 3.5); });
         const M = Math.max(Rr, Rr * st.w * VSCALE, Ac);
