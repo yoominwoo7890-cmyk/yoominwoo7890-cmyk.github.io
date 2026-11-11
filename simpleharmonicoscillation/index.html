@@ -1383,7 +1383,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     for (let i = 0; i < n; i++) {
       const th = w * i * dt, cx = X(r * Math.cos(th)), cy = Y(r * Math.sin(th));
       // each Δt position as a small orange dot, like the trail on screen
-      c.fillStyle = 'rgba(228, 87, 46, 0.75)'; c.beginPath(); c.arc(cx, cy, 4.5 * k, 0, Math.PI * 2); c.fill();
+      c.fillStyle = sw.r ? 'rgba(37, 99, 201, 0.75)' : 'rgba(228, 87, 46, 0.75)'; c.beginPath(); c.arc(cx, cy, 4.5 * k, 0, Math.PI * 2); c.fill();
       if (i % every === 0 && !(i > 0 && n - i < every * 0.6)) {
         const lr = r * u + 18 * k;
         const lx = X(0) + lr * Math.cos(th), ly = Y(0) - lr * Math.sin(th);
@@ -1404,6 +1404,29 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     const wl = (30 + 18) * k, wx = X(0) + wl * Math.cos(sweep / 2), wy = Y(0) - wl * Math.sin(sweep / 2);
     c.lineWidth = 4 * k; c.strokeStyle = '#ffffff'; c.strokeText('ωt', wx, wy);
     c.fillStyle = '#e4572e'; c.fillText('ωt', wx, wy);
+    // vectors that are switched on, at the same scale as on screen (r blue, v green, a purple);
+    // v and a also get their dashed copies at the origin, whose tips are what the sheets record
+    if (sw.r || sw.v || sw.a) {
+      const vMag = w * r, aMag = w * w * r, cap = LIM - 0.5;
+      const sv = Math.min(VS, cap / vMag), sa = Math.min(AS, cap / aMag);
+      const px = r * Math.cos(thNow), py = r * Math.sin(thNow);
+      const vx = -vMag * Math.sin(thNow) * sv, vy = vMag * Math.cos(thNow) * sv;
+      const ax = -aMag * Math.cos(thNow) * sa, ay = -aMag * Math.sin(thNow) * sa;
+      if (sw.v) arrowC(c, X(0), Y(0), X(vx), Y(vy), C.vv, k, true);
+      if (sw.a) arrowC(c, X(0), Y(0), X(ax), Y(ay), C.va, k, true);
+      if (sw.r) {
+        arrowC(c, X(0), Y(0), ox, oy, C.vr, k, false, 10 * k);
+        vlabelC(c, 'r', X(px * 0.55) - (py / r) * 18 * k, Y(py * 0.55) - (px / r) * 18 * k, C.vr, k);
+      }
+      if (sw.v) {
+        const e = arrowC(c, ox, oy, X(px + vx), Y(py + vy), C.vv, k);
+        if (e) vlabelC(c, 'v', e.x + e.ux * 16 * k, e.y + e.uy * 16 * k, C.vv, k);
+      }
+      if (sw.a) {
+        const e = arrowC(c, ox, oy, X(px + ax), Y(py + ay), C.va, k);
+        if (e) vlabelC(c, 'a', (ox + e.x) / 2 + e.uy * 16 * k, (oy + e.y) / 2 - e.ux * 16 * k, C.va, k);
+      }
+    }
     const br = 9 * k, g = c.createRadialGradient(ox - br * 0.35, oy - br * 0.4, k, ox, oy, br);
     g.addColorStop(0, '#ffc2a8'); g.addColorStop(0.35, '#f26a43'); g.addColorStop(1, '#a3321a');
     c.fillStyle = g; c.beginPath(); c.arc(ox, oy, br, 0, Math.PI * 2); c.fill();
@@ -1424,6 +1447,34 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     }
     c.restore();
   }
+  // arrow and vector letter for the printable circle (same look as on screen, scaled by k)
+  function arrowC(c, x1, y1, x2, y2, color, k, dash = false, shrink = 0) {
+    let l = Math.hypot(x2 - x1, y2 - y1);
+    if (l < 2 * k) return null;
+    const ux = (x2 - x1) / l, uy = (y2 - y1) / l;
+    x2 -= ux * shrink; y2 -= uy * shrink; l -= shrink;
+    const hl = Math.min(15 * k, l * 0.5), hw = hl * 0.55, ex = x2 - ux * hl, ey = y2 - uy * hl;
+    c.save(); c.lineCap = 'round';
+    if (dash) { c.globalAlpha = 0.75; c.setLineDash([6 * k, 5 * k]); c.lineWidth = 2 * k; }
+    else { c.strokeStyle = 'rgba(255,255,255,0.9)'; c.lineWidth = 7.5 * k; c.beginPath(); c.moveTo(x1, y1); c.lineTo(ex, ey); c.stroke(); c.lineWidth = 3.5 * k; }
+    c.strokeStyle = color; c.beginPath(); c.moveTo(x1, y1); c.lineTo(ex + ux, ey + uy); c.stroke();
+    c.setLineDash([]); c.fillStyle = color;
+    c.beginPath(); c.moveTo(x2, y2); c.lineTo(ex - uy * hw, ey + ux * hw); c.lineTo(ex + uy * hw, ey - ux * hw); c.closePath(); c.fill();
+    c.restore();
+    return { x: x2, y: y2, ux, uy };
+  }
+  function vlabelC(c, t, x, y, color, k) {
+    c.save();
+    c.font = `italic 700 ${22 * k}px Georgia, "Times New Roman", serif`;
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.lineWidth = 4 * k; c.strokeStyle = 'rgba(255,255,255,0.9)'; c.strokeText(t, x, y);
+    c.fillStyle = color; c.fillText(t, x, y);
+    c.strokeStyle = color; c.lineWidth = 1.6 * k; c.beginPath();
+    c.moveTo(x - 6 * k, y - 15 * k); c.lineTo(x + 6 * k, y - 15 * k);
+    c.moveTo(x + 3 * k, y - 18 * k); c.lineTo(x + 6 * k, y - 15 * k); c.lineTo(x + 3 * k, y - 12 * k); c.stroke();
+    c.restore();
+  }
+
   function line(c, x1, y1, x2, y2) { c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke(); }
   function head(c, x, y, dx, dy, k) {
     const h = 9 * k, s = 4.5 * k;
