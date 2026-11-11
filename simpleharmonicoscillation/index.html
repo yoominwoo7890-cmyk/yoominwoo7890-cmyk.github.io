@@ -1344,7 +1344,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
   }
 
   // printable circle: drawn fresh instead of copying the screen. Grid, screens, the orbit and one dot per Δt
-  // over a full period, numbered around the outside (thinned when crowded), plus a small arrow for the direction.
+  // over a full period, drawn as the object and numbered around the outside (thinned when crowded).
   function circleSheet(c, Z, k) {
     const { r, w, T, dt } = S();
     const pad = PAD * k, u = (Z / 2 - pad) / LIM;
@@ -1382,21 +1382,17 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     c.textAlign = 'center'; c.textBaseline = 'middle';
     for (let i = 0; i < n; i++) {
       const th = w * i * dt, cx = X(r * Math.cos(th)), cy = Y(r * Math.sin(th));
-      c.fillStyle = INK; c.beginPath(); c.arc(cx, cy, 4.2 * k, 0, Math.PI * 2); c.fill();
+      // the object itself at each Δt, drawn like the ball on screen
+      const br = 6.5 * k, g = c.createRadialGradient(cx - br * 0.35, cy - br * 0.4, 0.5 * k, cx, cy, br);
+      g.addColorStop(0, '#ffc2a8'); g.addColorStop(0.35, '#f26a43'); g.addColorStop(1, '#a3321a');
+      c.fillStyle = g; c.beginPath(); c.arc(cx, cy, br, 0, Math.PI * 2); c.fill();
       if (i % every === 0 && !(i > 0 && n - i < every * 0.6)) {
-        const lr = r * u + 16 * k;
+        const lr = r * u + 18 * k;
         const lx = X(0) + lr * Math.cos(th), ly = Y(0) - lr * Math.sin(th);
         c.lineWidth = 4 * k; c.strokeStyle = '#ffffff'; c.strokeText(String(i), lx, ly);
         c.fillStyle = INK; c.fillText(String(i), lx, ly);
       }
     }
-    // direction of motion: a short arc just inside the orbit after dot 0
-    const ar = r * u - 18 * k, a0 = 0.12, a1 = Math.min(0.7, 0.12 + 46 * k / Math.max(ar, 1));
-    c.strokeStyle = '#e4572e'; c.fillStyle = '#e4572e'; c.lineWidth = 2 * k;
-    c.beginPath(); c.arc(X(0), Y(0), ar, -a0, -a1, true); c.stroke();
-    const hx = X(0) + ar * Math.cos(a1), hy = Y(0) - ar * Math.sin(a1), tx = -Math.sin(a1), ty = -Math.cos(a1);
-    c.beginPath(); c.moveTo(hx + tx * 9 * k, hy + ty * 9 * k);
-    c.lineTo(hx - ty * 5 * k, hy + tx * 5 * k); c.lineTo(hx + ty * 5 * k, hy - tx * 5 * k); c.closePath(); c.fill();
     c.restore();
   }
 
