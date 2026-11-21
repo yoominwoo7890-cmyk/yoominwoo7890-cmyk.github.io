@@ -1,0 +1,1166 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>파동</title>
+<style>
+:root{--ink:#1d1d1f;--sub:#8a8a8e;--line:#e7e7ea;}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#fff;color:var(--ink);
+  font-family:-apple-system,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;}
+body{display:flex;flex-direction:column;overflow:hidden;user-select:none;-webkit-user-select:none}
+header{display:flex;align-items:center;gap:4px;padding:14px 18px 4px;flex-wrap:wrap}
+.freq{font-size:15px;color:var(--ink);font-weight:600;gap:10px}
+.freq b{min-width:44px}
+.freq input[type=range]{width:140px}
+.tab{border:none;background:none;font:inherit;font-size:16px;padding:8px 14px;border-radius:10px;color:var(--sub);cursor:pointer}
+.tab:hover{color:var(--ink)}
+.tab.on{color:var(--ink);background:#f2f2f4;font-weight:600}
+#stage{flex:1;min-height:0;display:flex;flex-direction:column;position:relative}
+.stagebtns{z-index:3}
+#mainWrap{flex:1;min-height:0;position:relative}
+#subWrap{flex:0 0 44%;border-top:1px solid var(--line);display:none;position:relative}
+canvas{display:block;position:absolute;left:0;top:0;width:100%;height:100%;touch-action:none}
+#cv{cursor:grab}
+.hint{position:absolute;left:50%;transform:translateX(-50%);top:10px;font-size:13px;color:#b4b4b9;pointer-events:none;transition:opacity .6s}
+footer{display:flex;align-items:center;gap:6px;padding:12px 18px 16px;flex-wrap:wrap;border-top:1px solid var(--line)}
+.btn{height:38px;padding:0 15px;border-radius:19px;border:1px solid var(--line);background:#fff;
+  font:inherit;font-size:15px;cursor:pointer;color:var(--ink);transition:background .15s,color .15s}
+.btn:hover{border-color:#cfcfd4}
+.btn.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn.icon{width:38px;padding:0;font-size:15px}
+.btn.off{opacity:.35;pointer-events:none}
+.seg{display:flex;border:1px solid var(--line);border-radius:19px;overflow:hidden}
+#dim{margin-left:14px}
+.seg button{height:36px;border:none;background:#fff;padding:0 14px;font:inherit;font-size:15px;cursor:pointer;color:var(--ink)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--ink);color:#fff}
+.sep{width:1px;height:22px;background:var(--line);margin:0 4px}
+.grow{flex:1}
+.stagebtns{position:absolute;right:18px;top:14px;display:flex;gap:10px}
+.mergebtn{position:absolute;left:14px;top:50%;transform:translateY(-50%);transition:top .9s,transform .9s;z-index:3;display:flex;align-items:center;gap:7px;height:36px;padding:0 14px;border:2px solid #1d1d1f;border-radius:18px;
+  background:#fff;color:#1d1d1f;font:inherit;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.10)}
+.mergebtn:hover{background:#f4f4f6}
+.mergebtn.merged{top:30px;transform:none}   /* 겹친 뒤엔 칸 사이가 없어지므로 위로 비켜남 */
+.mergebtn i{display:inline-block;width:10px;height:10px;border-radius:50%}
+.flatbtn{display:flex;align-items:center;gap:8px;height:44px;padding:0 20px;
+  border:none;border-radius:22px;background:#1d1d1f;color:#fff;font:inherit;font-size:16px;font-weight:600;cursor:pointer;
+  box-shadow:0 4px 14px rgba(0,0,0,.18);transition:background .15s}
+.flatbtn:hover{background:#000}
+.flatbtn svg{width:18px;height:18px}
+.phase{display:none;align-items:center;gap:8px;font-size:14px;color:var(--sub)}
+.phase b{color:var(--ink);font-weight:600;min-width:34px}
+.phase-sl{display:flex;align-items:center;gap:8px}
+.phase-sl input[type=range]{width:70px}
+.presets{display:flex;gap:3px}
+.presets button{height:30px;min-width:34px;padding:0 5px;border:1px solid var(--line);border-radius:15px;background:#fff;
+  font:inherit;font-size:13px;color:var(--ink);cursor:pointer}
+.presets button:hover{border-color:#cfcfd4}
+.presets button.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.ctl{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--sub)}
+.ctl b{color:var(--ink);font-weight:600;min-width:38px}
+.ctl input[type=range]{width:76px}
+input[type=range]{width:90px;accent-color:#1d1d1f}
+</style>
+</head>
+<body>
+<header>
+  <button class="tab on" data-mode="chain">용수철 구슬</button>
+  <button class="tab" data-mode="string">줄 파동</button>
+  <button class="tab" data-mode="water">수면파</button>
+  <button class="tab" data-mode="sound">음파</button>
+  <button class="tab" data-mode="em">전자기파</button>
+  <div class="seg dim-only" id="dim"><button class="on" data-v="1">1차원</button><button data-v="2">2차원</button></div>
+  <span class="grow"></span>
+  <label class="ctl freq">주기
+    <input type="range" id="freq" min="1" max="3" step="0.5" value="1.5"><b id="freqVal"></b>
+  </label>
+</header>
+
+<div id="stage">
+  <div id="mainWrap">
+    <canvas id="cv"></canvas>
+    <div class="hint" id="hint"></div>
+    <div class="stagebtns">
+      <button class="flatbtn" id="flat" style="display:none"><svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10a6 6 0 1 0 2-4.5"/><path d="M4 3.5V7h3.5"/></svg>원래대로</button>
+    </div>
+  </div>
+  <div id="subWrap"><canvas id="cs"></canvas><button class="mergebtn" id="merge"></button></div>
+</div>
+
+<footer>
+  <button class="btn" id="play">초기화</button>
+  <button class="btn" id="pause">일시정지</button>
+  <span class="sep"></span>
+  <div class="seg" id="add">
+    <button class="on" data-v="0">파동 1개</button>
+    <button data-v="1">+ 같은 방향</button>
+    <button data-v="2">+ 반대 방향</button>
+  </div>
+  <div class="phase" id="phaseBox">
+    <label class="phase-sl">위상차
+      <input type="range" id="phase" min="0" max="360" step="15" value="0"><b id="phaseVal">0°</b>
+    </label>
+    <div class="presets" id="presets">
+      <button data-v="0" class="on">0°</button><button data-v="30">30°</button><button data-v="60">60°</button><button data-v="90">90°</button><button data-v="120">120°</button><button data-v="150">150°</button><button data-v="180">180°</button>
+    </div>
+  </div>
+  <label class="ctl two-only">거리
+    <input type="range" id="d2" min="0.5" max="4" step="0.5" value="2"><b id="d2Val">2λ</b>
+  </label>
+  <button class="btn two-only" id="lines">무늬선</button>
+  <label class="ctl chain-only">매단 용수철
+    <input type="range" id="hang" min="0" max="100" step="5" value="0"><b id="hangVal">0%</b>
+  </label>
+  <div class="seg sound-only" id="snd">
+    <button class="on" data-v="d">변위</button>
+    <button data-v="p">압력</button>
+  </div>
+  <span class="grow"></span>
+  <button class="btn" id="slow">천천히</button>
+</footer>
+
+<script>
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const sm = u => u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u);
+
+/* ---------- 상태 ---------- */
+const S = { mode:'chain', play:true, arrows:true, add:0, phase:0, slow:false, circle:true,
+            drive:true, couple:true, t:0, t2:0, hang:0, sel:9, snd:'d', T:1.5, dim:1, d2:2, lines:false, probe:null };
+const FG = '#16a34a', FP = '#7c3aed';   // 힘 화살표: 매단 용수철(초록), 연결 용수철(보라)
+const CAM0 = { string:{yaw:0,pitch:0}, water:{yaw:-0.35,pitch:0.5}, sound:{yaw:0,pitch:0}, em:{yaw:0,pitch:0},
+               water2:{yaw:0,pitch:Math.PI / 2}, sound2:{yaw:0,pitch:Math.PI / 2}, em2:{yaw:0,pitch:Math.PI / 2} };   // 2차원: 위에서 내려다봄
+const cam = JSON.parse(JSON.stringify(CAM0));
+const hintSeen = {};
+
+const RED = '#e5484d', BLUE_B = '#2f6fd6';
+const PAL = [
+  { line:'#1d1d1f', hue:207, ball:['#ffffff','#a1a1aa','#52525b'] },
+  { line:'#2f6fd6', hue:214, ball:['#eef3ff','#86a9ea','#2f5fb8'] },
+  { line:'#e8890c', hue:32,  ball:['#fff4e3','#f2b460','#b86a05'] }
+];
+
+/* ---------- 해석적 파동 (줄 / 수면 / 전자기) ---------- */
+const L = 6, K = Math.PI / 2, OM = Math.PI, V = OM / K, AMP = 0.9, ZW = 2.5;
+
+// 주기(진동수): 파원의 위상 Θ(τ)를 구간별로 기록한다. 어느 지점의 변위는 거리 d만큼 늦은 시각의 파원 위상
+// y = A·sin Θ(t − d/v) → 진동수를 바꾸면 새 파장이 파원에서부터 퍼져 나간다 (파동의 속력 v는 그대로).
+// 주기 T는 모든 모드에서 '화면에서 실제로 한 번 진동하는 데 걸리는 시간'(초)이다.
+const omNow = () => 2 * Math.PI / S.T, kNow = () => omNow() / V;
+let FH = [{ t:0, th:0, w:omNow() }];
+function srcPhase(tau){
+  let i = FH.length - 1;
+  while (i > 0 && FH[i].t > tau) i--;
+  return FH[i].th + FH[i].w * (tau - FH[i].t);
+}
+function setSrcFreq(){
+  FH.push({ t:S.t, th:srcPhase(S.t), w:omNow() });
+  while (FH.length > 1 && FH[1].t < S.t - 2 * L / V - 2) FH.shift();   // 이미 관을 빠져나간 기록은 버림
+}
+function comp(n, x){
+  const t = S.t;
+  if (n === 1){
+    const d = x + L;
+    return AMP * sm((V * t - d) / 0.8) * Math.sin(srcPhase(t - d / V));
+  }
+  const d = S.add === 2 ? L - x : x + L;
+  return AMP * sm((V * (t - S.t2) - d) / 0.8) * Math.sin(srcPhase(t - d / V) + S.phase);
+}
+const dirOf = n => n === 1 ? 1 : (S.add === 2 ? -1 : 1);
+const sumF = (comps, x) => comps.reduce((a, n) => a + comp(n, x), 0);
+const sumB = (comps, x) => comps.reduce((a, n) => a + dirOf(n) * comp(n, x), 0);
+
+/* ---------- 용수철 구슬 사슬 ---------- */
+const CN = 24, CP = 40, CM = CN + CP, KC = 10, CW = 4, CA = 0.45;
+const cwNow = () => 2 * Math.PI / (1.3 * S.T);   // 흔드는 각진동수 (사슬은 화면 시간의 1.3배 빠르기로 계산)
+let drvPh = 0;                    // 흔드는 위상 (진동수를 바꿔도 끊기지 않게 누적)
+const damp = new Float64Array(CM);
+for (let i = CN; i < CM; i++){ const u = (i - CN + 1) / CP; damp[i] = 4 * u * u; }
+const mk = () => ({ y:new Float64Array(CM), v:new Float64Array(CM), t0:0 });
+// 파동 2는 sin·cos 두 사슬로 계산해 두고 위상차에 맞게 섞는다 (선형계라 정확히 같은 결과).
+// 그래서 위상차를 바꾸면 처음부터 그 위상으로 출발한 파동이 즉시 나타난다.
+const chA = mk(), chBs = mk(), chBc = mk();
+let cT = 0, rot = null;
+
+function stepCh(ch, h, driven, ph){
+  const y = ch.y, v = ch.v, kc = kcNow(), w0 = w0sq();
+  for (let i = 0; i < CM; i++){
+    let a = -w0 * y[i] - damp[i] * v[i];
+    if (i > 0) a += kc * (y[i-1] - y[i]);
+    if (i < CM - 1) a += kc * (y[i+1] - y[i]);
+    v[i] += a * h;
+  }
+  for (let i = 0; i < CM; i++) y[i] += v[i] * h;
+  if (driven){
+    const e = sm((cT - ch.t0) / 3);
+    y[0] = CA * e * Math.sin(drvPh + ph);
+    v[0] = CA * e * cwNow() * Math.cos(drvPh + ph);
+  }
+}
+const bMix = () => [Math.cos(phB()), Math.sin(phB())];
+const bY = j => { const m = bMix(); return m[0] * chBs.y[j] + m[1] * chBc.y[j]; };
+const bAt = i => bY(S.add === 2 ? CN - 1 - i : i);
+
+// 먼 끝에 도착한 파동의 진폭·위상을 구한다 (CW 성분만 걸러냄, 3단 평균)
+const mkDM = () => [[0, 0], [0, 0], [0, 0]];
+let dmA = mkDM(), dmBs = mkDM(), dmBc = mkDM();
+function demod(dm, y, h){
+  const th = drvPh, tau = (2 * Math.PI / cwNow()) / 3, f = h / tau;
+  let a = 2 * y * Math.sin(th), b = 2 * y * Math.cos(th);
+  for (const st of dm){ st[0] += (a - st[0]) * f; st[1] += (b - st[1]) * f; a = st[0]; b = st[1]; }
+}
+function demodVec(dm){
+  const th = drvPh, a = dm[2][0], b = dm[2][1];
+  return [a * Math.cos(th) - b * Math.sin(th), a * Math.sin(th) + b * Math.cos(th)];
+}
+// 반대 방향: 파동 2가 사슬을 건너오는 동안 늦어지는 위상(분산 관계 cos ka = 1 - (ω²-ω0²)/2k)
+// 물리는 항상 연결 용수철만으로 계산한다 (매단 용수철 없음).
+// '매단 용수철' 슬라이더는 그림만 바꾼다: 연결 용수철이 주는 복원력 −mω²y를
+// 각 구슬에 매단 용수철(k = mω²)이 주는 것처럼 바꿔 보여 줄 뿐, 운동은 그대로다.
+const w0sq = () => 0;
+const kcNow = () => KC;
+const KAf = () => Math.acos(clamp(1 - cwNow() ** 2 / (2 * KC), -1, 1)), CROSSf = () => (CN - 1) * KAf();
+// 위상차 슬라이더 = 합성 원이 있는 지점에서 두 파동의 위상차
+// (같은 방향: 왼쪽 끝 / 반대 방향: 오른쪽 끝 — 파동 1이 건너와 늦어진 위상 기준)
+const phB = () => S.phase - (S.add === 2 ? CROSSf() : 0);
+function demodB(){
+  const m = bMix(), a = demodVec(dmBs), b = demodVec(dmBc);
+  return [m[0] * a[0] + m[1] * b[0], m[0] * a[1] + m[1] * b[1]];
+}
+function driverVec(ch, ph){
+  const e = sm((cT - ch.t0) / 3), th = drvPh + ph;
+  return [CA * e * Math.cos(th), CA * e * Math.sin(th)];
+}
+function stepChains(dt){
+  const n = Math.ceil(dt / 0.004), h = dt / n;
+  for (let k = 0; k < n; k++){
+    cT += h; drvPh += cwNow() * h;
+    stepCh(chA, h, S.drive, 0);
+    if (S.add){ stepCh(chBs, h, true, 0); stepCh(chBc, h, true, Math.PI / 2); }
+    demod(dmA, chA.y[CN - 1], h);
+    if (S.add){ demod(dmBs, chBs.y[CN - 1], h); demod(dmBc, chBc.y[CN - 1], h); }
+  }
+}
+function resetChains(){
+  for (const c of [chA, chBs, chBc]){ c.y.fill(0); c.v.fill(0); c.t0 = 0; }
+  dmA = mkDM(); dmBs = mkDM(); dmBc = mkDM();
+  cT = 0; drvPh = 0;
+}
+
+/* ---------- 2차원 간섭 ----------
+   두 점파원 S₁(파랑), S₂(주황)에서 원형파가 퍼진다. 무한히 넓은 매질이라 반사파가 없다.
+   진폭은 거리에 따라 아주 조금만 줄어든다: A(r) = A₀ / (1 + 0.03 r)
+   각 점의 변위 = Σ A(r_i)·sin Θ(t − r_i/v) (+ S₂의 위상차) — 1차원과 같은 파원 위상 기록 Θ를 쓴다 */
+const D2 = { R:6.5, X:6.5, Z:6.5, nx:140, nz:140 };   // 원형 면 (반지름 R)
+const sqPlane = () => S.mode === 'em';   // 전자기파만 정사각형 면 (한 변 2R)
+const inDisk = (x, z, m = 0) => sqPlane() ? Math.abs(x) <= D2.R - m && Math.abs(z) <= D2.R - m
+                                          : x * x + z * z <= (D2.R - m) * (D2.R - m);
+const is2D = () => S.dim === 2 && (S.mode === 'water' || S.mode === 'sound' || S.mode === 'em');
+const lam = () => V * S.T;
+const sepMax = () => Math.max(0.5, Math.min(4, Math.floor(2 * (2 * D2.R - 3) / lam()) / 2));   // 파원이 면 안에 있도록 (λ 단위)
+const sep = () => Math.min(S.d2, sepMax()) * lam();
+const srcX = i => (i ? 1 : -1) * sep() / 2;
+const amp2 = r => AMP / (1 + 0.03 * r);
+function w2(i, x, z){
+  const dx = x - srcX(i), r = Math.hypot(dx, z);
+  return { a:amp2(r) * sm((V * S.t - r) / 0.8), th:srcPhase(S.t - r / V) + (i ? S.phase : 0), r,
+           ux:r > 1e-6 ? dx / r : 0, uz:r > 1e-6 ? z / r : 0 };
+}
+// 색표: v ∈ [-1, 1]
+function hslRgb(h, s, l){
+  s /= 100; l /= 100; const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l);
+  const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+  return [f(0) * 255, f(8) * 255, f(4) * 255];
+}
+const LUTS = {};
+function lut(kind){
+  if (LUTS[kind]) return LUTS[kind];
+  const t = new Uint8ClampedArray(256 * 3);
+  for (let i = 0; i < 256; i++){
+    const v = i / 255 * 2 - 1; let c;
+    if (kind === 'water') c = hslRgb(207, 72, clamp(78 - 26 * v, 40, 97));            // 마루일수록 진하게 (1차원 수면과 같은 규칙)
+    else if (kind === 'sound') c = hslRgb(220, 6, clamp(70 - 32 * v, 30, 99));      // 밀한 곳일수록 진하게
+    else { const u = Math.abs(v), to = v >= 0 ? [229, 72, 77] : [71, 85, 105];      // 전기장 + 빨강, − 회청색
+           c = to.map(q => 255 + (q - 255) * Math.min(1, u * 1.15)); }
+    t.set(c, i * 3);
+  }
+  return (LUTS[kind] = t);
+}
+const hmC = document.createElement('canvas'); hmC.width = D2.nx; hmC.height = D2.nz;
+const hmX = hmC.getContext('2d'), hmImg = hmX.createImageData(D2.nx, D2.nz);
+function fieldImage(kind){
+  const { X, Z, nx, nz } = D2, d = hmImg.data, T8 = lut(kind), useCos = kind === 'sound';
+  const sx0 = srcX(0), sx1 = srcX(1), Vt = V * S.t, ph = S.phase;
+  for (let j = 0; j < nz; j++){
+    const z = -Z + (j + 0.5) * 2 * Z / nz;
+    for (let i = 0; i < nx; i++){
+      const x = -X + (i + 0.5) * 2 * X / nx;
+      const r0 = Math.hypot(x - sx0, z), r1 = Math.hypot(x - sx1, z);
+      const a0 = amp2(r0) * sm((Vt - r0) / 0.8), a1 = amp2(r1) * sm((Vt - r1) / 0.8);
+      const t0 = srcPhase(S.t - r0 / V), t1 = srcPhase(S.t - r1 / V) + ph;
+      // 음파(압력) ∝ −∂ξ/∂r → cos, 나머지는 변위 → sin
+      const v = useCos ? a0 * Math.cos(t0) + a1 * Math.cos(t1) : a0 * Math.sin(t0) + a1 * Math.sin(t1);
+      const q = clamp(Math.round((v / (2 * AMP) * 0.5 + 0.5) * 255), 0, 255) * 3, o = (j * nx + i) * 4;
+      d[o] = T8[q]; d[o + 1] = T8[q + 1]; d[o + 2] = T8[q + 2]; d[o + 3] = 255;
+    }
+  }
+  hmX.putImageData(hmImg, 0, 0);
+}
+let plane2D = null;   // 화면 ↔ 면 좌표 변환 (클릭한 점 찾기)
+function draw2D(c, vp){
+  const { X, Z } = D2, cm = cam[camKey()], kind = S.mode;
+  // 기울여도 면(과 높이)이 화면 안에 들어오도록 축척을 맞춘다
+  const hm = kind === 'sound' ? 0 : 2 * AMP, P1 = projector({ x:0, y:0, w:0, h:0 }, 1, cm);
+  let wx = 0, wy = 0;
+  const rim = sqPlane() ? [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => [u * D2.R, v * D2.R])
+                        : Array.from({ length:48 }, (_, k) => [D2.R * Math.cos(k / 48 * 2 * Math.PI), D2.R * Math.sin(k / 48 * 2 * Math.PI)]);
+  for (const [rx, rz] of rim) for (const y of [-hm, hm]){ const q = P1(rx, y, rz); wx = Math.max(wx, Math.abs(q[0])); wy = Math.max(wy, Math.abs(q[1])); }
+  const s = Math.min(vp.w * 0.9 / (2 * wx), vp.h * 0.88 / (2 * wy));
+  const P = projector(vp, s, cm), top = cm.pitch > 1.3;
+  const O = P(0, 0, 0), ex = P(1, 0, 0), ez = P(0, 0, 1);
+  const ax = ex[0] - O[0], ay = ex[1] - O[1], bx = ez[0] - O[0], by = ez[1] - O[1], det = ax * by - ay * bx;
+  plane2D = { inv:(mx, my) => Math.abs(det) < 1e-6 ? null :
+    [((mx - O[0]) * by - (my - O[1]) * bx) / det, (ax * (my - O[1]) - ay * (mx - O[0])) / det] };
+  // 면 (점을 고르면 간섭 무늬는 숨기고 그 점에 닿는 두 파동만 보인다)
+  const all = !S.probe;
+  if (kind === 'water' && !top) drawRidges(c, P, cm);
+  else if (!(kind === 'sound' && S.snd === 'd')){
+    fieldImage(kind);
+    const nx = D2.nx, nz = D2.nz, sx = 2 * X / nx, sz = 2 * Z / nz;
+    c.save(); diskPath(c, P); c.clip();
+    c.transform(ax * sx, ay * sx, bx * sz, by * sz, O[0] - X * ax - Z * bx, O[1] - X * ay - Z * by);
+    c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'low'; c.drawImage(hmC, 0, 0); c.restore();
+  }
+  if (kind === 'sound' && S.snd === 'd') particles2D(c, P, s);
+  if (kind === 'em' && !top) emArrows2D(c, P);
+  // 점을 고르면 배경은 아주 희미하게: 그대로 그린 뒤 흰 막을 덮는다 (가림 관계 유지)
+  if (!all){ c.fillStyle = 'rgba(255,255,255,0.84)'; c.fillRect(vp.x, vp.y, vp.w, vp.h); }
+  c.strokeStyle = '#cfcfd4'; c.lineWidth = 1.2; diskPath(c, P); c.stroke();
+  if (S.lines){
+    nodalLines(c, P);
+    // 범례: — 보강  - - 상쇄
+    const lx = vp.x + 22, ly = vp.y + vp.h - 26;
+    c.textAlign = 'left';
+    c.strokeStyle = 'rgba(29,29,31,0.75)'; c.lineWidth = 2;
+    line(c, [lx, ly], [lx + 26, ly]); label(c, '보강', lx + 34, ly - 8, '#1d1d1f');
+    c.setLineDash([6, 6]); line(c, [lx + 82, ly], [lx + 108, ly]); c.setLineDash([]);
+    label(c, '상쇄', lx + 116, ly - 8, '#1d1d1f');
+  }
+  // 파원
+  for (const i of [0, 1]){
+    const p = P(srcX(i), 0, 0), col = PAL[i + 1].line;
+    c.fillStyle = '#fff'; c.beginPath(); c.arc(p[0], p[1], 8, 0, 7); c.fill();
+    c.fillStyle = col; c.beginPath(); c.arc(p[0], p[1], 5.5, 0, 7); c.fill();
+    label(c, i ? 'S₂' : 'S₁', p[0] + 9, p[1] + 6, col);
+  }
+  if (S.probe) probe2D(c, vp, P, top);
+}
+function diskPath(c, P){
+  c.beginPath();
+  if (sqPlane()){
+    const R = D2.R, q = [P(-R, 0, -R), P(R, 0, -R), P(R, 0, R), P(-R, 0, R)];
+    c.moveTo(q[0][0], q[0][1]); q.slice(1).forEach(p => c.lineTo(p[0], p[1])); c.closePath(); return;
+  }
+  for (let k = 0; k <= 96; k++){ const a = k / 96 * 2 * Math.PI, q = P(D2.R * Math.cos(a), 0, D2.R * Math.sin(a)); k ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]); }
+  c.closePath();
+}
+// 3D로 기울였을 때의 수면: 줄지어 선 단면을 뒤에서부터 칠해 가림을 만든다
+function drawRidges(c, P, cm){
+  const { X, Z } = D2, alongX = Math.abs(Math.cos(cm.yaw)) >= Math.abs(Math.sin(cm.yaw));
+  const NL = 30, NS = 60, rows = [];
+  const h = (x, z) => { const p = w2(0, x, z), q = w2(1, x, z); return p.a * Math.sin(p.th) + q.a * Math.sin(q.th); };
+  for (let j = 0; j <= NL; j++){
+    const w = alongX ? -Z + 2 * Z * j / NL : -X + 2 * X * j / NL;
+    rows.push({ w, d:alongX ? P(0, 0, w)[2] : P(w, 0, 0)[2] });
+  }
+  rows.sort((a, b) => a.d - b.d);
+  const at = (u, w, y) => alongX ? P(u, y, w) : P(w, y, u), U = alongX ? X : Z;
+  // 뒤쪽 띠부터 칠한다. 칸마다 높이에 따라 위에서 볼 때와 같은 색 (마루가 진함), 줄 선 없음.
+  // 같은 띠 안에서는 같은 색 칸을 묶어 한 번에 칠한다 (색 24단계).
+  const T8 = lut('water'), NC = 24, groups = Array.from({ length:NC }, () => []);
+  const col = k => { const q = Math.round((k + 0.5) / NC * 255) * 3; return `rgb(${T8[q]},${T8[q + 1]},${T8[q + 2]})`; };
+  const COLS = Array.from({ length:NC }, (_, k) => col(k));
+  let prev = null;
+  for (const { w } of rows){
+    const Uw = Math.sqrt(Math.max(0, D2.R * D2.R - w * w)), pts = [], hs = [];   // 원의 현
+    for (let i = 0; i <= NS; i++){ const u = -Uw + 2 * Uw * i / NS, y = alongX ? h(u, w) : h(w, u); pts.push(at(u, w, y)); hs.push(y); }
+    if (prev){
+      for (const g of groups) g.length = 0;
+      for (let i = 0; i < NS; i++){
+        const v = (hs[i] + hs[i + 1] + prev.h[i] + prev.h[i + 1]) / 4;
+        const k = clamp(Math.floor((v / (2 * AMP) * 0.5 + 0.5) * NC), 0, NC - 1);
+        groups[k].push(i);
+      }
+      // 띠 전체를 먼저 중간색으로 칠해 칸 사이 틈이 보이지 않게 한다
+      c.fillStyle = COLS[NC >> 1]; c.beginPath();
+      pts.forEach((q, i) => i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]));
+      for (let i = NS; i >= 0; i--) c.lineTo(prev.p[i][0], prev.p[i][1]);
+      c.closePath(); c.fill();
+      for (let k = 0; k < NC; k++){
+        if (k === NC >> 1) continue;
+        const g = groups[k]; if (!g.length) continue;
+        c.beginPath();
+        for (const i of g){
+          const a = prev.p[i], b = prev.p[i + 1], d = pts[i + 1], e = pts[i];
+          c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.lineTo(d[0], d[1]); c.lineTo(e[0], e[1]); c.closePath();
+        }
+        c.fillStyle = COLS[k]; c.fill();
+      }
+    }
+    prev = { p:pts, h:hs };
+  }
+}
+// 음파(변위): 공기 입자가 각 파원에서 멀어지는/다가오는 방향으로 움직이고, 두 변위가 벡터로 더해진다
+const P2J = Array.from({ length:66 * 66 * 2 }, (_, i) => { const r = Math.sin(i * 91.7 + 13.1) * 43758.5453; return r - Math.floor(r) - 0.5; });
+function particles2D(c, P, s){
+  const { X, Z } = D2, NX = 66, NZ = 66, DS = 0.75 / (2 * AMP * kNow()), r = Math.max(1.1, s * 0.035);   // 이웃 입자끼리 지나치지 않는 한도
+  c.fillStyle = '#6e6e73'; c.beginPath();
+  for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++){
+    const k = (j * NX + i) * 2;
+    const x0 = -X + (i + 0.5 + 0.3 * P2J[k]) * 2 * X / NX, z0 = -Z + (j + 0.5 + 0.3 * P2J[k + 1]) * 2 * Z / NZ;
+    if (!inDisk(x0, z0, 0.1)) continue;
+    const p = w2(0, x0, z0), q = w2(1, x0, z0), e0 = DS * p.a * Math.sin(p.th), e1 = DS * q.a * Math.sin(q.th);
+    const t = P(x0 + e0 * p.ux + e1 * q.ux, 0, z0 + e0 * p.uz + e1 * q.uz);
+    c.moveTo(t[0] + r, t[1]); c.arc(t[0], t[1], r, 0, 7);
+  }
+  c.fill();
+}
+// 전자기파(기울였을 때): 면에 수직인 전기장 화살표
+function emArrows2D(c, P){
+  const { X, Z } = D2, pos = [], neg = [];
+  for (let j = 0; j <= 13; j++) for (let i = 0; i <= 13; i++){
+    const x = -X + 2 * X * i / 13, z = -Z + 2 * Z * j / 13;
+    if (!inDisk(x, z, 0.2)) continue;
+    const p = w2(0, x, z), q = w2(1, x, z);
+    const E = p.a * Math.sin(p.th) + q.a * Math.sin(q.th);
+    (E >= 0 ? pos : neg).push([P(x, 0, z), P(x, E, z)]);
+  }
+  arrowsBatch(c, pos, '#c92a2f', 1.5, 7); arrowsBatch(c, neg, '#334155', 1.5, 7);
+}
+// 보강선(실선) · 상쇄선(점선): k(r₁ − r₂) + φ = 2πm 또는 (2m+1)π 인 쌍곡선
+function nodalLines(c, P){
+  const { X, Z } = D2, k = 2 * Math.PI / lam(), a = sep() / 2;
+  for (const [off, dash, col] of [[0, [], 'rgba(29,29,31,0.6)'], [Math.PI, [6, 6], 'rgba(29,29,31,0.6)']]){
+    c.setLineDash(dash); c.strokeStyle = col; c.lineWidth = 1.6;
+    for (let m = -12; m <= 12; m++){
+      const d = (2 * Math.PI * m + off - S.phase) / k;   // r₁ − r₂
+      if (Math.abs(d) > 2 * a + 1e-6) continue;
+      const pts = [];
+      if (Math.abs(d) >= 2 * a - 1e-6){
+        // 경로차 = 파원 간격: 쌍곡선이 두 파원을 잇는 직선의 바깥쪽 반직선으로 납작해진다
+        const sg = Math.sign(d); pts.push(P(sg * a, 0, 0), P(sg * D2.R, 0, 0));
+      }
+      else if (Math.abs(d) < 1e-6) pts.push(P(0, 0, -Z), P(0, 0, Z));
+      else {
+        const A = Math.abs(d) / 2, B = Math.sqrt(a * a - A * A), sg = Math.sign(d);
+        for (let u = -4; u <= 4.0001; u += 0.04){
+          const x = sg * A * Math.cosh(u), z = B * Math.sinh(u);
+          if (inDisk(x, z)) pts.push(P(x, 0, z));
+        }
+      }
+      if (pts.length > 1) poly(c, pts);
+    }
+  }
+  c.setLineDash([]);
+}
+// 클릭한 점: 두 파원에서 오는 경로 + 위상자(원운동 화살표)
+function probe2D(c, vp, P, top){
+  const { x, z } = S.probe, p = P(x, 0, z), w = [w2(0, x, z), w2(1, x, z)];
+  const pres = S.mode === 'sound' && S.snd === 'p', f = pres ? Math.cos : Math.sin, G = 0.75;
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  for (const i of [0, 1]){
+    // S_i → P 경로를 따라 진행하는 파동 하나 (위에서 볼 땐 경로 옆으로, 기울이면 위아래로 그림)
+    const sx = srcX(i), dx = x - sx, R = Math.hypot(dx, z), ux = R ? dx / R : 0, uz = R ? z / R : 0, col = PAL[i + 1].line;
+    const at = (r, v) => top ? P(sx + ux * r - uz * v, 0, uz * r + ux * v) : P(sx + ux * r, v, uz * r);
+    const val = r => amp2(r) * sm((V * S.t - r) / 0.8) * f(srcPhase(S.t - r / V) + (i ? S.phase : 0)) * G;
+    c.setLineDash([3, 4]); c.strokeStyle = col; c.globalAlpha = 0.45; c.lineWidth = 1.2; line(c, P(sx, 0, 0), p); c.setLineDash([]); c.globalAlpha = 1;
+    const N = Math.max(24, Math.ceil(R * 24)), pts = [];
+    for (let k = 0; k <= N; k++){ const r = R * k / N; pts.push(at(r, val(r))); }
+    c.strokeStyle = col; c.lineWidth = 2.6; poly(c, pts);
+    // 그 점에서의 변위 (압력일 땐 크기만)
+    if (!pres) arrow(c, p, at(R, val(R)), col, 2.4, true, 9);
+  }
+  c.fillStyle = '#fff'; c.strokeStyle = '#1d1d1f'; c.lineWidth = 2.5; c.beginPath(); c.arc(p[0], p[1], 6, 0, 7); c.fill(); c.stroke();
+  // 위상자
+  const R = 46, cx = clamp(p[0] + (p[0] > vp.x + vp.w - 150 ? -86 : 86), vp.x + R + 10, vp.x + vp.w - R - 10),
+        cy = clamp(p[1] - 70, vp.y + 2 * R + 10, vp.y + vp.h - 2 * R - 34);
+  c.fillStyle = 'rgba(255,255,255,0.92)'; c.beginPath(); c.arc(cx, cy, R + 12, 0, 7); c.fill();
+  c.strokeStyle = '#ececef'; c.lineWidth = 1; line(c, [cx - R - 6, cy], [cx + R + 6, cy]); line(c, [cx, cy - R - 6], [cx, cy + R + 6]);
+  c.strokeStyle = '#bdbdc3'; c.lineWidth = 1.5; c.beginPath(); c.arc(cx, cy, R, 0, 7); c.stroke();
+  const sc = R / AMP, v = w.map(o => [o.a * Math.cos(o.th) * sc, o.a * Math.sin(o.th) * sc]);
+  const t1 = [cx + v[0][0], cy - v[0][1]], t2 = [cx + v[1][0], cy - v[1][1]], ts = [cx + v[0][0] + v[1][0], cy - v[0][1] - v[1][1]];
+  c.setLineDash([3, 3]); c.strokeStyle = '#c9c9ce'; c.lineWidth = 1; line(c, t1, ts); line(c, t2, ts); c.setLineDash([]);
+  if (Math.hypot(...v[0]) > 6 && Math.hypot(...v[1]) > 6){
+    const a1 = -Math.atan2(v[0][1], v[0][0]), a2 = -Math.atan2(v[1][1], v[1][0]);
+    let d = a2 - a1; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+    c.strokeStyle = '#55555a'; c.lineWidth = 2; c.beginPath(); c.arc(cx, cy, R * 0.32, a1, a1 + d, d < 0); c.stroke();
+  }
+  arrow(c, [cx, cy], t1, PAL[1].line, 2.6, true, 10);
+  arrow(c, [cx, cy], t2, PAL[2].line, 2.6, true, 10);
+  arrow(c, [cx, cy], ts, '#1d1d1f', 3, true, 11);
+  c.fillStyle = '#1d1d1f'; c.beginPath(); c.arc(cx, cy, 2.5, 0, 7); c.fill();
+  // 경로차 (λ 단위)
+  const dr = (w[0].r - w[1].r) / lam(), txt = '경로차 ' + (Math.round(Math.abs(dr) * 100) / 100) + 'λ';
+  c.font = '600 13px -apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif';
+  c.textAlign = 'center'; c.textBaseline = 'top'; c.fillStyle = '#1d1d1f'; c.fillText(txt, cx, cy + 2 * R + 8);   // 합성 화살표(최대 2R)와 겹치지 않게 c.textAlign = 'left';
+}
+
+/* ---------- 캔버스 ---------- */
+const cv = $('#cv'), cs = $('#cs');
+let g = cv.getContext('2d'), gs = cs.getContext('2d');
+function fit(c){
+  const r = c.getBoundingClientRect(), d = window.devicePixelRatio || 1;
+  c.width = Math.max(1, r.width * d); c.height = Math.max(1, r.height * d);
+  const x = c.getContext('2d'); x.setTransform(d, 0, 0, d, 0, 0);
+  c.W = r.width; c.H = r.height; return x;
+}
+const subOn = () => S.add > 0 && !is2D();
+function resize(){ g = fit(cv); if (subOn()) gs = fit(cs); }
+window.addEventListener('resize', resize);
+const mainVp = () => ({ x:0, y:0, w:cv.W, h:cv.H });
+
+/* ---------- 3D 투영 ---------- */
+function projector(vp, s, c){
+  const cy = Math.cos(c.yaw), sy = Math.sin(c.yaw), cp = Math.cos(c.pitch), sp = Math.sin(c.pitch);
+  const ox = vp.x + vp.w / 2, oy = vp.y + vp.h / 2;
+  return (x, y, z) => {
+    const x1 = x * cy + z * sy, z1 = -x * sy + z * cy;
+    const y2 = y * cp - z1 * sp, z2 = y * sp + z1 * cp;
+    return [ox + x1 * s, oy - y2 * s, z2];
+  };
+}
+function scaleFor(mode, vp, room){
+  const sx = vp.w * 0.84 / (2 * L);
+  let vert = room + 0.3;
+  if (mode === 'sound') vert = 2 * Math.max(SND.TY1, -(SND.GY - room / 2)) + 0.4;   // 관 + 아래 그래프
+  if (mode === 'water'){
+    const c = CAM0.water, sp = Math.abs(Math.sin(c.pitch));
+    vert = room * Math.cos(c.pitch) + (2 * ZW * Math.cos(c.yaw) + 2 * L * Math.abs(Math.sin(c.yaw))) * sp;
+  }
+  return Math.min(sx, vp.h * 0.84 / vert);
+}
+
+/* ---------- 그리기 도구 ---------- */
+function arrow(c, a, b, color, lw, halo, hmax){
+  if (ARW && color === RED){
+    color = ARW.k > 0.5 ? ARW.col : RED;
+    a = [a[0] + ARW.dx, a[1]]; b = [b[0] + ARW.dx, b[1]];
+  }
+  const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy);
+  if (len < 1.5) return;
+  const h = Math.min(hmax || 9, len * 0.45), ux = dx / len, uy = dy / len;
+  const bx = b[0] - ux * h, by = b[1] - uy * h;
+  const shape = () => {
+    c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(bx, by); c.stroke();
+    c.beginPath(); c.moveTo(b[0], b[1]);
+    c.lineTo(bx - uy * h * 0.55, by + ux * h * 0.55);
+    c.lineTo(bx + uy * h * 0.55, by - ux * h * 0.55);
+    c.closePath(); c.fill(); if (halo) c.stroke();
+  };
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  if (halo){ c.strokeStyle = c.fillStyle = '#fff'; c.lineWidth = lw + 3; shape(); }
+  c.strokeStyle = c.fillStyle = color; c.lineWidth = lw; shape();
+}
+function line(c, a, b){ c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+function poly(c, pts){ c.beginPath(); pts.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.stroke(); }
+// 여러 용수철을 한 경로에 모아 한 번에 그린다 (성능)
+function springPath(c, x1, y1, x2, y2, coils, amp){
+  const dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy);
+  if (len < 1) return;
+  const ux = dx / len, uy = dy / len, nx = -uy, ny = ux;
+  const lead = Math.min(6, len * 0.12), body = len - 2 * lead, back = amp * 0.5;
+  const steps = coils * 9;
+  c.moveTo(x1, y1); c.lineTo(x1 + ux * lead, y1 + uy * lead);
+  for (let k = 1; k < steps; k++){
+    const t = k / steps, th = 2 * Math.PI * coils * t;
+    const along = lead + body * t - back * (1 - Math.cos(th)), side = amp * Math.sin(th);
+    c.lineTo(x1 + ux * along + nx * side, y1 + uy * along + ny * side);
+  }
+  c.lineTo(x2 - ux * lead, y2 - uy * lead); c.lineTo(x2, y2);
+}
+// 용수철 한 개를 미리 그려 두고(스프라이트) 늘이거나 줄여서 찍는다
+const SPR = new Map();
+function sprite(coils, amp, lw, dark, light){
+  const key = [coils, amp.toFixed(1), lw.toFixed(2), dark].join('|');
+  let sp = SPR.get(key);
+  if (sp) return sp;
+  const k = Math.min(4, (window.devicePixelRatio || 1) * 2), len = coils * amp * 1.6 + 12, h = 2 * amp + lw * 2 + 4;
+  const cnv = document.createElement('canvas');
+  cnv.width = Math.ceil(len * k); cnv.height = Math.ceil(h * k);
+  const x = cnv.getContext('2d'); x.scale(k, k);
+  x.beginPath(); springPath(x, 0, h / 2, len, h / 2, coils, amp);
+  x.lineCap = 'round'; x.lineJoin = 'round';
+  x.strokeStyle = dark; x.lineWidth = lw; x.stroke();
+  x.translate(0, -lw * 0.22); x.strokeStyle = light; x.lineWidth = lw * 0.35; x.stroke();
+  sp = { cnv, h };
+  if (SPR.size > 40) SPR.clear();
+  SPR.set(key, sp); return sp;
+}
+function springs(c, list, coils, amp, lw, dark, light){
+  const sp = sprite(coils, amp, lw, dark, light);
+  for (const q of list){
+    const dx = q[2] - q[0], dy = q[3] - q[1], len = Math.hypot(dx, dy);
+    if (len < 1) continue;
+    c.save(); c.translate(q[0], q[1]); c.rotate(Math.atan2(dy, dx));
+    c.drawImage(sp.cnv, 0, -sp.h / 2, len, sp.h); c.restore();
+  }
+}
+function label(c, text, x, y, color){
+  c.font = '600 13px -apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif';
+  c.fillStyle = color; c.textBaseline = 'top'; c.fillText(text, x, y);
+}
+
+/* ---------- 용수철 구슬 ---------- */
+function geom(vp){
+  const k = S.add ? 2 : 1;
+  let ds = vp.h * (vp.single ? 0.34 : 0.2), ml = 0, mr = 0;
+  if (S.circle){
+    if (vp.ml !== undefined){ ml = vp.ml; mr = vp.mr; ds = Math.min(ds, (ml - 24) / (2 * CA)); }
+    else {
+      ds = Math.min(ds, (vp.w * 0.2 - 24) / (2 * k * CA));
+      ml = 2 * k * CA * ds + 24; mr = S.add === 2 ? ml : 0;
+    }
+  }
+  ds = Math.max(0, ds);
+  const gap = Math.max(0, (vp.w - ml - mr) / (CN + 1));
+  return { gap, ml, mr, r:Math.max(0, Math.min(gap * 0.3, vp.h * 0.055, 13)),
+           top:vp.y + Math.max(vp.h * 0.1, 30), eq:vp.y + vp.h * 0.6, ds };
+}
+// 파원 옆의 원운동: comps = [[x, y, color], ...] (진폭 단위)
+function drawSource(c, vp, G, X, src){
+  const left = src.side === 'L', cx = left ? vp.x + G.ml / 2 : vp.x + vp.w - G.mr / 2, cy = G.eq;
+  const R = CA * G.ds, bx = X(left ? 0 : CN - 1), list = src.comps;
+  c.strokeStyle = '#ececef'; c.lineWidth = 1;
+  line(c, [cx - R - 8, cy], [cx + R + 8, cy]); line(c, [cx, cy - R - 8], [cx, cy + R + 8]);
+  c.strokeStyle = '#bdbdc3'; c.lineWidth = 1.5;
+  c.beginPath(); c.arc(cx, cy, Math.max(0, R), 0, Math.PI * 2); c.stroke();
+  const pt = p => [cx + p[0] * G.ds, cy - p[1] * G.ds];
+  let sum = [0, 0]; list.forEach(p => { sum[0] += p[0]; sum[1] += p[1]; });
+  const tip = pt(sum);
+  if (list.length === 2){
+    const t1 = pt(list[0]), t2 = pt(list[1]);
+    c.setLineDash([3, 3]); c.strokeStyle = '#c9c9ce'; c.lineWidth = 1;
+    line(c, t1, tip); line(c, t2, tip); c.setLineDash([]);
+    const l1 = Math.hypot(...list[0]) * G.ds, l2 = Math.hypot(...list[1]) * G.ds;
+    if (l1 > 6 && l2 > 6){
+      const a1 = -Math.atan2(list[0][1], list[0][0]), a2 = -Math.atan2(list[1][1], list[1][0]);
+      let d = a2 - a1; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+      c.strokeStyle = '#55555a'; c.lineWidth = 2;
+      c.beginPath(); c.arc(cx, cy, Math.max(0, R * 0.32), a1, a1 + d, d < 0); c.stroke();
+    }
+    arrow(c, [cx, cy], t1, list[0][2], 2.6, true, 10);
+    arrow(c, [cx, cy], t2, list[1][2], 2.6, true, 10);
+    arrow(c, [cx, cy], tip, '#1d1d1f', 3, true, 11);
+  } else {
+    arrow(c, [cx, cy], tip, list[0][2], 3, true, 11);
+  }
+  c.fillStyle = '#1d1d1f'; c.beginPath(); c.arc(cx, cy, 2.5, 0, 7); c.fill();
+  if (src.noProj) return;
+  c.setLineDash([4, 4]); c.strokeStyle = '#8e8e93'; c.lineWidth = 1.2;
+  line(c, tip, [bx, tip[1]]); c.setLineDash([]);
+}
+let chainHit = null;
+function mixHex(a, b, t){
+  const p = h => [1, 3, 5].map(k => parseInt(h.slice(k, k + 2), 16));
+  const A = p(a), B = p(b);
+  return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join('');
+}
+function drawChain(c, vp, Y, style, SRC, FORCE){
+  const G = geom(vp), P = PAL[style];
+  const ga = c.globalAlpha;
+  const X = i => vp.x + G.ml + G.gap * (i + 1), Yp = i => G.eq - Y[i] * G.ds;
+  const x0 = vp.x + G.ml + G.gap * 0.5, x1 = vp.x + vp.w - G.mr - G.gap * 0.5;
+  const gb = c.globalAlpha, sel = S.sel;
+  // 천장 + 매단 용수철: 세기에 따라 옅어짐
+  c.globalAlpha = gb * S.hang;
+  if (S.hang > 0.001){
+    c.strokeStyle = '#c9c9ce'; c.lineWidth = 1;
+    for (let x = x0; x < x1; x += 10) line(c, [x, G.top - 6], [x + 6, G.top]);
+    c.strokeStyle = '#6b6b70'; c.lineWidth = 2.5;
+    line(c, [x0, G.top], [x1, G.top]);
+  }
+  c.globalAlpha = gb;
+  // 평형 위치
+  c.setLineDash([3, 5]); c.strokeStyle = '#dcdce0'; c.lineWidth = 1;
+  line(c, [x0, G.eq], [x1, G.eq]); c.setLineDash([]);
+  // 매단 용수철
+  const sw = Math.max(1.4, G.r * 0.17);
+  const hang = [];
+  for (let i = 0; i < CN; i++) if (!(FORCE && i === sel)) hang.push([X(i), G.top, X(i), Yp(i) - G.r]);
+  if (S.hang > 0.001){
+    c.globalAlpha = gb * S.hang;
+    springs(c, hang, 14, G.r * 0.6, sw, '#5f6368', '#d7d9dc');
+    if (FORCE) springs(c, [[X(sel), G.top, X(sel), Yp(sel) - G.r]], 14, G.r * 0.6, sw, FG, '#bbf7d0');
+    c.globalAlpha = gb;
+  }
+  // 연결 용수철 (약함)
+  if (S.couple){
+    const cpl = [], mine = [];
+    for (let i = 0; i < CN - 1; i++){
+      const ax = X(i), ay = Yp(i), bx = X(i + 1), by = Yp(i + 1), d = Math.hypot(bx - ax, by - ay);
+      const ux = (bx - ax) / d, uy = (by - ay) / d;
+      (FORCE && (i === sel || i === sel - 1) ? mine : cpl).push([ax + ux * G.r, ay + uy * G.r, bx - ux * G.r, by - uy * G.r]);
+    }
+    // 매단 용수철과 반대로: 매단 100% → 연결 용수철 안 보임, 매단 0% → 연결 용수철 진하게
+    const t = 1 - S.hang;
+    if (t > 0.001){
+      c.globalAlpha = gb * t;
+      springs(c, cpl, 4, G.r * 0.42, sw, '#5f6368', '#d7d9dc');
+      if (mine.length) springs(c, mine, 4, G.r * 0.42, sw + 0.6, FP, '#ddd6fe');
+      c.globalAlpha = gb;
+    }
+  }
+  // 쇠구슬
+  for (let i = 0; i < CN; i++){
+    const x = X(i), y = Yp(i);
+    const gr = c.createRadialGradient(x - G.r * 0.35, y - G.r * 0.4, G.r * 0.1, x, y, G.r);
+    gr.addColorStop(0, P.ball[0]); gr.addColorStop(0.55, P.ball[1]); gr.addColorStop(1, P.ball[2]);
+    c.fillStyle = gr; if (G.r > 0){ c.beginPath(); c.arc(x, y, G.r, 0, Math.PI * 2); c.fill(); }
+  }
+  c.globalAlpha = ga;
+  if (FORCE){
+    chainHit = { X, Yp, r:G.r };
+    // 고른 구슬: 테두리 + 복원력 화살표 두 개를 나란히
+    // 둘 다 같은 복원력(−mω²y)을 가리키고, 그 힘을 맡은 비율만큼만 선명하게 보인다
+    const x = X(sel), y = Yp(sel), fs = 1.8 * G.ds / (CW * CW);
+    c.strokeStyle = '#1d1d1f'; c.lineWidth = 2; c.beginPath(); c.arc(x, y, G.r + 3.5, 0, 7); c.stroke();
+    const tip = y + cwNow() ** 2 * Y[sel] * fs, fx = x + G.r + 9;
+    const fa = c.globalAlpha;
+    if (S.hang > 0.001){ c.globalAlpha = fa * S.hang; arrow(c, [fx, y], [fx, tip], FG, 3.2, true, 10); }
+    if (S.hang < 0.999){ c.globalAlpha = fa * (1 - S.hang); arrow(c, [fx + 9, y], [fx + 9, tip], FP, 3.2, true, 10); }
+    c.globalAlpha = fa;
+  }
+  if (S.circle && SRC) SRC.forEach(src => drawSource(c, vp, G, X, src));
+  // 변위 벡터
+  if (S.arrows) for (let i = 0; i < CN; i++){
+    const hx = X(i);
+    c.fillStyle = '#c4c4c9'; c.beginPath(); c.arc(hx, G.eq, 2, 0, 7); c.fill();
+    arrow(c, [hx, G.eq], [hx, Yp(i)], RED, 2.6, true, 10);
+  }
+  c.globalAlpha = ga;
+}
+
+/* ---------- 줄 파동 ---------- */
+function drawString(c, vp, s, comps, style){
+  const P = projector(vp, s, cam.string), col = PAL[style].line;
+  c.setLineDash([4, 5]); c.strokeStyle = '#d4d4d8'; c.lineWidth = 1;
+  line(c, P(-L, 0, 0), P(L, 0, 0)); c.setLineDash([]);
+  const pts = [];
+  for (let i = 0; i <= 240; i++){ const x = -L + 2 * L * i / 240; pts.push(P(x, sumF(comps, x), 0)); }
+  c.strokeStyle = col; c.lineWidth = 2.6; c.lineJoin = 'round'; poly(c, pts);
+  if (S.arrows){
+    for (let k = 0; k <= 24; k++){
+      const x = -L + k * 0.5, b = P(x, 0, 0);
+      c.fillStyle = '#c4c4c9'; c.beginPath(); c.arc(b[0], b[1], 1.6, 0, 7); c.fill();
+      arrow(c, b, P(x, sumF(comps, x), 0), RED, 1.8);
+    }
+  }
+}
+
+/* ---------- 수면파 (평면파) ---------- */
+function drawWater(c, vp, s, comps, style){
+  const P = projector(vp, s, cam.water), hue = PAL[style].hue;
+  const NX = 72, xs = [], ys = [];
+  for (let i = 0; i <= NX; i++){ const x = -L + 2 * L * i / NX; xs.push(x); ys.push(sumF(comps, x)); }
+  // 평형면
+  c.setLineDash([4, 5]); c.strokeStyle = '#d4d4d8'; c.lineWidth = 1;
+  poly(c, [P(-L,0,-ZW), P(L,0,-ZW), P(L,0,ZW), P(-L,0,ZW), P(-L,0,-ZW)]); c.setLineDash([]);
+  // 수면: 높이가 x에만 달린 평면파라 z 방향으로는 한 장의 띠로 그린다 (띠 72장, 깊이순)
+  const strips = [];
+  for (let i = 0; i < NX; i++){
+    const q = [P(xs[i],ys[i],-ZW), P(xs[i+1],ys[i+1],-ZW), P(xs[i+1],ys[i+1],ZW), P(xs[i],ys[i],ZW)];
+    strips.push({ q, d:P((xs[i] + xs[i+1]) / 2, (ys[i] + ys[i+1]) / 2, 0)[2], h:(ys[i] + ys[i+1]) / 2 });
+  }
+  strips.sort((a, b) => a.d - b.d);
+  c.lineWidth = 0.8; c.lineJoin = 'round';
+  for (const o of strips){
+    const Lt = clamp(85 - 24 * o.h / (2 * AMP), 55, 96);
+    c.fillStyle = c.strokeStyle = `hsl(${hue},68%,${(Lt + (100 - Lt) * 0.1).toFixed(1)}%)`;
+    const q = o.q; c.beginPath(); c.moveTo(q[0][0], q[0][1]); c.lineTo(q[1][0], q[1][1]); c.lineTo(q[2][0], q[2][1]); c.lineTo(q[3][0], q[3][1]); c.closePath();
+    c.fill(); c.stroke();
+  }
+  // 양쪽 가장자리
+  c.strokeStyle = `hsl(${hue},45%,55%)`; c.lineWidth = 1.2;
+  for (const z of [-ZW, ZW]) poly(c, xs.map((x, i) => P(x, ys[i], z)));
+  // 파면 (마루)
+  const F = 240, fy = [];
+  for (let i = 0; i <= F; i++) fy.push(sumF(comps, -L + 2 * L * i / F));
+  c.strokeStyle = `hsl(${hue},75%,30%)`; c.lineWidth = 3; c.lineCap = 'round';
+  c.beginPath();
+  for (let i = 1; i < F; i++){
+    if (fy[i] > 0.3 * AMP && fy[i] >= fy[i-1] && fy[i] > fy[i+1]){
+      const x = -L + 2 * L * i / F, a = P(x, fy[i], -ZW), b = P(x, fy[i], ZW);
+      c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]);
+    }
+  }
+  c.stroke();
+  // 변위 벡터: 125개를 한 번에 그린다
+  if (S.arrows){
+    const list = [];
+    for (let k = 0; k <= 24; k++){
+      const x = -L + k * 0.5, y = sumF(comps, x);
+      for (const z of [-2, -1, 0, 1, 2]) list.push([P(x, 0, z), P(x, y, z)]);
+    }
+    arrowsBatch(c, list, RED, 1.5, 9);
+  }
+}
+// 같은 색 화살표 여러 개를 경로 두 개(몸통, 머리)로 한 번에 그린다
+function arrowsBatch(c, list, color, lw, hmax){
+  let dx = 0;
+  if (ARW && color === RED){ color = ARW.k > 0.5 ? ARW.col : RED; dx = ARW.dx; }
+  const heads = [];
+  c.strokeStyle = c.fillStyle = color; c.lineWidth = lw; c.lineCap = 'round';
+  c.beginPath();
+  for (const [a, b] of list){
+    const ax = a[0] + dx, ay = a[1], bx0 = b[0] + dx, by0 = b[1];
+    const ddx = bx0 - ax, ddy = by0 - ay, len = Math.hypot(ddx, ddy);
+    if (len < 1.5) continue;
+    const h = Math.min(hmax, len * 0.45), ux = ddx / len, uy = ddy / len, bx = bx0 - ux * h, by = by0 - uy * h;
+    c.moveTo(ax, ay); c.lineTo(bx, by);
+    heads.push([bx0, by0, bx - uy * h * 0.55, by + ux * h * 0.55, bx + uy * h * 0.55, by - ux * h * 0.55]);
+  }
+  c.stroke();
+  c.beginPath();
+  for (const t of heads){ c.moveTo(t[0], t[1]); c.lineTo(t[2], t[3]); c.lineTo(t[4], t[5]); c.closePath(); }
+  c.fill();
+}
+
+/* ---------- 음파 (종파) ----------
+   관 속 공기 입자가 진행 방향(x)으로 앞뒤로 진동한다.
+   변위: 가운데 줄의 입자마다 가로 화살표, 아래에는 그 화살표를 세워 놓은 변위 그래프
+   압력: 입자가 몰린 곳(밀)을 진하게, 아래에는 압력 그래프 (변위와 위상이 90° 어긋남) */
+const SND = { TY0:0.6, TY1:2.8, GY:-1.5, DS:0.3, ZT:0.9, NX:49, NY:9 };
+SND.jit = Array.from({ length:SND.NX * SND.NY * 3 }, (_, i) => { const r = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return (r - Math.floor(r)) - 0.5; });
+function drawSound(c, vp, s, comps, style){
+  const P = projector(vp, s, cam.sound), cm = cam.sound;
+  const flat = Math.abs(cm.yaw) < 0.01 && Math.abs(cm.pitch) < 0.01;
+  const { TY0, TY1, ZT, NX, NY } = SND, xi = x => sumF(comps, x), DS = SND.DS / Math.max(1, omNow() / OM);
+  const col = PAL[style].line, press = S.snd === 'p', compact = !!vp.single;   // 아래 칸: 그래프만
+  const GY = compact ? 0 : SND.GY;
+  const pv = x => -(xi(x + 0.02) - xi(x - 0.02)) / 0.04 / kNow();   // 압력 ∝ −dξ/dx (변위와 같은 높이로 맞춤)
+  if (!compact){
+  // 관
+  c.strokeStyle = '#cfcfd4'; c.lineWidth = 1.2;
+  const box = z => [P(-L - 0.3, TY0 - 0.15, z), P(L + 0.3, TY0 - 0.15, z), P(L + 0.3, TY1 + 0.15, z), P(-L - 0.3, TY1 + 0.15, z)];
+  if (flat){ const b = box(0); poly(c, [...b, b[0]]); }
+  else {
+    const f = box(ZT), k = box(-ZT); poly(c, [...f, f[0]]); poly(c, [...k, k[0]]);
+    for (let i = 0; i < 4; i++) line(c, f[i], k[i]);
+  }
+  // 압력: 밀한 곳을 진하게
+  if (press){
+    const N = 96;
+    for (let i = 0; i < N; i++){
+      const x0 = -L + 2 * L * i / N, x1 = x0 + 2 * L / N, v = pv((x0 + x1) / 2);
+      const a = clamp(0.03 + 0.22 * v / (2 * AMP), 0, 0.5);
+      if (a < 0.01) continue;
+      c.fillStyle = style ? `hsla(${PAL[style].hue},70%,45%,${a})` : `rgba(29,29,31,${a})`;
+      const q = [P(x0, TY0, 0), P(x1, TY0, 0), P(x1, TY1, 0), P(x0, TY1, 0)];
+      c.beginPath(); c.moveTo(q[0][0], q[0][1]); q.slice(1).forEach(p => c.lineTo(p[0], p[1])); c.closePath(); c.fill();
+    }
+  }
+  // 공기 입자
+  const zs = flat ? [0] : [-ZT * 0.6, 0, ZT * 0.6], r = Math.max(1.2, s * 0.035), mid = (NY - 1) >> 1;
+  c.fillStyle = style ? col : '#8e8e93';
+  c.globalAlpha *= style ? 0.55 : 1;
+  c.beginPath();
+  for (let i = 0; i < NX; i++){
+    const x0 = -L + 2 * L * i / (NX - 1), X = x0 + DS * xi(x0);
+    for (let j = 0; j < NY; j++) for (let k = 0; k < zs.length; k++){
+      if (j === mid && zs[k] === 0 && i % 2 === 0) continue;   // 추적 입자는 따로
+      const y = TY0 + (j + 0.5) * (TY1 - TY0) / NY + 0.12 * SND.jit[(i * NY + j) * 3 + k];
+      const p = P(X, y, zs[k]); c.moveTo(p[0] + r, p[1]); c.arc(p[0], p[1], r, 0, 7);
+    }
+  }
+  c.fill(); c.globalAlpha /= style ? 0.55 : 1;
+  // 추적 입자 (가운데 줄, 0.5 간격) + 변위 화살표
+  const ym = TY0 + (mid + 0.5) * (TY1 - TY0) / NY;
+  for (let k = 0; k <= 24; k++){
+    const x0 = -L + k * 0.5, X = x0 + DS * xi(x0), b = P(x0, ym, 0), t = P(X, ym, 0);
+    if (!press){
+      c.strokeStyle = '#c4c4c9'; c.lineWidth = 1; line(c, P(x0, ym - 0.14, 0), P(x0, ym + 0.14, 0));
+      arrow(c, b, t, RED, 2.2, true, 7);
+    }
+    c.fillStyle = style ? col : '#1d1d1f'; c.beginPath(); c.arc(t[0], t[1], r * 1.8, 0, 7); c.fill();
+  }
+  }
+  // 아래 그래프
+  c.setLineDash([4, 5]); c.strokeStyle = '#d4d4d8'; c.lineWidth = 1;
+  line(c, P(-L, GY, 0), P(L, GY, 0)); c.setLineDash([]);
+  const pts = [];
+  for (let i = 0; i <= 240; i++){ const x = -L + 2 * L * i / 240; pts.push(P(x, GY + (press ? pv(x) : xi(x)), 0)); }
+  if (press){
+    c.fillStyle = style ? `hsla(${PAL[style].hue},70%,50%,0.12)` : 'rgba(29,29,31,0.08)';
+    c.beginPath(); c.moveTo(...P(-L, GY, 0)); pts.forEach(p => c.lineTo(p[0], p[1])); c.lineTo(...P(L, GY, 0)); c.closePath(); c.fill();
+  }
+  c.strokeStyle = col; c.lineWidth = 2.4; c.lineJoin = 'round'; poly(c, pts);
+  if (!press) for (let k = 0; k <= 24; k++){ const x = -L + k * 0.5; arrow(c, P(x, GY, 0), P(x, GY + xi(x), 0), RED, 1.6); }
+  const lp = P(-L - 0.35, GY, 0); c.textAlign = 'right'; label(c, press ? '압력' : '변위', lp[0], lp[1] - 7, '#8a8a8e'); c.textAlign = 'left';
+}
+
+/* ---------- 전자기파 ---------- */
+function drawEM(c, vp, s, comps){
+  const P = projector(vp, s, cam.em);
+  const o = P(0,0,0), u = P(0,0,1);
+  const aB = clamp(Math.hypot(u[0] - o[0], u[1] - o[1]) / s * 2.5, 0, 1);
+  c.setLineDash([4, 5]); c.strokeStyle = '#c4c4c9'; c.lineWidth = 1;
+  line(c, P(-L, 0, 0), P(L, 0, 0)); c.setLineDash([]);
+  const N = 240, Ep = [], Bp = [];
+  for (let i = 0; i <= N; i++){
+    const x = -L + 2 * L * i / N;
+    Ep.push(P(x, sumF(comps, x), 0)); Bp.push(P(x, 0, sumB(comps, x)));
+  }
+  const ga = c.globalAlpha;
+  c.globalAlpha = ga * aB;
+  if (aB > 0.01){
+    c.strokeStyle = BLUE_B; c.lineWidth = 2.2; poly(c, Bp);
+    if (S.arrows) for (let k = 0; k <= 24; k++){ const x = -L + k * 0.5; arrow(c, P(x,0,0), P(x,0,sumB(comps,x)), BLUE_B, 1.5); }
+    const lb = P(-L - 0.45, 0, AMP * 0.9); label(c, 'B', lb[0] - 4, lb[1] - 8, BLUE_B);
+  }
+  c.globalAlpha = ga;
+  c.strokeStyle = ARW && ARW.k > 0.5 ? ARW.col : RED; c.lineWidth = 2.2; poly(c, Ep);
+  if (S.arrows) for (let k = 0; k <= 24; k++){ const x = -L + k * 0.5; arrow(c, P(x,0,0), P(x,sumF(comps,x),0), RED, 1.5); }
+  const le = P(-L - 0.45, AMP * 0.9, 0); label(c, 'E', le[0] - 4, le[1] - 8, RED);
+}
+
+function drawWave(c, vp, s, comps, style){
+  if (S.mode === 'string') drawString(c, vp, s, comps, style);
+  else if (S.mode === 'water') drawWater(c, vp, s, comps, style);
+  else if (S.mode === 'sound') drawSound(c, vp, s, comps, style);
+  else drawEM(c, vp, s, comps);
+}
+
+/* ---------- 합치기 (아래 화면) ----------
+   파동 1(위 칸)과 파동 2(아래 칸)가 가운데로 모여 한 축에 겹친다. 더하지는 않는다. */
+const MG = { from:0, to:0, t0:0 };
+const mergeE = () => MG.from + (MG.to - MG.from) * sm((performance.now() - MG.t0) / 900);
+function mergeTo(v){ MG.from = mergeE(); MG.to = v; MG.t0 = performance.now(); updateMergeBtn(); }
+function mergeReset(){ MG.from = MG.to = 0; updateMergeBtn(); }
+function updateMergeBtn(){
+  const b = $('#merge'); b.style.display = S.add && !is2D() ? '' : 'none';
+  b.classList.toggle('merged', !!MG.to);
+  b.innerHTML = '<i style="background:' + PAL[1].line + '"></i><i style="background:' + PAL[2].line + ';margin-left:' + (MG.to ? '-4px' : '-14px') + '"></i>' + (MG.to ? '나누기' : '합치기');
+}
+// 겹쳐 그릴 때 두 파동의 화살표를 구분: 빨강 대신 파동 색, 살짝 옆으로 비켜 그림
+let ARW = null;
+
+/* ---------- 프레임 ---------- */
+// 아래 화면의 두 파동: 떨어져 있을 땐 각 칸에 잘라 그리고, 모일수록 화살표를 파동 색으로 구분해 겹쳐 그린다
+function subPair(st, me, fn){
+  if (me < 0.001){ clipped(st[0], () => fn(st[0], 1)); clipped(st[1], () => fn(st[1], 2)); return; }
+  for (const n of [1, 2]){
+    ARW = { col:PAL[n].line, dx:(n === 1 ? -4 : 4) * me, k:me };
+    gs.save(); if (n === 2 && S.mode === 'water') gs.globalAlpha = 1 - 0.4 * me;
+    fn(st[n - 1], n); gs.restore();
+  }
+  ARW = null;
+}
+function clipped(vp, fn){ gs.save(); gs.beginPath(); gs.rect(vp.x, vp.y, vp.w, vp.h); gs.clip(); fn(); gs.restore(); }
+function draw(){
+  const mv = mainVp(); g.clearRect(0, 0, mv.w, mv.h);
+  if (!(mv.w > 40 && mv.h > 40)) return;
+  const sub = subOn() && cs.W > 40 && cs.H > 40; let st = null;
+  const me = sub ? mergeE() : 0;
+  if (sub){
+    gs.clearRect(0, 0, cs.W, cs.H);
+    const q = me * cs.H / 4;   // 합치기: 두 칸이 가운데로 모인다
+    st = [{ x:0, y:q, w:cs.W, h:cs.H / 2, single:true }, { x:0, y:cs.H / 2 - q, w:cs.W, h:cs.H / 2, single:true }];
+    gs.globalAlpha = 1 - me; gs.strokeStyle = '#f0f0f2'; gs.lineWidth = 1; line(gs, [0, cs.H / 2], [cs.W, cs.H / 2]); gs.globalAlpha = 1;
+  }
+  if (is2D()) draw2D(g, mv);
+  else if (S.mode === 'chain'){
+    const A = [], B = [], T = [];
+    for (let i = 0; i < CN; i++){ const a = chA.y[i], b = S.add ? bAt(i) : 0; A.push(a); B.push(b); T.push(a + b); }
+    const w = cwNow();
+    const col1 = PAL[1].line, col2 = PAL[2].line;
+    const aSrc = S.drive ? [...driverVec(chA, 0), col1] : [chA.v[0] / w, chA.y[0], col1];   // 파동 1의 파원
+    const bSrc = S.add ? [...driverVec(chBs, phB()), col2] : null;                        // 파동 2의 파원
+    const aFar = [...demodVec(dmA), col1], bFar = S.add ? [...demodB(), col2] : null;   // 반대편 끝에 도착한 파동
+    const pa = () => aSrc, pb = i => (S.add === 2 && i === 0) ? bFar : bSrc;
+    const src = S.add === 2
+      ? [{ side:'R', comps:[aFar, bSrc] }]
+      : [{ side:'L', comps: S.add ? [aSrc, bSrc] : [aSrc] }];
+    const MG = geom(mv);
+    drawChain(g, mv, T, 0, src, true);
+    if (sub){
+      st.forEach(v => { v.ml = MG.ml; v.mr = MG.mr; });
+      const s2 = S.add === 2 ? { side:'R', comps:[pb(CN - 1)] } : { side:'L', comps:[pb(0)] };
+      subPair(st, me, (vp, n) => n === 1
+        ? drawChain(gs, vp, A, 1, [{ side:'L', comps:[pa(0)] }])
+        : drawChain(gs, vp, B, 2, [s2]));
+    }
+  } else {
+    const comps = S.add ? [1, 2] : [1];
+    let s = scaleFor(S.mode, mv, 4 * AMP);
+    let ss = sub ? scaleFor(S.mode === 'sound' ? 'string' : S.mode, st[0], 2 * AMP + 0.2) : 0;   // 음파의 아래 칸은 그래프만
+    if (sub && S.mode !== 'water') s = ss = Math.min(s, ss);
+    drawWave(g, mv, s, comps, 0);
+    if (sub) subPair(st, me, (vp, n) => drawWave(gs, vp, ss, [n], n));
+  }
+  if (sub){
+    label(g, '합친 파동', 18, 12, '#8a8a8e');
+    label(gs, '파동 1', 18, 10, PAL[1].line);
+    label(gs, '파동 2', 18 + 58 * me, (cs.H / 2 + 28) * (1 - me) + 10 * me, PAL[2].line);   // 칸 사이의 합치기 버튼 아래
+  }
+  // '원래대로' 버튼: 드래그로 시점을 바꾼 뒤에만 나타난다
+  const k = camKey(), c = cam[k], c0 = CAM0[k];
+  const moved = !!c && !camTo && (Math.abs(Math.atan2(Math.sin(c.yaw - c0.yaw), Math.cos(c.yaw - c0.yaw))) > 0.01 || Math.abs(c.pitch - c0.pitch) > 0.01);
+  if (moved !== lastMoved){ $('#flat').style.display = moved ? '' : 'none'; lastMoved = moved; }
+}
+let lastMoved = null, camTo = null;
+const camKey = () => is2D() ? S.mode + '2' : S.mode;
+function easeFlat(dt){
+  const c = cam[camKey()]; if (!camTo || !c) return;
+  const k = Math.min(1, dt * 10);
+  c.yaw += (camTo.yaw - c.yaw) * k; c.pitch += (camTo.pitch - c.pitch) * k;
+  if (Math.abs(c.yaw - camTo.yaw) < 0.005 && Math.abs(c.pitch - camTo.pitch) < 0.005){ c.yaw = camTo.yaw; c.pitch = camTo.pitch; camTo = null; }
+}
+
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  if (S.play && !S.paused){
+    const sp = S.slow ? 0.3 : 1;
+    if (S.mode === 'chain') stepChains(dt * sp * 1.3);
+    else S.t += dt * sp;
+  }
+  easeFlat(dt);
+  draw();
+  requestAnimationFrame(frame);
+}
+
+/* ---------- 입력 ---------- */
+function pos(e, c){ const r = c.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+function hideHint(){ hintSeen[is2D() ? '2d' : S.mode] = true; $('#hint').style.opacity = 0; }
+
+function down(e, c){
+  if (S.mode === 'chain'){
+    if (c !== cv || !chainHit) return;
+    const [mx, my] = pos(e, c); let best = -1, bd = chainHit.r * 2.5;
+    for (let i = 1; i < CN - 1; i++){ const d = Math.hypot(mx - chainHit.X(i), my - chainHit.Yp(i)); if (d < bd){ bd = d; best = i; } }
+    if (best > 0){ S.sel = best; hideHint(); }
+    return;
+  }
+  rot = { x:e.clientX, y:e.clientY, x0:e.clientX, y0:e.clientY, moved:false };
+  c.setPointerCapture(e.pointerId); c.style.cursor = 'grabbing';
+}
+function move(e, c){
+  if (!rot) return;
+  if (!rot.moved){
+    if (Math.hypot(e.clientX - rot.x0, e.clientY - rot.y0) < 5) return;   // 작은 움직임은 '클릭'
+    rot.moved = true; camTo = null;
+  }
+  const cm = cam[camKey()];
+  cm.yaw += (e.clientX - rot.x) * 0.008;
+  cm.pitch = is2D() ? clamp(cm.pitch + (e.clientY - rot.y) * 0.008, 0.15, Math.PI / 2)
+                    : clamp(cm.pitch + (e.clientY - rot.y) * 0.008, -1.45, 1.45);
+  rot.x = e.clientX; rot.y = e.clientY; hideHint();
+}
+function up(e, c){
+  if (rot && !rot.moved && is2D() && c === cv && plane2D){
+    const [mx, my] = pos(e, c), q = plane2D.inv(mx, my);
+    S.probe = q && inDisk(q[0], q[1]) ? { x:q[0], z:q[1] } : null;
+    hideHint();
+  }
+  rot = null; c.style.cursor = S.mode === 'chain' ? 'default' : (is2D() ? 'crosshair' : 'grab');
+}
+for (const c of [cv, cs]){
+  c.addEventListener('pointerdown', e => down(e, c));
+  c.addEventListener('pointermove', e => move(e, c));
+  c.addEventListener('pointerup', e => up(e, c));
+  c.addEventListener('pointercancel', e => { rot = null; });
+}
+
+/* ---------- 버튼 ---------- */
+function resetAll(){ S.t = 0; S.t2 = 0; FH = [{ t:0, th:0, w:omNow() }]; resetChains(); }
+
+function updateUI(){
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.mode === S.mode));
+  document.querySelectorAll('.chain-only').forEach(b => b.style.display = S.mode === 'chain' ? '' : 'none');
+  document.querySelectorAll('.wave-only').forEach(b => b.style.display = S.mode === 'chain' ? 'none' : '');
+  document.querySelectorAll('.sound-only').forEach(b => b.style.display = S.mode === 'sound' ? '' : 'none');
+  document.querySelectorAll('#snd button').forEach(b => b.classList.toggle('on', b.dataset.v === S.snd));
+  document.querySelectorAll('#add button').forEach(b => b.classList.toggle('on', +b.dataset.v === S.add));
+  $('#play').textContent = S.play ? '초기화' : '재생';
+  $('#play').classList.toggle('on', !S.play);
+  $('#pause').textContent = S.paused ? '계속' : '일시정지';
+  $('#pause').classList.toggle('on', S.paused);
+  $('#pause').classList.toggle('off', !S.play);
+  $('#slow').classList.toggle('on', S.slow);
+  const two = is2D();
+  $('#phaseBox').style.display = (S.add || two) ? 'flex' : 'none';
+  $('#add').style.display = two ? 'none' : '';
+  document.querySelectorAll('.dim-only').forEach(b => b.style.display = ['water', 'sound', 'em'].includes(S.mode) ? '' : 'none');
+  document.querySelectorAll('#dim button').forEach(b => b.classList.toggle('on', +b.dataset.v === S.dim));
+  document.querySelectorAll('.two-only').forEach(b => b.style.display = two ? '' : 'none');
+  $('#lines').classList.toggle('on', S.lines);
+  showSep();
+  updateMergeBtn();
+  showFreq();
+  $('#subWrap').style.display = subOn() ? 'block' : 'none';
+  $('#mainWrap').classList.toggle('chainmode', S.mode === 'chain');
+  cv.style.cursor = cs.style.cursor = S.mode === 'chain' ? 'default' : (two ? 'crosshair' : 'grab');
+  const h = $('#hint'), hk = two ? '2d' : S.mode;
+  h.textContent = S.mode === 'chain' ? '구슬을 누르면 그 구슬의 힘이 보여요' : two ? '한 점을 누르면 두 파동을 비교해요' : '드래그하면 돌아가요';
+  h.style.opacity = hintSeen[hk] ? 0 : 1;
+  resize();
+}
+
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => {
+  if (S.mode === b.dataset.mode) return;
+  S.mode = b.dataset.mode; S.probe = null; camTo = null; mergeReset(); resetAll(); updateUI();
+});
+function togglePlay(){ S.play = !S.play; S.paused = false; if (!S.play) resetAll(); updateUI(); }
+$('#pause').onclick = () => { if (S.play){ S.paused = !S.paused; updateUI(); } };
+$('#play').onclick = togglePlay;
+$('#slow').onclick = () => { S.slow = !S.slow; updateUI(); };
+$('#flat').onclick = () => {
+  const k = camKey(), c = cam[k]; if (!c) return;
+  c.yaw = CAM0[k].yaw + Math.atan2(Math.sin(c.yaw - CAM0[k].yaw), Math.cos(c.yaw - CAM0[k].yaw));   // 가까운 쪽으로 돌아가기
+  camTo = { ...CAM0[k] };
+  draw();
+};
+// 합치기: 아래 두 파동이 위로 올라와 한 축에 겹친 뒤 하나의 파동으로 합쳐진다
+$('#merge').onclick = () => { if (S.add) mergeTo(MG.to ? 0 : 1); };
+document.querySelectorAll('#add button').forEach(b => b.onclick = () => {
+  const v = +b.dataset.v; if (v === S.add) return;
+  S.add = v; S.t2 = S.t; mergeReset();
+  for (const c of [chBs, chBc]){ c.y.fill(0); c.v.fill(0); c.t0 = cT; }
+  dmBs = mkDM(); dmBc = mkDM();
+  updateUI();
+});
+document.querySelectorAll('#dim button').forEach(b => b.onclick = () => {
+  const v = +b.dataset.v; if (v === S.dim) return;
+  S.dim = v; S.probe = null; camTo = null; mergeReset(); resetAll(); updateUI();
+});
+$('#lines').onclick = () => { S.lines = !S.lines; updateUI(); };
+function showSep(){
+  const el = $('#d2'), mx = sepMax();
+  el.max = mx; if (S.d2 > mx){ S.d2 = mx; el.value = mx; }
+  $('#d2Val').textContent = S.d2 + 'λ';
+}
+$('#d2').oninput = e => { S.d2 = +e.target.value; showSep(); };
+$('#hang').oninput = e => { S.hang = e.target.value / 100; $('#hangVal').textContent = e.target.value + '%'; };
+document.querySelectorAll('#snd button').forEach(b => b.onclick = () => { S.snd = b.dataset.v; updateUI(); });
+// 주기: 천천히 끈 상태에서 한 번 진동하는 데 걸리는 시간
+function showFreq(){ $('#freqVal').textContent = S.T.toFixed(1) + ' s'; }
+$('#freq').oninput = e => {
+  S.T = +e.target.value; showFreq(); showSep();
+  setSrcFreq();
+};
+$('#phase').oninput = e => {
+  S.phase = e.target.value * Math.PI / 180; $('#phaseVal').textContent = e.target.value + '°';
+  document.querySelectorAll('#presets button').forEach(b => b.classList.toggle('on', b.dataset.v === e.target.value));
+};
+document.querySelectorAll('#presets button').forEach(b => b.onclick = () => {
+  const el = $('#phase'); el.value = b.dataset.v; el.dispatchEvent(new Event('input'));
+});
+window.addEventListener('keydown', e => { if (e.code === 'Space'){ e.preventDefault(); togglePlay(); } });
+
+updateUI();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
