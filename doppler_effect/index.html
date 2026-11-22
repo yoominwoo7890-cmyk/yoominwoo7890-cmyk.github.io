@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>물개와 도플러 효과</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #fff; color: #222;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 20px 16px 28px; }
+  .bar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .tabs { display: flex; gap: 2px; background: #f3f3f3; border-radius: 10px; padding: 3px; }
+  .tab {
+    border: 0; background: transparent; padding: 8px 18px; border-radius: 8px;
+    font: inherit; font-size: 15px; color: #777; cursor: pointer;
+  }
+  .tab:focus { outline: none; }
+  .tab.on { background: #fff; color: #222; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .sp { flex: 1; }
+  .btn {
+    border: 1px solid #e3e3e3; background: #fff; height: 38px; min-width: 38px; padding: 0 12px;
+    border-radius: 9px; font: inherit; font-size: 14px; color: #222; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .btn:hover { background: #f8f8f8; }
+  .btn:disabled { color: #bbb; cursor: default; background: #fff; }
+  .btn svg { width: 16px; height: 16px; }
+  .btn.on { background: #1f5f9e; border-color: #1f5f9e; color: #fff; }
+  .ctrl { display: flex; align-items: center; gap: 16px; margin-top: 16px; padding: 0 4px; }
+  .lab { font-size: 14px; color: #777; white-space: nowrap; min-width: 76px; }
+  .rb { flex: 1; position: relative; display: flex; align-items: center; }
+  .rb::before { content: ''; position: absolute; left: 50%; top: 50%; width: 2px; height: 20px; margin: -10px 0 0 -1px; background: #cfcfcf; border-radius: 1px; }
+  #spd { position: relative; width: 100%; -webkit-appearance: none; appearance: none; height: 8px; border-radius: 4px; background: #e6e6e6; outline: none; margin: 16px 0; cursor: pointer; }
+  #spd::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 28px; border-radius: 50%; background: #2b2b2b; border: 3px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.3); cursor: grab; }
+  #spd::-moz-range-thumb { width: 22px; height: 22px; border-radius: 50%; background: #2b2b2b; border: 3px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.3); cursor: grab; }
+  #spd:disabled { opacity: .4; cursor: default; }
+  .val { font-size: 15px; font-weight: 600; min-width: 120px; text-align: right; font-variant-numeric: tabular-nums; }
+  .end { font-size: 15px; color: #aaa; width: 10px; text-align: center; }
+  .res { display: flex; align-items: center; gap: 16px; margin-top: 4px; padding: 0 4px; flex-wrap: wrap; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { font-size: 14px; padding: 6px 12px; border: 1px solid #e6e6e6; border-radius: 16px; font-variant-numeric: tabular-nums; }
+  .chip.src { color: #888; }
+  canvas { display: block; width: 100%; border: 1px solid #e6e6e6; border-radius: 12px; touch-action: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <div class="tabs">
+      <button class="tab on" data-mode="land">물개 이동</button>
+      <button class="tab" data-mode="obs">마이크 이동</button>
+      <button class="tab" data-mode="sea">반사</button>
+    </div>
+    <div class="sp"></div>
+    <button class="btn" id="add">+ 측정기</button>
+    <button class="btn" id="snd" title="소리 켜기"></button>
+    <button class="btn" id="play" title="일시정지"></button>
+    <button class="btn" id="reset" title="처음으로">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8a5.5 5.5 0 1 0 1.7-4"/><path d="M2.5 2.5v3h3"/></svg>
+    </button>
+  </div>
+  <canvas id="cv"></canvas>
+  <div class="ctrl" style="display:none">
+    <span class="lab" id="lab">물개 속력</span>
+    <span class="end">−</span>
+    <div class="rb"><input type="range" id="spd" min="-100" max="100" step="1" value="0"></div>
+    <span class="end">+</span>
+    <span class="val" id="val">0</span>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- 그림 ----------
+  function mkImg(inner, w, h) {
+    const img = new Image();
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w * 4}" height="${h * 4}">${inner}</svg>`);
+    return img;
+  }
+  const IMG = {
+    tail: mkImg(`<path d="M28,60 C12,56 3,64 7,71 C12,77 24,71 30,64 Z" fill="#EEE9DD" stroke="#C9C1AF" stroke-width="1.2"/><path d="M24,64 C12,66 8,76 14,80 C20,83 28,74 30,66 Z" fill="#F4F0E6" stroke="#C9C1AF" stroke-width="1.2"/>`, 160, 90),
+    body: mkImg(`<path d="M22,62 C22,46 52,40 86,37 C100,22 126,17 142,29 C154,39 152,55 139,62 C112,73 60,75 22,62 Z" fill="#F4F0E6" stroke="#C9C1AF" stroke-width="1.4"/><ellipse cx="151" cy="37" rx="6" ry="5" fill="#1C1C1C"/><ellipse cx="152.5" cy="35" rx="1.8" ry="1.2" fill="#FFFFFF"/><path d="M148,43 C148,47 145,49 141,49" fill="none" stroke="#1C1C1C" stroke-width="1.2" stroke-linecap="round"/><circle cx="131" cy="35" r="4.2" fill="#7A4524"/><circle cx="131.5" cy="35" r="2.4" fill="#1C1C1C"/><circle cx="132.8" cy="33.6" r="1" fill="#FFFFFF"/>`, 160, 90),
+    ff: mkImg(`<path d="M96,63 C92,76 100,85 111,83 C118,81 114,71 107,63 Z" fill="#F7F3EA" stroke="#C9C1AF" stroke-width="1.2"/>`, 160, 90),
+    front: mkImg(`<path d="M30,62 C14,60 4,68 10,74 C18,80 34,74 40,66 Z" fill="#F7F3EA" stroke="#C9C1AF" stroke-width="1.2"/><path d="M90,62 C106,60 116,68 110,74 C102,80 86,74 80,66 Z" fill="#F7F3EA" stroke="#C9C1AF" stroke-width="1.2"/><ellipse cx="60" cy="66" rx="32" ry="16" fill="#EEE9DD" stroke="#C9C1AF" stroke-width="1.2"/><ellipse cx="60" cy="44" rx="30" ry="27" fill="#F4F0E6" stroke="#C9C1AF" stroke-width="1.4"/><circle cx="47" cy="40" r="4" fill="#7A4524"/><circle cx="47" cy="40" r="2.3" fill="#1C1C1C"/><circle cx="48.2" cy="38.7" r="0.9" fill="#FFFFFF"/><circle cx="73" cy="40" r="4" fill="#7A4524"/><circle cx="73" cy="40" r="2.3" fill="#1C1C1C"/><circle cx="74.2" cy="38.7" r="0.9" fill="#FFFFFF"/><ellipse cx="60" cy="49" rx="6" ry="4.5" fill="#1C1C1C"/><ellipse cx="58.5" cy="47.6" rx="1.6" ry="1" fill="#FFFFFF"/><path d="M60,53 L60,57 M60,57 C59,60.5 55.5,61.5 53,59.5 M60,57 C61,60.5 64.5,61.5 67,59.5" fill="none" stroke="#1C1C1C" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>`, 120, 90),
+    fish: mkImg(`<path d="M6,12 C20,4 50,4 66,10 L78,4 L74,12 L78,20 L66,14 C50,20 20,20 6,12 Z" fill="#B8C6D4" stroke="#5D7287" stroke-width="1"/><path d="M8,11 C22,6 48,6 66,10 C48,9 22,9 8,11 Z" fill="#3E5A78"/><path d="M2,12 L8,11 L8,13 Z" fill="#E8B83A"/><circle cx="13" cy="11" r="1.4" fill="#1C1C1C"/>`, 80, 24),
+  };
+
+  // ---------- 설정 ----------
+  const FONT = '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif';
+  const C = 450;          // 화면 속 파동 속력 (px/s)
+  const F = 4.5;            // 화면 속 진동수 (Hz)
+  const VMAX = 90;        // 물개·물고기 최대 속력
+  const GAP = 85;         // 물고기가 물개에 다가갈 수 있는 거리
+  const SS = 130 / 160;   // 옆모습 크기 비율
+  const SEA_TOP = 36;
+  const MAXN = 4;
+  const CFG = {
+    water: { speed: v => (Math.abs(v) / 10).toFixed(1) + ' cm/s', fmt: f => f.toFixed(2) + ' Hz', per: T => T.toFixed(3) + ' s', fmul: 1, info: '물결 속력 30 cm/s', add: '+ 측정기', lab: '물개 속도' },
+    land:  { speed: v => Math.round(Math.abs(v) * 1500 / C) + ' m/s', fmt: f => Math.round(f) + ' Hz', per: T => (T * 1000).toFixed(3) + ' ms', fmul: 440 / 4.5, info: '물속 소리 속력 1500 m/s · 느린 화면', add: '', lab: '물개 속도' },
+    obs:   { speed: v => Math.round(Math.abs(v) * 1500 / C) + ' m/s', fmt: f => Math.round(f) + ' Hz', per: T => (T * 1000).toFixed(3) + ' ms', fmul: 440 / 4.5, info: '물속 소리 속력 1500 m/s · 느린 화면', add: '', lab: '마이크 속도' },
+    sea:   { speed: v => Math.round(Math.abs(v) * 1500 / C) + ' m/s', fmt: f => Math.round(f) + ' Hz', per: T => (T * 1000).toFixed(3) + ' ms', fmul: 440 / 4.5, info: '물속 소리 속력 1500 m/s · 느린 화면', add: '', lab: '물고기 속도' },
+  };
+  const lamM = fReal => (1500 / fReal).toFixed(2) + ' m';
+  const lamOf = fScreen => (C / fScreen) * (1.5 / (C / F));   // m (λ₀ = 1.50 m)
+
+  // ---------- 상태 ----------
+  const cv = document.getElementById('cv');
+  const ctx = cv.getContext('2d');
+  const addBtn = document.getElementById('add');
+  const playBtn = document.getElementById('play');
+  let W = 0, H = 0, running = true, S = null, drag = null, ptr = { x: -99, y: -99 }, fishId = 0, sliding = false;
+  const SUB = '₀₁₂₃₄₅₆₇₈₉';
+  const spd = document.getElementById('spd'), valEl = document.getElementById('val'), labEl = document.getElementById('lab');
+
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const groundY = () => H - 84;
+  const seaCY = () => (SEA_TOP + H) / 2;
+  const det = (x, y) => ({ x, y, px: x, v: 0, arr: [], arrD: [], flash: -9, drag: false });
+  const fish = (x, y, v) => ({ id: ++fishId, x, y, px: x, py: y, v, face: Math.sign(v) || (x > W / 2 ? -1 : 1), arr: [], flash: -9, phase: Math.random() * 6, drag: false });
+
+  function setup(mode) {
+    S = { mode, t: 0, next: 0, waves: [], dets: [], fish: [], pulse: -9, phase: 0, sel: null, mic: null, listen: 0,
+          src: { x: W / 2, y: H / 2, v: 0, face: 1, drag: false } };
+    const dx = Math.min(260, W * 0.36);
+    if (mode === 'water') {
+      S.dets.push(det(W / 2 - dx, H / 2), det(W / 2 + dx, H / 2));
+    } else if (mode === 'land') {
+      S.src.y = seaCY();
+      S.src.x = 110;
+      S.dets.push(det(W / 2, seaCY()));
+    } else if (mode === 'obs') {
+      S.src.y = seaCY();
+      S.dets.push(det(110, seaCY()));
+    } else {
+      S.src.y = seaCY(); S.src.x = 125;
+      S.mic = det(28, seaCY());
+      const f0 = fish(W - 60, seaCY(), 0);
+      S.fish.push(f0); S.sel = f0;
+    }
+    labEl.textContent = CFG[mode].lab;
+    if (typeof setSndBtn === 'function') setSndBtn();
+    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
+    updateAdd();
+  }
+
+  function updateAdd() {
+    addBtn.style.display = CFG[S.mode].add ? '' : 'none';
+    addBtn.textContent = CFG[S.mode].add;
+    addBtn.disabled = (S.mode === 'sea' ? S.fish.length : S.dets.length) >= MAXN;
+  }
+
+  function emitPos() {
+    const s = S.src;
+    return { x: s.x, y: s.y };
+  }
+  const detY = d => d.y;
+  const push = (arr, v) => { arr.push(v); if (arr.length > 3) arr.shift(); };
+  const freq = arr => arr.length < 2 ? null : (arr.length - 1) / (arr[arr.length - 1] - arr[0]);
+
+  // ---------- 계산 ----------
+  function step(dt) {
+    const tp = S.t, t = tp + dt, s = S.src;
+    S.t = t;
+
+    if (S.mode !== 'sea') {
+      if (!s.drag && s.v) {
+        s.x += s.v * dt;
+        if (s.x <= 110) { s.x = 110; s.v = 0; }
+        if (s.x >= W - 110) { s.x = W - 110; s.v = 0; }
+      }
+      if (s.v && Math.sign(s.v) !== s.face) {
+        s.face = Math.sign(s.v);
+      }
+    }
+    S.phase += dt * (Math.abs(s.v) > 1 ? 4 + Math.abs(s.v) / 12 : 1.6);
+
+    for (const f of S.fish) {
+      f.px = f.x; f.py = f.y;
+      if (!f.drag && f.v) {
+        const lo = s.x + GAP, hi = W - 50;
+        f.x += f.v * dt;
+        if (f.x <= lo) { f.x = lo; f.v = 0; }
+        if (f.x >= hi) { f.x = hi; f.v = 0; }
+        for (const g of S.fish) {
+          if (g !== f && Math.abs(g.x - f.x) < 90 && (g.x - f.x) * f.v > 0 && Math.abs(g.px - f.px) >= 89) {
+            f.x = g.x - 90 * Math.sign(f.v); f.v = 0;
+          }
+        }
+      }
+      if (f.v) f.face = Math.sign(f.v);
+      f.phase += dt * (3 + Math.abs(f.v) / 10);
+    }
+
+    for (const d of S.dets) {
+      d.px = d.x;
+      if (S.mode === 'obs' && !d.drag && d.v) {
+        d.x += d.v * dt;
+        if (d.x <= 40) { d.x = 40; d.v = 0; }
+        if (d.x >= W - 40) { d.x = W - 40; d.v = 0; }
+      }
+    }
+
+    // 소리(파면) 내기
+    while (S.next <= t) {
+      const te = S.next, p = emitPos();
+      const back = (s.drag || S.mode === 'sea') ? 0 : s.v * (t - te);
+      S.waves.push({ x: p.x - back, y: p.y, t0: te, e: false, hit: new Set() });
+      S.next += 1 / F;
+      S.pulse = te;
+    }
+
+    // 도달 확인
+    const n = S.waves.length;
+    for (let i = 0; i < S.waves.length; i++) {
+      const w = S.waves[i];
+      const rp = Math.max(0, C * (tp - w.t0)), rc = C * (t - w.t0);
+      if (!w.e) {
+        for (const d of S.dets) {
+          const gp = Math.hypot(d.px - w.x, d.y - w.y) - rp;
+          const gc = Math.hypot(d.x - w.x, d.y - w.y) - rc;
+          if (gp > 0 && gc <= 0) {
+            const a = gp / (gp - gc);
+            push(d.arr, tp + a * dt);
+            push(d.arrD, Math.hypot(d.px + (d.x - d.px) * a - w.x, d.y - w.y));   // 도착 순간 물개와의 거리
+            d.flash = t;
+          }
+        }
+        for (const f of S.fish) {
+          if (w.hit.has(f.id)) continue;
+          const gp = Math.hypot(f.px - w.x, f.py - w.y) - rp;
+          const gc = Math.hypot(f.x - w.x, f.y - w.y) - rc;
+          if (gp > 0 && gc <= 0) {
+            const a = gp / (gp - gc);
+            S.waves.push({ x: f.px + (f.x - f.px) * a, y: f.py + (f.y - f.py) * a, t0: Math.max(w.t0, tp + a * dt), e: true, fid: f.id });
+            w.hit.add(f.id); f.flash = t;
+          }
+        }
+      } else if (i < n) {
+        const f = S.fish.find(q => q.id === w.fid);
+        if (!f) continue;
+        const dd = Math.hypot(w.x - S.mic.x, w.y - S.mic.y);
+        if (dd > rp && dd <= rc) { push(f.arr, w.t0 + dd / C); if (f === S.sel) S.mic.flash = t; }
+      }
+    }
+    const maxR = Math.hypot(W, H) + 40;
+    S.waves = S.waves.filter(w => C * (t - w.t0) < maxR);
+  }
+
+  // ---------- 그리기 ----------
+  function rr(x, y, w, h, r) {
+    ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  function pill(text, x, y, color, center) {
+    ctx.font = '600 13px ' + FONT;
+    const w = ctx.measureText(text).width + 16, h = 24;
+    const left = clamp(center ? x - w / 2 : x, 4, W - w - 4), top = clamp(y - h / 2, 4, H - h - 4);
+    rr(left, top, w, h, 12);
+    ctx.fillStyle = 'rgba(255,255,255,.94)'; ctx.fill();
+    ctx.strokeStyle = '#e2e2e2'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = color; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, left + 8, top + h / 2 + 0.5);
+  }
+  function small(text, x, y, color, align) {
+    ctx.font = '12px ' + FONT; ctx.fillStyle = color || '#999';
+    ctx.textAlign = align || 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x, y);
+  }
+
+  function drawBg() {
+    ctx.clearRect(0, 0, W, H);
+    if (S.mode === 'water') {
+      ctx.fillStyle = '#F3F8FC'; ctx.fillRect(0, 0, W, H);
+    } else {
+      const gr = ctx.createLinearGradient(0, SEA_TOP, 0, H);
+      gr.addColorStop(0, '#EEF6FC'); gr.addColorStop(1, '#DCEAF5');
+      ctx.fillStyle = gr;
+      ctx.beginPath(); ctx.moveTo(0, H); ctx.lineTo(0, SEA_TOP);
+      for (let x = 0; x <= W; x += 8) ctx.lineTo(x, SEA_TOP + Math.sin(x / 22 + S.t * 1.5) * 2);
+      ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = '#A9C6DE'; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      for (let x = 0; x <= W; x += 8) { const y = SEA_TOP + Math.sin(x / 22 + S.t * 1.5) * 2; x ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+      ctx.stroke();
+    }
+  }
+
+  function drawWaves() {
+    const t = S.t, maxR = Math.hypot(W, H);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, SEA_TOP + 2, W, H); ctx.clip();
+    ctx.lineWidth = 1.6;
+    if (S.mode === 'sea') { drawBeams(); ctx.restore(); return; }
+    for (const w of S.waves) {
+      const r = C * (t - w.t0);
+      if (r <= 0.5) continue;
+      const a = Math.max(0, 1 - r / maxR);
+      ctx.strokeStyle = w.e ? `rgba(228,124,44,${0.85 * a})`
+        : `rgba(47,111,176,${0.7 * a})`;
+      ctx.beginPath(); ctx.arc(w.x, w.y, r, 0, Math.PI * 2); ctx.stroke();
+      if (!w.e && S.mode !== 'sea') {
+        ctx.fillStyle = `rgba(47,111,176,${0.5 * a})`;
+        ctx.beginPath(); ctx.arc(w.x, w.y, 2, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
+  function arcSeg(x, y, r, dir) {
+    const a = Math.min(1.1, 40 / r);
+    ctx.beginPath(); ctx.arc(x, y, r, dir - a, dir + a); ctx.stroke();
+  }
+  function drawBeams() {
+    const t = S.t, s = S.src;
+    let reachR = 0, reachL = 0;
+    for (const f of S.fish) { const d = Math.abs(f.x - s.x); if (f.x > s.x) reachR = Math.max(reachR, d); else reachL = Math.max(reachL, d); }
+    ctx.lineWidth = 2.2; ctx.lineCap = 'round';
+    for (const w of S.waves) {
+      const r = C * (t - w.t0);
+      if (r <= 4) continue;
+      if (!w.e) {
+        if (r < 34) continue;
+        ctx.strokeStyle = 'rgba(47,111,176,.8)';
+        if (r <= reachR + 4) arcSeg(w.x, w.y, r, 0);
+        if (r <= reachL + 4) arcSeg(w.x, w.y, r, Math.PI);
+      } else {
+        const d = Math.abs(w.x - S.mic.x);
+        if (r > d - 10) continue;
+        ctx.strokeStyle = 'rgba(228,124,44,.9)';
+        arcSeg(w.x, w.y, r, w.x > s.x ? Math.PI : 0);
+      }
+    }
+  }
+
+  function drawVel(x, y, v) {
+    const L = v * 0.9;
+    if (Math.abs(v) > 0.5) {
+      const d = Math.sign(L);
+      ctx.strokeStyle = '#2b2b2b'; ctx.fillStyle = '#2b2b2b'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + L - d * 8, y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x + L, y); ctx.lineTo(x + L - d * 11, y - 6); ctx.lineTo(x + L - d * 11, y + 6); ctx.closePath(); ctx.fill();
+    } else {
+      ctx.fillStyle = '#2b2b2b'; ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.font = '600 13px ' + FONT; ctx.fillStyle = '#2b2b2b'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('v = ' + (Math.abs(v) > 0.5 ? (v < 0 ? '−' : '+') + CFG[S.mode].speed(v) : '0'), x, y + 18);
+  }
+
+  function drawSide(x, y, face, moving, talk) {
+    const ph = S.phase, sw = moving ? 1 : 0.25;
+    ctx.save();
+    ctx.translate(x, y); ctx.scale(face * SS, SS); ctx.translate(-82, -85);
+    ctx.save(); ctx.translate(30, 64); ctx.rotate(Math.sin(ph) * 0.16 * sw); ctx.translate(-30, -64);
+    ctx.drawImage(IMG.tail, 0, 0, 160, 90); ctx.restore();
+    ctx.save(); ctx.translate(0, -Math.abs(Math.sin(ph)) * 1.8 * (moving ? 1 : 0.6) - talk * 2.5);
+    if (talk) { ctx.translate(90, 60); ctx.rotate(-talk * 0.06); ctx.translate(-90, -60); }
+    ctx.drawImage(IMG.body, 0, 0, 160, 90); ctx.restore();
+    ctx.save(); ctx.translate(100, 63); ctx.rotate(Math.sin(ph + Math.PI) * 0.19 * sw); ctx.translate(-100, -63);
+    ctx.drawImage(IMG.ff, 0, 0, 160, 90); ctx.restore();
+    ctx.restore();
+  }
+
+  function talkAmt() {
+    const p = (S.t - S.pulse) / 0.35;
+    return p >= 0 && p < 1 ? Math.sin(p * Math.PI) : 0;
+  }
+
+  function drawHydro(d, fp) {
+    ctx.strokeStyle = '#8a8a8a'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(d.x, SEA_TOP); ctx.lineTo(d.x, d.y - 11); ctx.stroke();
+    rr(d.x - 7, d.y - 11, 14, 22, 7); ctx.fillStyle = '#3a3a3a'; ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(d.x - 3, d.y - 4); ctx.lineTo(d.x + 3, d.y - 4); ctx.moveTo(d.x - 3, d.y); ctx.lineTo(d.x + 3, d.y); ctx.moveTo(d.x - 3, d.y + 4); ctx.lineTo(d.x + 3, d.y + 4); ctx.stroke();
+    if (fp >= 0 && fp < 1) {
+      ctx.strokeStyle = `rgba(210,72,62,${1 - fp})`; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(d.x, d.y, 12 + 14 * fp, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
+  function drawSpeaker(x, y, dir) {
+    ctx.save(); ctx.translate(x, y); ctx.scale(dir, 1);
+    ctx.fillStyle = '#1f5f9e';
+    ctx.beginPath(); ctx.moveTo(-7, -3); ctx.lineTo(-4, -3); ctx.lineTo(1, -7); ctx.lineTo(1, 7); ctx.lineTo(-4, 3); ctx.lineTo(-7, 3); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#1f5f9e'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+    const k = (S.t * 3) % 1;
+    ctx.globalAlpha = 0.5 + 0.5 * Math.sin(S.t * 8);
+    ctx.beginPath(); ctx.arc(2, 0, 5, -0.8, 0.8); ctx.stroke();
+    ctx.beginPath(); ctx.arc(2, 0, 9, -0.8, 0.8); ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawDet(d, i) {
+    const t = S.t, fp = (t - d.flash) / 0.45, y0 = detY(d);
+    if (S.mode === 'water') {
+      const bob = fp < 1 ? -3 * Math.sin(fp * Math.PI) : 0;
+      ctx.fillStyle = '#fff'; ctx.strokeStyle = '#D2483E'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(d.x, d.y + bob, 9, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#D2483E'; ctx.beginPath(); ctx.arc(d.x, d.y + bob, 3.5, 0, Math.PI * 2); ctx.fill();
+    } else {
+      drawHydro(d, fp);
+      if (soundOn && i === S.listen) drawSpeaker(d.x + (d.x < W / 2 ? 24 : -24), d.y - 26, d.x < W / 2 ? 1 : -1);
+    }
+    const f = freq(d.arr), cfg = CFG[S.mode];
+    const by = d.y + 32;
+    const n = S.dets.length > 1 ? SUB[i + 1] : '';
+    pill('T' + n + ' = ' + (f ? cfg.per(1 / (f * cfg.fmul)) : '–'), d.x, by, '#555', true);
+    pill('f' + n + ' = ' + (f ? cfg.fmt(f * cfg.fmul) : '–'), d.x, by + 28, '#1f5f9e', true);
+    let lam = f ? lamM(f * cfg.fmul) : '–';
+    if (f && S.mode === 'obs') {
+      // 이웃한 두 파면 사이 거리 = (소리가 간 거리) − (그동안 마이크가 물개에서 멀어진 거리)
+      const n1 = d.arr.length - 1;
+      const gap = (C * (d.arr[n1] - d.arr[0]) - (d.arrD[n1] - d.arrD[0])) / n1;   // 화면 px
+      lam = (1500 * gap / C / cfg.fmul).toFixed(2) + ' m';
+    }
+    pill('λ' + n + ' = ' + lam, d.x, by + 56, '#2b2b2b', true);
+    if (S.mode === 'obs') drawVel(d.x, by + 92, d.v);
+  }
+
+  function drawFish(f) {
+    const right = f.face > 0;
+    if (f === S.sel && S.fish.length > 1) {
+      ctx.strokeStyle = '#9aa7b4'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(f.x - 22, f.y + 20); ctx.lineTo(f.x + 22, f.y + 20); ctx.stroke();
+    }
+    ctx.save();
+    ctx.translate(f.x, f.y);
+    ctx.rotate(Math.sin(f.phase) * 0.04);
+    if (right) ctx.scale(-1, 1);
+    ctx.drawImage(IMG.fish, -38, -11.5, 76, 23);
+    ctx.restore();
+    const fr = freq(f.arr);
+    pill('λ = ' + (fr ? lamM(fr * CFG.sea.fmul) : '–'), f.x, f.y - 30, '#C9621A', true);
+    drawVel(f.x, f.y + 28, f.v);
+  }
+
+  function drawTrash() {
+    if (!drag || drag.type !== 'det' || S.mode !== 'water') return;
+    const x = W / 2, y = H - 34, near = Math.hypot(ptr.x - x, ptr.y - y) < 34;
+    ctx.fillStyle = near ? '#FBE3E1' : '#f2f2f2';
+    ctx.beginPath(); ctx.arc(x, y, 22, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = near ? '#D2483E' : '#888'; ctx.lineWidth = 1.8; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x - 8, y - 6); ctx.lineTo(x + 8, y - 6);
+    ctx.moveTo(x - 3, y - 6); ctx.lineTo(x - 3, y - 9); ctx.lineTo(x + 3, y - 9); ctx.lineTo(x + 3, y - 6);
+    ctx.moveTo(x - 6, y - 6); ctx.lineTo(x - 5, y + 9); ctx.lineTo(x + 5, y + 9); ctx.lineTo(x + 6, y - 6);
+    ctx.stroke();
+  }
+
+  function draw() {
+    drawBg();
+    drawWaves();
+    const s = S.src, talk = talkAmt(), moving = Math.abs(s.v) > 1 && !s.drag;
+    const cfg = CFG[S.mode];
+
+    if (S.mode === 'water') {
+      ctx.strokeStyle = 'rgba(47,111,176,.22)'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.ellipse(s.x, s.y + 24, 62, 7, 0, 0, Math.PI * 2); ctx.stroke();
+      drawSide(s.x - 4 * s.face * SS, s.y + 37 * SS + Math.sin(S.t * 2) * 1.2, s.face, moving, 0);
+      pill('T₀ = ' + cfg.per(1 / (F * cfg.fmul)), s.x, s.y - 50, '#888', true);
+      S.dets.forEach(drawDet);
+    } else if (S.mode === 'land') {
+      const g = s.y + 37 * SS + Math.sin(S.t * 2) * 1.5;
+      drawSide(s.x - 4 * s.face * SS, g, s.face, moving, talk);
+      const p = (S.t - S.pulse) / 0.9;
+      if (p >= 0 && p < 1) {
+        const m = { x: s.x + 50 * s.face, y: s.y - 3 };
+        ctx.font = '18px ' + FONT; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = `rgba(60,60,60,${(1 - p) * 0.75})`;
+        ctx.fillText('♪', m.x + s.face * (6 + p * 10), m.y - 8 - p * 22);
+      }
+      S.dets.forEach(drawDet);
+      drawVel(s.x, s.y + 44, s.v);
+      pill('T₀ = ' + cfg.per(1 / (F * cfg.fmul)), s.x, s.y - 104, '#888', true);
+      pill('λ₀ = ' + lamM(F * cfg.fmul), s.x, s.y - 48, '#888', true);
+      pill('f₀ = ' + cfg.fmt(F * cfg.fmul), s.x, s.y - 76, '#888', true);
+    } else if (S.mode === 'obs') {
+      const sc = 110 / 120 * (1 + talk * 0.04);
+      ctx.drawImage(IMG.front, s.x - 60 * sc, s.y - 45 * sc, 120 * sc, 90 * sc);
+      pill('T₀ = ' + cfg.per(1 / (F * cfg.fmul)), s.x, s.y - 116, '#888', true);
+      pill('f₀ = ' + cfg.fmt(F * cfg.fmul), s.x, s.y - 88, '#888', true);
+      pill('λ₀ = ' + lamM(F * cfg.fmul), s.x, s.y - 60, '#888', true);
+      S.dets.forEach(drawDet);
+    } else {
+      const sc = 110 / 120 * (1 + talk * 0.04);
+      ctx.drawImage(IMG.front, s.x - 60 * sc, s.y - 45 * sc, 120 * sc, 90 * sc);
+      S.fish.forEach(drawFish);
+      pill('λ₀ = ' + lamM(F * cfg.fmul), s.x, s.y - 60, '#888', true);
+      drawHydro(S.mic, (S.t - S.mic.flash) / 0.45);
+      if (soundOn) drawSpeaker(S.mic.x + 24, S.mic.y - 26, 1);
+      const ef = S.sel ? freq(S.sel.arr) : null;
+      pill("T′ = " + (ef ? cfg.per(1 / (ef * cfg.fmul)) : '–'), S.mic.x, S.mic.y + 60, '#555', true);
+      pill("f′ = " + (ef ? cfg.fmt(ef * cfg.fmul) : '–'), S.mic.x, S.mic.y + 88, '#1f5f9e', true);
+      pill("λ′ = " + (ef ? lamM(ef * cfg.fmul) : '–'), S.mic.x, S.mic.y + 116, '#2b2b2b', true);
+      // 범례
+      ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(47,111,176,.8)'; ctx.beginPath(); ctx.moveTo(14, 18); ctx.lineTo(30, 18); ctx.stroke();
+      small('물개 소리', 36, 18, '#777', 'left');
+      ctx.font = '12px ' + FONT;
+      const lx = 36 + ctx.measureText('물개 소리').width + 18;
+      ctx.strokeStyle = 'rgba(228,124,44,.9)'; ctx.beginPath(); ctx.moveTo(lx, 18); ctx.lineTo(lx + 16, 18); ctx.stroke();
+      small('반사된 소리', lx + 22, 18, '#777', 'left');
+    }
+    small(cfg.info, W - 14, 18, '#a0a0a0', 'right');
+    drawTrash();
+  }
+
+  // ---------- 조작 ----------
+  function hit(p) {
+    const s = S.src;
+    if (S.mode === 'land') {
+      for (let i = 0; i < S.dets.length; i++) {
+        const d = S.dets[i];
+        if (Math.abs(p.x - d.x) < 24 && Math.abs(p.y - d.y) < 26) return { type: 'listen', i };
+      }
+    }
+    for (let i = S.mode === 'land' ? -1 : S.dets.length - 1; i >= 0; i--) {
+      const d = S.dets[i];
+      if (Math.hypot(p.x - d.x, p.y - detY(d)) < 18) return { type: 'det', o: d, ox: p.x - d.x, oy: p.y - d.y };
+    }
+    for (let i = S.fish.length - 1; i >= 0; i--) {
+      const f = S.fish[i];
+      if (Math.abs(p.x - f.x) < 40 && Math.abs(p.y - f.y) < 16) return { type: 'fish', o: f, ox: p.x - f.x, oy: p.y - f.y };
+    }
+    if (S.mode === 'water' && Math.abs(p.x - s.x) < 66 && Math.abs(p.y - s.y) < 34) return { type: 'seal', o: s, ox: p.x - s.x };
+    if (S.mode === 'land' && Math.abs(p.x - s.x) < 66 && Math.abs(p.y - s.y) < 34) return { type: 'seal', o: s, ox: p.x - s.x };
+    return null;
+  }
+  function pos(e) { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left - cv.clientLeft, y: e.clientY - r.top - cv.clientTop }; }
+
+  function apply(p) {
+    const o = drag.o;
+    if (drag.type === 'seal') {
+      o.x = clamp(p.x - drag.ox, 110, W - 110);
+    } else if (drag.type === 'det') {
+      o.x = clamp(p.x - drag.ox, 40, W - 40); o.px = o.x;
+      o.arr = []; o.arrD = [];
+    } else if (drag.type === 'fish') {
+      o.x = clamp(p.x - drag.ox, S.src.x + GAP, W - 50);
+      o.arr = [];
+    }
+  }
+
+  cv.addEventListener('pointerdown', e => {
+    const p = pos(e); ptr = p;
+    const h = hit(p);
+    if (!h) return;
+    if (h.type === 'listen') { S.listen = h.i; lastF = 0; if (!soundOn) toggleSound(); return; }
+    drag = h;
+    if (h.type === 'fish') S.sel = h.o;
+    if (h.type === 'seal' || h.type === 'fish' || h.type === 'det') h.o.drag = true;
+    cv.setPointerCapture(e.pointerId);
+    cv.style.cursor = 'grabbing';
+    e.preventDefault();
+  });
+  cv.addEventListener('pointermove', e => {
+    const p = pos(e); ptr = p;
+    if (drag) apply(p);
+    else { const h = hit(p); cv.style.cursor = h ? (h.type === 'listen' ? 'pointer' : 'grab') : 'default'; }
+  });
+  const end = () => {
+    if (!drag) return;
+    if (drag.type === 'det' && S.mode === 'water' && Math.hypot(ptr.x - W / 2, ptr.y - (H - 34)) < 34) {
+      if (drag.type === 'det') S.dets = S.dets.filter(d => d !== drag.o);
+      else {
+        S.fish = S.fish.filter(f => f !== drag.o); S.waves = S.waves.filter(w => w.fid !== drag.o.id);
+        if (S.sel === drag.o) S.sel = S.fish[S.fish.length - 1] || null;
+      }
+      updateAdd();
+    }
+    if (drag.o) drag.o.drag = false;
+    drag = null;
+    cv.style.cursor = 'default';
+  };
+  cv.addEventListener('pointerup', end);
+  cv.addEventListener('pointercancel', end);
+
+  addBtn.addEventListener('click', () => {
+    const side = Math.random() < 0.5 ? -1 : 1;
+    if (S.mode === 'sea') {
+      if (S.fish.length >= MAXN) return;
+      let x = W - 60;
+      while (x > S.src.x + GAP && S.fish.some(f => Math.abs(f.x - x) < 95)) x -= 20;
+      if (x < S.src.x + GAP) return;
+      const nf = fish(x, seaCY(), 0);
+      nf.face = -1;
+      S.fish.push(nf); S.sel = nf;
+    } else {
+      if (S.dets.length >= MAXN) return;
+      let x = 0;
+      for (let k = 0; k < 30; k++) {
+        x = 40 + Math.random() * (W - 80);
+        if (Math.abs(x - S.src.x) > 90 && S.dets.every(d => Math.abs(d.x - x) > 70)) break;
+      }
+      S.dets.push(det(x, S.mode === 'land' ? groundY() : S.src.y));
+    }
+    updateAdd();
+  });
+
+  const ICON_PAUSE = '<svg viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="2.5" width="3" height="11" rx="1"/><rect x="9.5" y="2.5" width="3" height="11" rx="1"/></svg>';
+  const ICON_PLAY = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 2.8v10.4c0 .6.6.9 1.1.6l8-5.2c.5-.3.5-.9 0-1.2l-8-5.2c-.5-.3-1.1 0-1.1.6z"/></svg>';
+  function setPlay() { playBtn.innerHTML = running ? ICON_PAUSE : ICON_PLAY; playBtn.title = running ? '일시정지' : '재생'; }
+  playBtn.addEventListener('click', () => { running = !running; setPlay(); });
+
+  // ---------- 소리 ----------
+  const sndBtn = document.getElementById('snd');
+  let soundOn = false, actx = null, osc = null, gain = null, lastF = 0, lastG = -1;
+  const ICON_SND_ON = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6h2.5l3.5-3v10L5 10H2.5z" fill="currentColor"/><path d="M11 5.5a3.5 3.5 0 0 1 0 5M12.8 3.5a6 6 0 0 1 0 9"/></svg>';
+  const ICON_SND_OFF = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 6h2.5l3.5-3v10L5 10H2.5z" fill="currentColor"/><path d="M11 6l4 4M15 6l-4 4"/></svg>';
+  function setSndBtn() {
+    sndBtn.innerHTML = soundOn ? ICON_SND_ON : ICON_SND_OFF;
+    sndBtn.classList.toggle('on', soundOn);
+    sndBtn.title = soundOn ? '소리 끄기' : '소리 켜기';
+  }
+  function toggleSound() {
+    soundOn = !soundOn;
+    if (soundOn) {
+      try {
+        if (!actx) {
+          actx = new (window.AudioContext || window.webkitAudioContext)();
+          osc = actx.createOscillator(); osc.type = 'sine';
+          gain = actx.createGain(); gain.gain.value = 0;
+          osc.connect(gain); gain.connect(actx.destination); osc.start();
+        }
+        actx.resume();
+      } catch (e) { soundOn = false; }
+    }
+    lastF = 0; lastG = -1;
+    setSndBtn();
+  }
+  sndBtn.addEventListener('click', toggleSound);
+  function updateSound() {
+    if (!gain) return;
+    let g = 0, fr = 0;
+    if (soundOn && running) {
+      const arr = S.mode !== 'sea' ? (S.dets[S.listen] || {}).arr : (S.sel || {}).arr;
+      const f = arr && freq(arr);
+      if (f) { fr = Math.round(f * CFG[S.mode].fmul); g = 0.06; }
+    }
+    const now = actx.currentTime;
+    if (g !== lastG) { gain.gain.setTargetAtTime(g, now, 0.04); lastG = g; }
+    if (fr && fr !== lastF) { osc.frequency.setTargetAtTime(fr, now, 0.03); lastF = fr; }
+  }
+  document.getElementById('reset').addEventListener('click', () => setup(S.mode));
+  document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => setup(b.dataset.mode)));
+
+  // ---------- 속력 슬라이더 ----------
+  const target = () => S.mode === 'sea' ? S.sel : S.mode === 'obs' ? S.dets[0] : S.src;
+  let lastTxt = '', lastVal = null, lastChips = '';
+  spd.addEventListener('input', () => {
+    const o = target(); if (!o) return;
+    let v = +spd.value; if (Math.abs(v) <= 3) v = 0;
+    o.v = v / 100 * VMAX;
+  });
+  spd.addEventListener('pointerdown', () => sliding = true);
+  window.addEventListener('pointerup', () => sliding = false);
+  spd.addEventListener('dblclick', () => { const o = target(); if (o) o.v = 0; });
+  function syncSlider() {
+    const o = target();
+    spd.disabled = !o;
+    const val = o ? Math.round(o.v / VMAX * 100) : 0;
+    if (!sliding && val !== lastVal) { spd.value = val; }
+    lastVal = val;
+    const pct = (+spd.value + 100) / 2, a = Math.min(50, pct), b = Math.max(50, pct);
+    spd.style.background = `linear-gradient(to right, #e6e6e6 ${a}%, #2b2b2b ${a}%, #2b2b2b ${b}%, #e6e6e6 ${b}%)`;
+    const txt = 'v = ' + (!o || Math.abs(o.v) < 0.5 ? '0' : (o.v < 0 ? '−' : '+') + CFG[S.mode].speed(o.v));
+    if (txt !== lastTxt) { valEl.textContent = txt; lastTxt = txt; }
+  }
+
+  // ---------- 방향키 ----------
+  let keyDir = 0;
+  window.addEventListener('keydown', e => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const o = target(); if (!o) return;
+    keyDir = e.key === 'ArrowLeft' ? -1 : 1;
+    o.v = keyDir * VMAX;
+  });
+  window.addEventListener('keyup', e => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    const d = e.key === 'ArrowLeft' ? -1 : 1;
+    if (d !== keyDir) return;
+    keyDir = 0;
+    const o = target(); if (o) o.v = 0;
+  });
+  window.addEventListener('blur', () => { if (keyDir) { keyDir = 0; const o = target(); if (o) o.v = 0; } });
+
+  // ---------- 크기 ----------
+  function resize() {
+    const w = Math.floor(cv.clientWidth);
+    if (w === W) return;
+    W = w; H = W < 640 ? 440 : 540;
+    const dpr = window.devicePixelRatio || 1;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    cv.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    setup(S ? S.mode : 'land');
+  }
+  window.addEventListener('resize', resize);
+
+  // ---------- 실행 ----------
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    if (running) step(dt);
+    draw();
+    syncSlider();
+    updateSound();
+    requestAnimationFrame(frame);
+  }
+  resize(); setPlay(); setSndBtn();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
