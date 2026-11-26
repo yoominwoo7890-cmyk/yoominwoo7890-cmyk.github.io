@@ -128,7 +128,7 @@ const sm = u => u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u);
 
 /* ---------- 상태 ---------- */
 const S = { mode:'chain', play:true, arrows:true, add:0, phase:0, slow:false, circle:true,
-            drive:true, couple:true, t:0, t2:0, hang:0, sel:9, snd:'d', T:1.5, dim:1, d2:2, lines:false, probe:null };
+            drive:true, couple:true, t:0, t2:0, hang:0, sel:9, pk:null, snd:'d', T:1.5, dim:1, d2:2, lines:false, probe:null };
 const FG = '#16a34a', FP = '#7c3aed';   // 힘 화살표: 매단 용수철(초록), 연결 용수철(보라)
 const CAM0 = { string:{yaw:0,pitch:0}, water:{yaw:-0.35,pitch:0.5}, sound:{yaw:0,pitch:0}, em:{yaw:0,pitch:0},
                water2:{yaw:0,pitch:Math.PI / 2}, sound2:{yaw:0,pitch:Math.PI / 2}, em2:{yaw:0,pitch:Math.PI / 2} };   // 2차원: 위에서 내려다봄
@@ -662,12 +662,39 @@ function drawSource(c, vp, G, X, src){
   line(c, tip, [bx, tip[1]]); c.setLineDash([]);
 }
 let chainHit = null;
+// 구슬 하나에서 도는 위상자: 원의 중심 = 그 구슬의 평형 위치, 반지름 = 진폭
+function ballPhasor(c, G, X, Yp, i, comps){
+  const cx = X(i), cy = G.eq, R = CA * G.ds, ga = c.globalAlpha;
+  const pt = q => [cx + q[0] * G.ds, cy - q[1] * G.ds];
+  let sx = 0, sy = 0; comps.forEach(q => { sx += q[0]; sy += q[1]; });
+  const tip = pt([sx, sy]);
+  // 배경을 가리지 않게 테두리만
+  c.strokeStyle = '#a9a9ae'; c.lineWidth = 1.5; c.beginPath(); c.arc(cx, cy, R, 0, 7); c.stroke();
+  if (comps.length === 2){
+    const t1 = pt(comps[0]), t2 = pt(comps[1]);
+    c.setLineDash([3, 3]); c.strokeStyle = '#c9c9ce'; c.lineWidth = 1; line(c, t1, tip); line(c, t2, tip); c.setLineDash([]);
+    const l1 = Math.hypot(comps[0][0], comps[0][1]) * G.ds, l2 = Math.hypot(comps[1][0], comps[1][1]) * G.ds;
+    if (l1 > 5 && l2 > 5){
+      const a1 = -Math.atan2(comps[0][1], comps[0][0]), a2 = -Math.atan2(comps[1][1], comps[1][0]);
+      let d = a2 - a1; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI;
+      c.strokeStyle = '#55555a'; c.lineWidth = 1.6; c.beginPath(); c.arc(cx, cy, R * 0.35, a1, a1 + d, d < 0); c.stroke();
+    }
+    arrow(c, [cx, cy], t1, comps[0][2], 2.2, true, 8);
+    arrow(c, [cx, cy], t2, comps[1][2], 2.2, true, 8);
+    arrow(c, [cx, cy], tip, '#1d1d1f', 2.6, true, 9);
+  } else arrow(c, [cx, cy], tip, comps[0][2], 2.6, true, 9);
+  c.fillStyle = '#1d1d1f'; c.beginPath(); c.arc(cx, cy, 2.2, 0, 7); c.fill();
+  // 사영: 화살표 끝 → 구슬 (같은 높이)
+  c.setLineDash([4, 4]); c.strokeStyle = '#8e8e93'; c.lineWidth = 1.2; line(c, tip, [cx, Yp(i)]); c.setLineDash([]);
+  c.strokeStyle = '#1d1d1f'; c.lineWidth = 2; c.beginPath(); c.arc(cx, Yp(i), G.r + 3, 0, 7); c.stroke();
+  c.globalAlpha = ga;
+}
 function mixHex(a, b, t){
   const p = h => [1, 3, 5].map(k => parseInt(h.slice(k, k + 2), 16));
   const A = p(a), B = p(b);
   return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join('');
 }
-function drawChain(c, vp, Y, style, SRC, FORCE){
+function drawChain(c, vp, Y, style, SRC, FORCE, PK){
   const G = geom(vp), P = PAL[style];
   const ga = c.globalAlpha;
   const X = i => vp.x + G.ml + G.gap * (i + 1), Yp = i => G.eq - Y[i] * G.ds;
@@ -721,8 +748,7 @@ function drawChain(c, vp, Y, style, SRC, FORCE){
   }
   c.globalAlpha = ga;
   if (FORCE){
-    chainHit = { X, Yp, r:G.r };
-    // 고른 구슬: 테두리 + 복원력 화살표 두 개를 나란히
+    // 힘을 보여 주는 구슬 (위치 고정): 테두리 + 복원력 화살표 두 개를 나란히
     // 둘 다 같은 복원력(−mω²y)을 가리키고, 그 힘을 맡은 비율만큼만 선명하게 보인다
     const x = X(sel), y = Yp(sel), fs = 1.8 * G.ds / (CW * CW);
     c.strokeStyle = '#1d1d1f'; c.lineWidth = 2; c.beginPath(); c.arc(x, y, G.r + 3.5, 0, 7); c.stroke();
@@ -733,6 +759,8 @@ function drawChain(c, vp, Y, style, SRC, FORCE){
     c.globalAlpha = fa;
   }
   if (S.circle && SRC) SRC.forEach(src => drawSource(c, vp, G, X, src));
+  if (FORCE) chainHit = { X, Yp, r:G.r };
+  const pkDraw = PK && S.pk !== null ? () => ballPhasor(c, G, X, Yp, S.pk, PK(S.pk)) : null;
   // 변위 벡터
   if (S.arrows) for (let i = 0; i < CN; i++){
     const hx = X(i);
@@ -740,6 +768,7 @@ function drawChain(c, vp, Y, style, SRC, FORCE){
     arrow(c, [hx, G.eq], [hx, Yp(i)], RED, 2.6, true, 10);
   }
   c.globalAlpha = ga;
+  if (pkDraw) pkDraw();
 }
 
 /* ---------- 줄 파동 ---------- */
@@ -982,14 +1011,18 @@ function draw(){
     const src = S.add === 2
       ? [{ side:'R', comps:[aFar, bSrc] }]
       : [{ side:'L', comps: S.add ? [aSrc, bSrc] : [aSrc] }];
+    // 고른 구슬의 위상자: 각 파동이 그 구슬에서 만드는 회전 벡터 (가로 = v/ω, 세로 = y)
+    const ka = i => [chA.v[i] / w, chA.y[i], col1];
+    const kb = i => { const j = S.add === 2 ? CN - 1 - i : i, m = bMix();
+      return [(m[0] * chBs.v[j] + m[1] * chBc.v[j]) / w, m[0] * chBs.y[j] + m[1] * chBc.y[j], col2]; };
     const MG = geom(mv);
-    drawChain(g, mv, T, 0, src, true);
+    drawChain(g, mv, T, 0, src, true, i => S.add ? [ka(i), kb(i)] : [ka(i)]);
     if (sub){
       st.forEach(v => { v.ml = MG.ml; v.mr = MG.mr; });
       const s2 = S.add === 2 ? { side:'R', comps:[pb(CN - 1)] } : { side:'L', comps:[pb(0)] };
       subPair(st, me, (vp, n) => n === 1
-        ? drawChain(gs, vp, A, 1, [{ side:'L', comps:[pa(0)] }])
-        : drawChain(gs, vp, B, 2, [s2]));
+        ? drawChain(gs, vp, A, 1, [{ side:'L', comps:[pa(0)] }], false, i => [ka(i)])
+        : drawChain(gs, vp, B, 2, [s2], false, i => [kb(i)]));
     }
   } else {
     const comps = S.add ? [1, 2] : [1];
@@ -1039,8 +1072,8 @@ function down(e, c){
   if (S.mode === 'chain'){
     if (c !== cv || !chainHit) return;
     const [mx, my] = pos(e, c); let best = -1, bd = chainHit.r * 2.5;
-    for (let i = 1; i < CN - 1; i++){ const d = Math.hypot(mx - chainHit.X(i), my - chainHit.Yp(i)); if (d < bd){ bd = d; best = i; } }
-    if (best > 0){ S.sel = best; hideHint(); }
+    for (let i = 0; i < CN; i++){ const d = Math.hypot(mx - chainHit.X(i), my - chainHit.Yp(i)); if (d < bd){ bd = d; best = i; } }
+    if (best >= 0){ S.pk = S.pk === best ? null : best; hideHint(); }
     return;
   }
   rot = { x:e.clientX, y:e.clientY, x0:e.clientX, y0:e.clientY, moved:false };
@@ -1103,14 +1136,14 @@ function updateUI(){
   $('#mainWrap').classList.toggle('chainmode', S.mode === 'chain');
   cv.style.cursor = cs.style.cursor = S.mode === 'chain' ? 'default' : (two ? 'crosshair' : 'grab');
   const h = $('#hint'), hk = two ? '2d' : S.mode;
-  h.textContent = S.mode === 'chain' ? '구슬을 누르면 그 구슬의 힘이 보여요' : two ? '한 점을 누르면 두 파동을 비교해요' : '드래그하면 돌아가요';
+  h.textContent = S.mode === 'chain' ? '구슬을 누르면 그 구슬의 위상자가 보여요' : two ? '한 점을 누르면 두 파동을 비교해요' : '드래그하면 돌아가요';
   h.style.opacity = hintSeen[hk] ? 0 : 1;
   resize();
 }
 
 document.querySelectorAll('.tab').forEach(b => b.onclick = () => {
   if (S.mode === b.dataset.mode) return;
-  S.mode = b.dataset.mode; S.probe = null; camTo = null; mergeReset(); resetAll(); updateUI();
+  S.mode = b.dataset.mode; S.probe = null; S.pk = null; camTo = null; mergeReset(); resetAll(); updateUI();
 });
 function togglePlay(){ S.play = !S.play; S.paused = false; if (!S.play) resetAll(); updateUI(); }
 $('#pause').onclick = () => { if (S.play){ S.paused = !S.paused; updateUI(); } };
