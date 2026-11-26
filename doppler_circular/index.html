@@ -48,6 +48,14 @@ h1,h2,h3{color:var(--ink);margin:0}
 header{border-bottom:1px solid var(--rule);background:var(--paper)}
 .hd{max-width:1200px;margin:0 auto;padding-block:16px;
   padding-left:max(22px,env(safe-area-inset-left,0px));padding-right:max(22px,env(safe-area-inset-right,0px))}
+.hdrow{display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.mode{display:inline-flex;align-items:center;gap:9px}
+.mode .k{font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:8px;overflow:hidden;background:var(--paper);box-shadow:var(--shadow)}
+.seg button{font-family:var(--ui);font-size:13.5px;font-weight:600;color:var(--body);background:none;border:0;padding:9px 16px;min-height:42px;cursor:pointer;transition:.13s;touch-action:manipulation}
+.seg button+button{border-left:1px solid var(--rule)}
+.seg button:hover{background:var(--surface)}
+.seg button[aria-pressed="true"]{background:var(--blue);color:#fff}
 .brand{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap}
 .brand h1{font-size:19px;font-weight:700;letter-spacing:-.02em}
 .brand span{font-size:12.5px;color:var(--muted)}
@@ -118,7 +126,7 @@ ul.nlist b{color:var(--body)}
 .empty.drag{background-color:var(--blue-soft)}
 .badge{position:absolute;top:10px;left:62px;font-family:var(--mono);font-size:11px;background:rgba(255,255,255,.94);border:1px solid var(--rule);color:var(--body);padding:3px 9px;border-radius:4px;pointer-events:none;box-shadow:var(--shadow);max-width:calc(100% - 80px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .badge.demo{border-color:#f0e3c2;background:var(--amber-soft);color:var(--amber-ink)}
-.hint{position:absolute;bottom:10px;left:62px;right:10px;font-size:12.5px;background:rgba(255,255,255,.95);border:1px solid var(--rule);border-radius:5px;padding:7px 11px;pointer-events:none;color:var(--body);box-shadow:var(--shadow)}
+.hint{font-size:12.5px;background:var(--paper);border-top:1px solid var(--rule-soft);padding:8px 14px;color:var(--muted)}
 @media(max-width:600px){.hint{display:none}}
 .spin{position:absolute;inset:0;background:rgba(255,255,255,.9);display:none;align-items:center;justify-content:center;flex-direction:column;gap:11px;z-index:5}
 .spin.on{display:flex}
@@ -194,6 +202,14 @@ button.link:hover{text-decoration:underline}
   .stat{padding:13px 16px}
   .calc{padding:11px 16px}
 }
+.sum.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.sum.three .stat{border-bottom:0;border-right:1px solid var(--rule-soft)}
+.sum.three .stat:last-child{border-right:0}
+@media(max-width:720px){
+  .sum.three{grid-template-columns:minmax(0,1fr)}
+  .sum.three .stat{border-right:0;border-bottom:1px solid var(--rule-soft)}
+  .sum.three .stat:last-child{border-bottom:0}
+}
 .a{color:var(--blue)!important} .r{color:var(--red)!important}
 
 .twrap{width:100%;overflow-x:auto;border:1px solid var(--rule);border-radius:8px;box-shadow:var(--shadow)}
@@ -228,9 +244,18 @@ table.rt{width:100%;border-collapse:collapse;font-size:14px;background:var(--pap
 <body>
 <header>
   <div class="hd">
-    <div class="brand">
-      <h1>도플러 녹음 분석기</h1>
-      <span>녹음 파일로 음원의 진동수 변화와 속도 측정</span>
+    <div class="hdrow">
+      <div class="brand">
+        <h1>도플러 녹음 분석기</h1>
+        <span>녹음 파일로 음원의 진동수 변화와 속도 측정</span>
+      </div>
+      <div class="mode">
+        <span class="k">음원의 운동</span>
+        <div class="seg" role="group" aria-label="음원의 운동 방식">
+          <button type="button" id="mCirc" aria-pressed="true">원운동</button>
+          <button type="button" id="mLin" aria-pressed="false">직선 운동</button>
+        </div>
+      </div>
     </div>
   </div>
 </header>
@@ -246,7 +271,7 @@ table.rt{width:100%;border-collapse:collapse;font-size:14px;background:var(--pap
     <div class="empty" id="empty">
       <h3>녹음 파일을 선택하세요</h3>
       <p>휴대폰 기본 녹음 앱으로 녹음한 m4a, wav, mp3 파일을 쓸 수 있습니다.<br>파일은 이 기기 안에서만 분석되며 어디로도 전송되지 않습니다.</p>
-      <div class="callout ok" style="max-width:440px;text-align:left"><b>권장 길이 5~15초</b> · 회전이 일정한 부분만 남기기</div>
+      <div class="callout ok" style="max-width:440px;text-align:left"><b id="tipB">권장 길이 5~15초</b><span id="tipT"> · 회전이 일정한 부분만 남기기</span></div>
       <div class="row">
         <button class="b pri" id="pick">녹음 파일 선택</button>
         <button class="b" id="demo">예시 녹음으로 해 보기</button>
@@ -330,16 +355,30 @@ table.rt{width:100%;border-collapse:collapse;font-size:14px;background:var(--pap
           <span class="pm" id="vSig"></span>
         </div>
         <div class="stats">
-          <div class="stat"><span class="lab"><i class="dot a"></i>f₁ 접근 (최댓값 평균)</span><b id="f1Out">—</b></div>
-          <div class="stat"><span class="lab"><i class="dot r"></i>f₂ 후퇴 (최솟값 평균)</span><b id="f2Out">—</b></div>
+          <div class="stat"><span class="lab"><i class="dot a"></i><span id="l1">f₁ 접근 (최댓값 평균)</span></span><b id="f1Out">—</b></div>
+          <div class="stat"><span class="lab"><i class="dot r"></i><span id="l2">f₂ 후퇴 (최솟값 평균)</span></span><b id="f2Out">—</b></div>
           <div class="stat"><span class="lab">Δf = f₁ − f₂</span><b id="dfOut">—</b></div>
-          <div class="stat"><span class="lab"><i class="dot"></i>f₀ 전체 평균</span><b id="f0Out">—</b></div>
+          <div class="stat"><span class="lab"><i class="dot"></i><span id="l0">f₀ 전체 평균</span></span><b id="f0Out">—</b></div>
         </div>
         <div class="calc"><span class="k">계산</span><code id="calcLine">—</code></div>
       </div>
     </div>
 
-    <div class="block">
+    <div class="block" id="linBlock" hidden>
+      <div class="blockhd"><h2>지나가는 순간</h2><span class="meta" id="linMeta"></span></div>
+      <div class="sum three">
+        <div class="stat"><span class="lab">가장 가까이 지나간 시각 t₀</span><b id="t0Out">—</b></div>
+        <div class="stat"><span class="lab">가장 가까운 거리 d</span><b id="dOut">—</b></div>
+        <div class="stat"><span class="lab">맞춤 곡선과의 차이 (RMS)</span><b id="rmsOut">—</b></div>
+      </div>
+      <ul class="nlist">
+        <li><b>f₁, f₂</b> = 음원이 아주 멀리 있을 때의 진동수 · 맞춤 곡선의 양 끝 값</li>
+        <li><b>d</b> = 진동수가 바뀌는 빠르기로 추정한 값 · 줄자로 잰 거리와 비교해 보세요</li>
+        <li><b>±</b> = 곡선 맞춤의 표준오차</li>
+      </ul>
+    </div>
+
+    <div class="block" id="circBlock">
       <div class="blockhd"><h2>바퀴별 측정값</h2><span class="meta" id="tblMeta"></span></div>
       <div class="twrap">
         <table class="rt">
@@ -375,13 +414,13 @@ table.rt{width:100%;border-collapse:collapse;font-size:14px;background:var(--pap
 "use strict";
 (() => {
 const $ = (s) => document.querySelector(s), $$ = (s) => [...document.querySelectorAll(s)];
-const COL = { ink:"#141922", body:"#3e4653", muted:"#7b8492", faint:"#a6adb9", rule:"#dde2ea", soft:"#ebeef3", blue:"#2b57b5", red:"#d13c36", selFill:"rgba(43,87,181,.10)", paper:"#ffffff" };
+const COL = { ink:"#141922", body:"#3e4653", muted:"#7b8492", faint:"#a6adb9", rule:"#dde2ea", soft:"#ebeef3", blue:"#2b57b5", red:"#d13c36", selFill:"rgba(43,87,181,.10)", paper:"#ffffff", green:"#1b8358" };
 const MONO = '"IBM Plex Mono",ui-monospace,monospace';
 
-const S = { x:null, fs:0, name:"", demo:false, env:null, fpeak:0, track:null, sel:null, scopeT:null, showT:false, result:null, step:0, maxStep:0, drag:null };
+const S = { mode:"circular", x:null, fs:0, name:"", demo:false, env:null, fpeak:0, track:null, sel:null, scopeT:null, showT:false, result:null, step:0, maxStep:0, drag:null };
 
 // each step: [title, items]; an item is a list of parts — plain text, {b:"bold"}, {b:"..", c:"a"|"r"}, or {code:".."}
-const GUIDE = [
+const GUIDES = { circular: [
   ["녹음 파일을 엽니다", [
     ["다른 기기에서 ", {b:"2000~4000 Hz 사인파"}, "를 틀고 줄에 묶어 돌립니다"],
     ["휴대폰을 ", {b:"고정"}, "한 채 기본 녹음 앱으로 녹음합니다 · ", {b:"음성 강조·잡음 제거는 끄기"}],
@@ -402,7 +441,28 @@ const GUIDE = [
     [{b:"빨간 점", c:"r"}, " = 바퀴마다 진동수 최소 (후퇴, f₂)"],
     [{code:"v = c·(f₁ − f₂)/(f₁ + f₂)"}, " 로 계산 · 결과는 ", {b:"아래 표"}, "에서 확인"],
   ]],
-];
+], linear: [
+  ["녹음 파일을 엽니다", [
+    ["다른 기기에서 ", {b:"2000~4000 Hz 사인파"}, "를 틀고 카트에 싣거나 들고 ", {b:"일정한 속도"}, "로 움직입니다"],
+    ["휴대폰을 ", {b:"고정"}, "하고 음원이 그 ", {b:"옆을 가까이 지나가게"}, " 합니다 · ", {b:"음성 강조·잡음 제거는 끄기"}],
+    ["다가올 때부터 멀어진 뒤까지 ", {b:"3~10초"}, "로 잘라서 올립니다"],
+  ]],
+  ["분석할 구간을 고릅니다", [
+    ["그래프는 ", {b:"시간에 따른 소리 크기"}, "입니다 · 가장 큰 봉우리가 ", {b:"지나가는 순간"}],
+    ["봉우리의 ", {b:"앞과 뒤가 모두"}, " 들어가게 드래그합니다 · 출발·정지 순간은 빼기"],
+    ["구간은 ", {b:"3~10초"}, "가 가장 좋습니다 · 미리 잘라 둔 파일이면 ", {b:"전체 구간"}, " 그대로"],
+  ]],
+  ["시간에 따른 진동수를 확인합니다", [
+    ["다가올 때 ", {b:"진동수 ↑", c:"a"}, ", 지나간 뒤 ", {b:"진동수 ↓", c:"r"}],
+    ["직선 운동이면 그래프가 ", {b:"높은 값에서 낮은 값으로 한 번 내려가는"}, " 모양이어야 합니다"],
+    ["그래프를 ", {b:"클릭"}, "하면 그 시점의 실제 파형이 아래에 나옵니다"],
+  ]],
+  ["음원 속도를 계산합니다", [
+    ["측정한 진동수에 ", {b:"이론 곡선을 맞춰"}, " 양 끝 값을 찾습니다 (초록 띠)"],
+    [{b:"파란 점선", c:"a"}, " = 멀리서 다가올 때의 f₁ · ", {b:"빨간 점선", c:"r"}, " = 멀어진 뒤의 f₂"],
+    [{code:"v = c·(f₁ − f₂)/(f₁ + f₂)"}, " 로 계산 · 결과는 ", {b:"아래"}, "에서 확인"],
+  ]],
+] };
 function renderGuide(title, items){
   $("#gTitle").textContent = title;
   const ol = $("#gList"); ol.innerHTML = "";
@@ -416,7 +476,10 @@ function renderGuide(title, items){
     li.appendChild(span); ol.appendChild(li);
   }
 }
-const HINT = [null, "드래그해서 분석 구간 선택 · 클릭하면 그 시점 파형 보기", "클릭하면 그 시점의 실제 파형을 아래에서 보여줍니다", "파란 점 = 바퀴별 최댓값(접근) · 빨간 점 = 최솟값(후퇴)"];
+const HINTS = {
+  circular: [null, "드래그해서 분석 구간 선택 · 클릭하면 그 시점 파형 보기", "클릭하면 그 시점의 실제 파형을 아래에서 보여줍니다", "파란 점 = 바퀴별 최댓값(접근) · 빨간 점 = 최솟값(후퇴)"],
+  linear:   [null, "드래그해서 분석 구간 선택 · 클릭하면 그 시점 파형 보기", "클릭하면 그 시점의 실제 파형을 아래에서 보여줍니다", "검은 선 = 측정값 · 초록 띠 = 맞춤 곡선 · 세로 점선 = 가장 가까이 지나간 순간"],
+};
 
 // ---------- FFT & signal ----------
 const twCache = new Map();
@@ -491,7 +554,7 @@ async function track(x, fs, fp, winSec, onProgress){
   for (let j = 0; j < frames; j++) valid[j] = !edge[j] && mag[j] > 0.25*med ? 1 : 0;
   const f3 = Float64Array.from(f);
   for (let j = 1; j < frames-1; j++) if (valid[j-1] && valid[j] && valid[j+1]){ const a = [f[j-1], f[j], f[j+1]].sort((p,q) => p-q); f3[j] = a[1]; }
-  return { t, f:f3, valid, hop:hopSec };
+  return { t, f:f3, valid, hop:hopSec, win:winSec };
 }
 
 // ---------- analysis ----------
@@ -506,6 +569,7 @@ function analyzeSel(){
   if (vi.length < 10){ res.err = "선택 구간에 진동수가 잡힌 점이 너무 적습니다. 구간을 넓히거나 녹음 음량을 확인하세요."; S.result = res; return; }
   const fv = vi.map((j) => tr.f[j]), mean = fv.reduce((a,b) => a+b, 0)/fv.length;
   res.f0 = mean;
+  if (S.mode === "linear"){ S.result = analyzeLinear(tr, vi, ta, tb, mean); return; }
   const ser = new Float64Array(idx.length); let last = mean;
   idx.forEach((j, i) => { if (tr.valid[j]) last = tr.f[j]; ser[i] = last - mean; });
   const dt = tr.hop, maxLag = Math.min(Math.floor(5/dt), Math.floor(ser.length/2)), minLag = Math.ceil(0.25/dt);
@@ -536,6 +600,69 @@ function analyzeSel(){
     Object.assign(res, { f1:q(0.97), f2:q(0.03), sf1:NaN, sf2:NaN, method:"상·하위 3% 값", noRot:true });
   }
   S.result = res;
+}
+
+// Straight-line pass at constant speed v, closest distance d at time t0:
+//   f(t) = f0 / (1 + β·s),  β = v/c,  s = u/√(u² + τ²),  u = t − t0,  τ = d/v
+// so 1/f is linear in s. Search (t0, τ) on a grid, solve the linear part exactly, then refine.
+function inv4(A){
+  const n = 4, M = A.map((r, i) => [...r, ...[0,1,2,3].map((k) => k === i ? 1 : 0)]);
+  for (let c = 0; c < n; c++){
+    let p = c; for (let r = c+1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+    if (Math.abs(M[p][c]) < 1e-300) return null;
+    [M[c], M[p]] = [M[p], M[c]];
+    const d = M[c][c]; for (let k = 0; k < 2*n; k++) M[c][k] /= d;
+    for (let r = 0; r < n; r++) if (r !== c){ const f = M[r][c]; if (f) for (let k = 0; k < 2*n; k++) M[r][k] -= f*M[c][k]; }
+  }
+  return M.map((r) => r.slice(n));
+}
+function analyzeLinear(tr, vi, ta, tb, fm){
+  const n = vi.length, T = new Float64Array(n), Z = new Float64Array(n);
+  let sz = 0, szz = 0;
+  for (let i = 0; i < n; i++){ T[i] = tr.t[vi[i]]; Z[i] = fm/tr.f[vi[i]] - 1; sz += Z[i]; szz += Z[i]*Z[i]; }
+  const solve = (t0, tau) => {
+    let ss = 0, sss = 0, ssz = 0;
+    for (let i = 0; i < n; i++){ const u = T[i] - t0, s = u/Math.sqrt(u*u + tau*tau); ss += s; sss += s*s; ssz += s*Z[i]; }
+    const den = n*sss - ss*ss; if (den < 1e-9*n*n) return null;
+    const b = (n*ssz - ss*sz)/den, a = (sz - b*ss)/n;
+    if (!(b > 0)) return null;
+    return { t0, tau, a, b, sse: szz - a*sz - b*ssz };
+  };
+  const span = tb - ta; let best = null;
+  const tryIt = (t0, tau) => { const r = solve(t0, tau); if (r && (!best || r.sse < best.sse)) best = r; };
+  for (let i = 0; i <= 80; i++) for (let k = 0; k <= 40; k++) tryIt(ta - 0.2*span + 1.4*span*i/80, 0.02*Math.pow(1000, k/40));
+  if (!best) return { f0:fm, err:"진동수가 높았다가 낮아지는 모양을 찾지 못했습니다. 음원이 휴대폰 옆을 지나가는 구간을 골랐는지 확인하세요." };
+  let dT = 1.4*span/80, dL = Math.log(1000)/40;
+  for (let round = 0; round < 4; round++){
+    const c0 = best.t0, l0 = Math.log(best.tau);
+    for (let i = -10; i <= 10; i++) for (let k = -10; k <= 10; k++) tryIt(c0 + dT*i/10, Math.exp(l0 + dL*k/10));
+    dT /= 8; dL /= 8;
+  }
+  const { t0, tau, a, b } = best;
+  const sOf = (t) => { const u = t - t0; return u/Math.sqrt(u*u + tau*tau); };
+  const fit = (t) => fm/(1 + a + b*sOf(t));
+  let sse = 0, sqHz = 0, sMin = Infinity, sMax = -Infinity;
+  const A = [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]];
+  for (let i = 0; i < n; i++){
+    const u = T[i] - t0, q = Math.pow(u*u + tau*tau, 1.5), s = sOf(T[i]), e = Z[i] - a - b*s;
+    sse += e*e; sqHz += (tr.f[vi[i]] - fit(T[i]))**2; sMin = Math.min(sMin, s); sMax = Math.max(sMax, s);
+    const g = [1, s, -b*tau*tau/q, -b*u*tau/q];
+    for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) A[r][k] += g[r]*g[k];
+  }
+  const beta = b/(1 + a), f0 = fm/(1 + a), f1 = fm/(1 + a - b), f2 = fm/(1 + a + b);
+  let sbeta = NaN, sf1 = NaN, sf2 = NaN;
+  const C = n > 8 ? inv4(A) : null;
+  if (C){
+    // neighbouring frequency points share most of their analysis window, so they are not independent
+    const sig2 = sse/(n - 4)*Math.max(1, (tr.win || 0.1)/tr.hop);
+    const ga = -b/((1 + a)*(1 + a)), gb = 1/(1 + a);
+    const vb = sig2*(ga*ga*C[0][0] + gb*gb*C[1][1] + 2*ga*gb*C[0][1]);
+    const v1 = sig2*(C[0][0] + C[1][1] - 2*C[0][1]), v2 = sig2*(C[0][0] + C[1][1] + 2*C[0][1]);
+    if (vb > 0) sbeta = Math.sqrt(vb);
+    if (v1 > 0) sf1 = f1*f1/fm*Math.sqrt(v1);
+    if (v2 > 0) sf2 = f2*f2/fm*Math.sqrt(v2);
+  }
+  return { linear:true, f0, f1, f2, sf1, sf2, beta, sbeta, t0, tau, rms:Math.sqrt(sqHz/n), sMin, sMax, fit, method:"곡선 맞춤" };
 }
 
 // ---------- canvas helpers ----------
@@ -595,12 +722,20 @@ function drawTrack(withExtremes){
   if (!vals.length){ axes(ctx, w, h, ta, tb, 0, 1, ""); CAN._map = null; return; }
   vals.sort((a,b) => a-b);
   let y0 = vals[Math.floor(vals.length*0.005)], y1 = vals[Math.ceil(vals.length*0.995) - 1];
+  if (withExtremes && r.linear){ // keep both end values of the fitted curve in view
+    for (const f of [r.f1, r.f2]) if (Number.isFinite(f) && Math.abs(f - r.f0) < 0.2*r.f0){ y0 = Math.min(y0, conv(f)); y1 = Math.max(y1, conv(f)); }
+  }
   const pad = Math.max((y1 - y0)*0.18, S.showT ? 2 : 0.5); y0 -= pad; y1 += pad;
   const { X, Y, P } = axes(ctx, w, h, ta, tb, y0, y1, S.showT ? "주기 T (μs)" : "진동수 f (Hz)");
   ctx.save(); ctx.beginPath(); ctx.rect(P.l, P.t, w - P.l - P.r, h - P.t - P.b); ctx.clip();
   if (withExtremes){
     const hl = (f, col) => { if (!Number.isFinite(f)) return; ctx.strokeStyle = col; ctx.setLineDash([6,4]); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(P.l, Y(conv(f))); ctx.lineTo(w - P.r, Y(conv(f))); ctx.stroke(); ctx.setLineDash([]); };
     hl(r.f0, COL.faint); hl(r.f1, COL.blue); hl(r.f2, COL.red);
+    if (r.linear){
+      ctx.strokeStyle = COL.green; ctx.lineWidth = 5; ctx.globalAlpha = 0.45; ctx.lineJoin = "round"; ctx.beginPath();
+      for (let k = 0; k <= 300; k++){ const t = ta + (tb - ta)*k/300, x = X(t), y = Y(conv(r.fit(t))); if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
+      ctx.stroke(); ctx.globalAlpha = 1;
+    }
   }
   ctx.strokeStyle = COL.ink; ctx.lineWidth = 1.5; ctx.lineJoin = "round"; ctx.beginPath();
   let pen = false;
@@ -613,16 +748,22 @@ function drawTrack(withExtremes){
   if (withExtremes){
     const dot = (p, col) => { ctx.fillStyle = col; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X(p.t), Y(conv(p.f)), 5.5, 0, Math.PI*2); ctx.fill(); ctx.stroke(); };
     (r.maxes || []).forEach((p) => dot(p, COL.blue)); (r.mins || []).forEach((p) => dot(p, COL.red));
+    if (r.linear){
+      if (r.t0 >= ta && r.t0 <= tb){ ctx.strokeStyle = COL.muted; ctx.lineWidth = 1; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(X(r.t0), P.t); ctx.lineTo(X(r.t0), h - P.b); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = COL.muted; ctx.font = `600 11px ${MONO}`; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText("t₀", X(r.t0) + 5, P.t + 4); }
+    }
   }
   if (S.step === 2 && S.scopeT != null && S.scopeT >= ta && S.scopeT <= tb){ ctx.strokeStyle = COL.muted; ctx.lineWidth = 1; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(X(S.scopeT), P.t); ctx.lineTo(X(S.scopeT), h - P.b); ctx.stroke(); ctx.setLineDash([]); }
   ctx.restore();
   if (withExtremes && w > 520){
     ctx.font = `600 11px ${MONO}`; ctx.textBaseline = "bottom"; ctx.textAlign = "right";
     let xx = w - P.r;
-    for (const [c, t] of [[COL.red, "f₂ 후퇴"], [COL.blue, "f₁ 접근"], [COL.faint, "f₀ 평균"]]){
+    const items = r.linear ? [[COL.green, "맞춤 곡선", true], [COL.red, "f₂ 후퇴"], [COL.blue, "f₁ 접근"], [COL.faint, "f₀ 음원"]]
+                           : [[COL.red, "f₂ 후퇴"], [COL.blue, "f₁ 접근"], [COL.faint, "f₀ 평균"]];
+    for (const [c, t, solid] of items){
       ctx.fillStyle = c; ctx.fillText(t, xx, P.t - 12); const tw = ctx.measureText(t).width;
-      ctx.strokeStyle = c; ctx.setLineDash([5,3]); ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(xx - tw - 24, P.t - 17); ctx.lineTo(xx - tw - 6, P.t - 17); ctx.stroke(); ctx.setLineDash([]);
-      xx -= tw + 40; }
+      ctx.strokeStyle = c; ctx.setLineDash(solid ? [] : [5,3]); ctx.lineWidth = solid ? 5 : 1.6; ctx.globalAlpha = solid ? 0.45 : 1; ctx.beginPath(); ctx.moveTo(xx - tw - 24, P.t - 17); ctx.lineTo(xx - tw - 6, P.t - 17); ctx.stroke(); ctx.setLineDash([]);
+      ctx.globalAlpha = 1; xx -= tw + 40; }
   }
   CAN._map = { x0:ta, x1:tb, P, w };
 }
@@ -656,37 +797,59 @@ function render(){
 
 // ---------- results ----------
 const fmtF = (f) => Number.isFinite(f) ? f.toFixed(1) : "—";
+const pm = (x, d, unit) => { const lim = Math.pow(10, -d), u = unit ? " " + unit : ""; return x < lim/2 ? `± ${lim.toFixed(d)}${u} 미만` : `± ${x.toFixed(d)}${u}`; };
 function numInto(el, main, unit, pm){
   el.textContent = main;
   if (main === "—") return;
-  const sm = document.createElement("small"); sm.textContent = (pm ? `± ${pm} ` : "") + unit; el.appendChild(sm);
+  const sm = document.createElement("small"); sm.textContent = pm || unit; el.appendChild(sm);
 }
 function cell(tr, text, cls){ const td = document.createElement("td"); td.textContent = text; if (cls) td.className = cls; tr.appendChild(td); return td; }
 function renderResults(){
   const T = parseFloat($("#temp").value), c = Number.isFinite(T) ? 331.3 + 0.606*T : NaN;
   const r = S.result || {};
   const has = Number.isFinite(r.f1), hasSe = Number.isFinite(r.sf1) && Number.isFinite(r.sf2);
-  numInto($("#f1Out"), fmtF(r.f1), "Hz", hasSe ? r.sf1.toFixed(1) : null);
-  numInto($("#f2Out"), fmtF(r.f2), "Hz", hasSe ? r.sf2.toFixed(1) : null);
+  numInto($("#f1Out"), fmtF(r.f1), "Hz", hasSe ? pm(r.sf1, 1, "Hz") : null);
+  numInto($("#f2Out"), fmtF(r.f2), "Hz", hasSe ? pm(r.sf2, 1, "Hz") : null);
   numInto($("#dfOut"), has ? (r.f1 - r.f2).toFixed(1) : "—", "Hz");
   numInto($("#f0Out"), fmtF(r.f0), "Hz");
   const [ta, tb] = selRange();
-  $("#resMeta").textContent = `구간 ${ta.toFixed(2)}–${tb.toFixed(2)} s` + (r.rot ? ` · 회전 주기 ${r.rot.toFixed(3)} s` : "") + ` · ${r.method || "—"}`;
+  $("#resMeta").textContent = `구간 ${ta.toFixed(2)}–${tb.toFixed(2)} s` + (r.rot && S.mode !== "linear" ? ` · 회전 주기 ${r.rot.toFixed(3)} s` : "") + ` · ${r.method || "—"}`;
+  const lin = S.mode === "linear";
+  $("#l1").textContent = lin ? "f₁ 접근 (멀리서 다가올 때)" : "f₁ 접근 (최댓값 평균)";
+  $("#l2").textContent = lin ? "f₂ 후퇴 (멀어진 뒤)" : "f₂ 후퇴 (최솟값 평균)";
+  $("#l0").textContent = lin ? "f₀ 음원 진동수 (맞춤값)" : "f₀ 전체 평균";
+  $("#circBlock").hidden = lin; $("#linBlock").hidden = !lin;
   let v = NaN;
   const sig = $("#vSig");
   if (has && Number.isFinite(c)){
     v = c*(r.f1 - r.f2)/(r.f1 + r.f2); $("#vMain").textContent = v.toFixed(2);
-    if (hasSe){ const sv = 2*c*Math.sqrt((r.f2*r.sf1)**2 + (r.f1*r.sf2)**2)/(r.f1 + r.f2)**2; sig.textContent = `± ${sv.toFixed(2)} m/s`; sig.className = "pm"; }
-    else { sig.textContent = "회전 주기를 찾지 못해 불확도는 생략했습니다"; sig.className = "pm q"; }
+    const sv = lin ? c*r.sbeta : hasSe ? 2*c*Math.sqrt((r.f2*r.sf1)**2 + (r.f1*r.sf2)**2)/(r.f1 + r.f2)**2 : NaN;
+    if (Number.isFinite(sv)){ sig.textContent = pm(sv, 2, "m/s"); sig.className = "pm"; }
+    else { sig.textContent = lin ? "불확도는 계산하지 못했습니다" : "회전 주기를 찾지 못해 불확도는 생략했습니다"; sig.className = "pm q"; }
     $("#calcLine").textContent = `v = c·(f₁ − f₂)/(f₁ + f₂) = ${c.toFixed(1)} × (${r.f1.toFixed(1)} − ${r.f2.toFixed(1)}) / (${r.f1.toFixed(1)} + ${r.f2.toFixed(1)}) = ${v.toFixed(2)} m/s  (음속 c, ${T} °C)`;
   } else {
     $("#vMain").textContent = "—"; sig.textContent = Number.isFinite(c) ? "" : "실내 온도를 입력하세요"; sig.className = "pm q";
     $("#calcLine").textContent = "—";
   }
   const warn = $("#resWarn");
-  const msg = r.err || (r.noRot ? "회전 주기를 찾지 못했습니다. 원운동이 아니거나 구간에 2바퀴 미만이 들어 있습니다. 상·하위 3% 값으로 대신 계산했습니다."
-    : (has && r.f1 - r.f2 < 2 ? "Δf가 매우 작습니다. 음원 진동수를 2000~4000 Hz로 올리거나 더 빠르게 돌려 보세요." : ""));
+  let msg = r.err || "";
+  if (!msg && lin && has){
+    if (r.sMax < 0.7 || r.sMin > -0.7) msg = (r.sMin > -0.7 ? "다가오는 구간" : "멀어지는 구간") + "이 충분히 들어 있지 않습니다. 지나가기 전부터 지나간 뒤까지 넓게 고르면 더 정확합니다.";
+    else if (r.f1 - r.f2 < 2) msg = "Δf가 매우 작습니다. 음원 진동수를 2000~4000 Hz로 올리거나 더 빠르게 움직여 보세요.";
+    else if (r.rms > 0.25*(r.f1 - r.f2)) msg = "측정값이 맞춤 곡선에서 많이 벗어납니다. 속도가 일정하지 않았거나 잡음·반사음이 섞였을 수 있습니다.";
+  } else if (!msg && !lin){
+    msg = r.noRot ? "회전 주기를 찾지 못했습니다. 원운동이 아니거나 구간에 2바퀴 미만이 들어 있습니다. 상·하위 3% 값으로 대신 계산했습니다. 직선으로 지나가는 실험이면 위에서 '직선 운동'을 고르세요."
+      : (has && r.f1 - r.f2 < 2 ? "Δf가 매우 작습니다. 음원 진동수를 2000~4000 Hz로 올리거나 더 빠르게 돌려 보세요." : "");
+  }
   warn.hidden = !msg; warn.textContent = msg;
+  if (lin){
+    const ok = r.linear && Number.isFinite(c);
+    numInto($("#t0Out"), ok ? r.t0.toFixed(2) : "—", "s");
+    numInto($("#dOut"), ok ? (v*r.tau).toFixed(2) : "—", "m");
+    numInto($("#rmsOut"), ok ? r.rms.toFixed(1) : "—", "Hz");
+    $("#linMeta").textContent = ok ? `d = v × ${r.tau.toFixed(3)} s` : "";
+    return;
+  }
   const body = $("#tbody"), foot = $("#tfoot"); body.innerHTML = ""; foot.innerHTML = "";
   if (r.maxes && r.maxes.length && Number.isFinite(c)){
     r.maxes.forEach((p, i) => { const q = r.mins[i], vv = c*(p.f - q.f)/(p.f + q.f);
@@ -696,9 +859,9 @@ function renderResults(){
       body.appendChild(tr); });
     const tr = document.createElement("tr");
     cell(tr, "평균"); cell(tr, "", "sl");
-    const c1 = cell(tr, r.f1.toFixed(1), "a"); if (hasSe){ const sm = document.createElement("small"); sm.textContent = `± ${r.sf1.toFixed(1)}`; c1.appendChild(sm); }
+    const c1 = cell(tr, r.f1.toFixed(1), "a"); if (hasSe){ const sm = document.createElement("small"); sm.textContent = pm(r.sf1, 1); c1.appendChild(sm); }
     cell(tr, "", "sl");
-    const c2 = cell(tr, r.f2.toFixed(1), "r"); if (hasSe){ const sm = document.createElement("small"); sm.textContent = `± ${r.sf2.toFixed(1)}`; c2.appendChild(sm); }
+    const c2 = cell(tr, r.f2.toFixed(1), "r"); if (hasSe){ const sm = document.createElement("small"); sm.textContent = pm(r.sf2, 1); c2.appendChild(sm); }
     cell(tr, (r.f1 - r.f2).toFixed(1), "sl"); cell(tr, Number.isFinite(v) ? v.toFixed(2) : "—", "v");
     foot.appendChild(tr);
     $("#tblMeta").textContent = `${r.maxes.length}바퀴`;
@@ -719,11 +882,11 @@ function setStep(n){
   S.step = n; S.maxStep = Math.max(S.maxStep, n);
   syncRail();
   ["open","sel","track","result"].forEach((k, i) => $("#p-" + k).classList.toggle("on", i === n));
-  $("#gNum").textContent = n + 1; renderGuide(GUIDE[n][0], GUIDE[n][1]);
+  $("#gNum").textContent = n + 1; renderGuide(GUIDES[S.mode][n][0], GUIDES[S.mode][n][1]);
   const loaded = !!S.x;
   $("#empty").hidden = loaded; CAN.hidden = !loaded; $("#console").hidden = !loaded; $("#stage").classList.toggle("solo", !loaded);
   $("#badge").hidden = !loaded;
-  setHint(loaded ? HINT[n] : null);
+  setHint(loaded ? HINTS[S.mode][n] : null);
   $("#resBlock").hidden = !(n === 3 && S.result);
   CAN.style.cursor = n === 1 ? "col-resize" : n === 2 ? "crosshair" : "default";
   if (n === 3) renderResults();
@@ -755,24 +918,35 @@ async function runTrack(){
   return true;
 }
 
+function updateLenInfo(){
+  const li = $("#lenInfo");
+  if (!S.x || S.demo){ li.hidden = true; return; }
+  const dur = totalDur(), d = dur.toFixed(1), lin = S.mode === "linear";
+  const say = (ok, t) => { li.className = "callout" + (ok ? " ok" : ""); li.textContent = t; };
+  li.hidden = false;
+  if (lin){
+    if (dur < 1.5) say(false, `녹음이 ${d}초로 너무 짧습니다. 다가올 때부터 멀어진 뒤까지 3~10초가 들어가게 다시 녹음하거나 덜 잘라 주세요.`);
+    else if (dur < 3) say(false, `녹음이 ${d}초입니다. 계산은 되지만 지나가기 전·후 구간이 짧아 오차가 커질 수 있습니다. 권장 길이는 3~10초입니다.`);
+    else if (dur <= 10) say(true, `녹음 길이 ${d}초 · 권장 길이(3~10초)입니다.`);
+    else if (dur <= 30) say(true, `녹음 길이 ${d}초 · 음원이 지나가는 순간의 앞뒤 3~10초 구간만 골라 주세요.`);
+    else say(false, `녹음이 ${d}초로 깁니다. 30초를 넘으면 진동수 계산 간격이 넓어져 정밀도가 떨어집니다. 지나가는 순간의 앞뒤 3~10초만 남기고 잘라서 다시 올리는 것을 권장합니다.`);
+  } else {
+    if (dur < 3) say(false, `녹음이 ${d}초로 너무 짧습니다. 회전이 최소 3바퀴 들어가도록 5~15초로 다시 녹음하거나 덜 잘라 주세요.`);
+    else if (dur < 5) say(false, `녹음이 ${d}초입니다. 계산은 되지만 바퀴 수가 적어 오차(±)가 커질 수 있습니다. 권장 길이는 5~15초입니다.`);
+    else if (dur <= 15) say(true, `녹음 길이 ${d}초 · 권장 길이(5~15초)입니다.`);
+    else if (dur <= 30) say(true, `녹음 길이 ${d}초 · 분석은 정밀하게 되지만, 회전이 일정한 5~15초 구간만 골라 주세요.`);
+    else say(false, `녹음이 ${d}초로 깁니다. 30초를 넘으면 진동수 계산 간격이 넓어져 정밀도가 떨어집니다. 회전이 일정한 5~15초만 남기고 잘라서 다시 올리는 것을 권장합니다.`);
+  }
+}
 function setAudio(x, fs, name, demo){
   job++; busy(false);
   S.x = x; S.fs = fs; S.name = name; S.demo = demo; S.env = envelope(x, fs);
-  S.sel = demo ? [2.2, 7.85] : null; S.scopeT = null; S.track = null; S.result = null; S.maxStep = 0;
+  S.sel = !demo ? null : S.mode === "linear" ? [0.4, 5.4] : [2.2, 7.85]; S.scopeT = null; S.track = null; S.result = null; S.maxStep = 0;
   $("#trackInfo").hidden = true;
-  const dur = x.length/fs, li = $("#lenInfo");
-  if (demo){ li.hidden = true; }
-  else {
-    li.hidden = false;
-    const d = dur.toFixed(1);
-    if (dur < 3){ li.className = "callout"; li.textContent = `녹음이 ${d}초로 너무 짧습니다. 회전이 최소 3바퀴 들어가도록 5~15초로 다시 녹음하거나 덜 잘라 주세요.`; }
-    else if (dur < 5){ li.className = "callout"; li.textContent = `녹음이 ${d}초입니다. 계산은 되지만 바퀴 수가 적어 오차(±)가 커질 수 있습니다. 권장 길이는 5~15초입니다.`; }
-    else if (dur <= 15){ li.className = "callout ok"; li.textContent = `녹음 길이 ${d}초 · 권장 길이(5~15초)입니다.`; }
-    else if (dur <= 30){ li.className = "callout ok"; li.textContent = `녹음 길이 ${d}초 · 분석은 정밀하게 되지만, 회전이 일정한 5~15초 구간만 골라 주세요.`; }
-    else { li.className = "callout"; li.textContent = `녹음이 ${d}초로 깁니다. 30초를 넘으면 진동수 계산 간격이 넓어져 정밀도가 떨어집니다. 회전이 일정한 5~15초만 남기고 잘라서 다시 올리는 것을 권장합니다.`; }
-  }
+  updateLenInfo();
   const badge = $("#badge"); badge.className = "badge" + (demo ? " demo" : "");
-  badge.textContent = demo ? "합성 예시 · 3000 Hz · 1.13초/바퀴 · 5.0 m/s" : `${name} · ${(x.length/fs).toFixed(2)} s · ${Math.round(fs)} Hz`;
+  badge.textContent = !demo ? `${name} · ${(x.length/fs).toFixed(2)} s · ${Math.round(fs)} Hz`
+    : S.mode === "linear" ? "합성 예시 · 3000 Hz · 가장 가까운 거리 0.50 m · 2.0 m/s" : "합성 예시 · 3000 Hz · 1.13초/바퀴 · 5.0 m/s";
   setStep(1);
 }
 
@@ -818,9 +992,47 @@ function makeDemo(){
   }
   return { x, fs };
 }
-function loadDemo(){ const d = makeDemo(); setAudio(d.x, d.fs, "합성 예시 녹음", true); }
+// synthetic demo: 3000 Hz source passing the mic in a straight line at 2.0 m/s, closest distance 0.50 m at t = 3 s.
+// The sound heard at time t left the source earlier, at te where t = te + r(te)/c.
+function makeDemoLinear(){
+  const fs = 48000, dur = 6, n = fs*dur, x = new Float32Array(n);
+  const c = 331.3 + 0.606*22, f0 = 3000, v = 2.0, d = 0.5, tp = 3.0;
+  let seed = 24680; const rnd = () => { seed = (seed*1664525 + 1013904223) >>> 0; return seed/4294967296; };
+  for (let i = 0; i < n; i++){
+    const t = i/fs; let te = t, r = d;
+    for (let k = 0; k < 4; k++){ r = Math.hypot(d, v*(te - tp)); te = t - r/c; }
+    const fade = t < 0.3 ? t/0.3 : t > dur - 0.5 ? Math.max(0, (dur - t)/0.5) : 1;
+    x[i] = fade*0.4*(d/r)*Math.sin(2*Math.PI*f0*te) + 0.03*(rnd() - 0.5);
+  }
+  return { x, fs };
+}
+function loadDemo(){ const d = S.mode === "linear" ? makeDemoLinear() : makeDemo(); setAudio(d.x, d.fs, "합성 예시 녹음", true); }
+
+function applyModeUI(){
+  const lin = S.mode === "linear";
+  $("#mCirc").setAttribute("aria-pressed", String(!lin)); $("#mLin").setAttribute("aria-pressed", String(lin));
+  $("#tipB").textContent = lin ? "권장 길이 3~10초" : "권장 길이 5~15초";
+  $("#tipT").textContent = lin ? " · 다가올 때부터 멀어진 뒤까지" : " · 회전이 일정한 부분만 남기기";
+}
+async function setMode(m){
+  if (m !== "linear" && m !== "circular" || m === S.mode) return;
+  S.mode = m; applyModeUI();
+  try { history.replaceState(null, "", "#" + m); } catch (e) {}
+  if (!S.x){ setStep(S.step); return; }
+  if (S.demo){ // the example recording belongs to its mode: swap it and come back to the same step
+    const prev = S.step; loadDemo();
+    if (prev >= 2 && await runTrack()){ S.maxStep = 3; setStep(prev); }
+    return;
+  }
+  updateLenInfo();
+  if (S.track) analyzeSel();
+  setStep(S.step);
+}
 
 // ---------- events ----------
+$("#mCirc").onclick = () => setMode("circular");
+$("#mLin").onclick = () => setMode("linear");
+window.addEventListener("hashchange", () => setMode((window.location.hash || "").slice(1)));
 $("#pick").onclick = $("#pick2").onclick = () => $("#file").click();
 $("#demo").onclick = $("#demo2").onclick = loadDemo;
 $("#resume").onclick = () => setStep(Math.max(1, S.maxStep));
@@ -889,6 +1101,8 @@ let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTime
 
 // open in a working state: the demo recording analysed through to the result
 (async () => {
+  if (window.location && window.location.hash === "#linear") S.mode = "linear";
+  applyModeUI();
   setStep(0);
   loadDemo();
   if (await runTrack()){ S.maxStep = 3; setStep(3); }
