@@ -41,7 +41,11 @@ h1 span { color: var(--accent); }
 .main { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 20px; align-items: start; }
 .stage { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--bg); min-width: 0; }
 canvas { display: block; width: 100%; height: auto; max-width: 100%; touch-action: manipulation; }
-#cv { aspect-ratio: 820 / 700; }
+#cv { aspect-ratio: 820 / 700; touch-action: none; cursor: grab; }
+#cv.dragging { cursor: grabbing; }
+.simstage { position: relative; }
+.viewchip { position: absolute; top: 12px; right: 12px; font: inherit; font-size: 14px; font-weight: 500; color: var(--muted); background: rgba(255,255,255,.92); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; pointer-events: none; }
+.viewchip.reset { pointer-events: auto; cursor: pointer; color: var(--ink); }
 #pcv { aspect-ratio: 1 / 1; }
 
 .tabs { display: inline-grid; grid-auto-flow: column; gap: 4px; padding: 4px; background: var(--soft); border: 1px solid var(--line); border-radius: 12px; justify-self: start; }
@@ -170,7 +174,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
   <h1>원운동의 그림자는 <span>단진동</span>이다</h1>
 
   <div class="main">
-    <div class="stage"><canvas id="cv" width="820" height="700" aria-label="원운동과 그림자, 용수철 진자 시뮬레이션. 램프의 스위치를 눌러 빛을 켭니다."></canvas></div>
+    <div class="stage simstage"><canvas id="cv" width="820" height="700" aria-label="원운동과 그림자, 용수철 진자 시뮬레이션. 램프의 스위치를 눌러 빛을 켜고, 드래그해서 보는 방향을 바꿉니다."></canvas><button type="button" class="viewchip" id="viewChip" tabindex="-1">드래그해서 시점 돌리기</button></div>
 
     <aside class="panel">
       <div class="sec">
@@ -342,16 +346,32 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
   const SLAB_Y = HS_Y - 18;
   const GLEN = 190, GSPD = 45;           // graph length and scroll speed (world units, units/s)              // table top under the horizontal mass
 
-  // ---------- camera: upper-left front, about 30° off the disk normal ----------
-  const AL = 22 * Math.PI / 180, BE = 21 * Math.PI / 180, DIST = 1800;
-  const CAM = [-Math.sin(AL) * Math.cos(BE) * DIST, Math.sin(BE) * DIST, Math.cos(AL) * Math.cos(BE) * DIST];
+  // ---------- camera: starts upper-left front, about 30° off the disk normal; drag to orbit ----------
+  // al: turn toward the left side (90° = looking along +x), be: tilt from above (90° = looking straight down)
+  const DEG = Math.PI / 180, DIST = 1800;
+  const CAM0 = { al: 22 * DEG, be: 21 * DEG };
+  const cam = { al: CAM0.al, be: CAM0.be };
   const norm = v => { const l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; };
   const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
   const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
-  const F = norm([-CAM[0], -CAM[1], -CAM[2]]);
-  const R = norm(cross(F, [0, 1, 0]));
-  const U = cross(R, F);
+  let CAM, F, R, U;
   const Z = { k: 1, ox: 0, oy: 0 };
+  function setCamera() {
+    const be = Math.min(cam.be, 89.9 * DEG);
+    const lift = Math.min(1, Math.max(0, (cam.be - 70 * DEG) / (18 * DEG)));
+    const al = cam.al * (1 - lift * lift * (3 - 2 * lift));   // looking straight down: x-axis lies across the screen
+    CAM = [-Math.sin(al) * Math.cos(be) * DIST, Math.sin(be) * DIST, Math.cos(al) * Math.cos(be) * DIST];
+    F = norm([-CAM[0], -CAM[1], -CAM[2]]);
+    R = norm(cross(F, [0, 1, 0]));
+    U = cross(R, F);
+    autofit();
+  }
+  // how far the view is from edge-on to the circle: 1 = normal, 0 = looking along the plane of motion.
+  // Near edge-on everything but the circle fades out (lamps first of all, which would sit in front of it).
+  function sceneVis() {
+    const e = Math.abs(F[2]), t = Math.min(1, Math.max(0, (e - 0.1) / 0.25));
+    return t * t * (3 - 2 * t);
+  }
   function P(x, y, z) {
     const d = [x - CAM[0], y - CAM[1], z - CAM[2]];
     const vz = dot(d, F), s = DIST / vz * Z.k;
@@ -360,19 +380,29 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
   const depth = (x, y, z) => dot([x - CAM[0], y - CAM[1], z - CAM[2]], F);
   const facing = (n, c) => dot(n, [CAM[0] - c[0], CAM[1] - c[1], CAM[2] - c[2]]) > 0;
 
-  // fit the whole set into the canvas once
-  (function autofit() {
-    const pts = [[-292, -185, -12], [-292, 185, 44], [-185, 281, -12], [185, 281, 44], [292, 190, 60], [292, -190, -40],
+  // fit the whole set into the canvas (again whenever the view turns)
+  function autofit() {
+    const full = [[-292, -185, -12], [-292, 185, 44], [-185, 281, -12], [185, 281, 44], [292, 190, 60], [292, -190, -40],
       [430, 256, 54], [430, -200, 12], [-244, SLAB_Y - 10, 54], [-380, -330, -30], [190, FLR_Y - 12, 60], [190, FLR_Y, -40], [110, SLAB_Y - 10, 54],
       [VS_X + GLEN + 50, 190, ZB], [VS_X + GLEN + 50, -190, ZB], [-150, HS_Y - 50 - GLEN, ZB], [150, HS_Y - 50 - GLEN, ZB]];
-    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
-    for (const p of pts) { const q = P(...p); x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y); }
-    const padL = 24, padR = 24, padT = 96, padB = 24;
-    const k = Math.min((W - padL - padR) / (x1 - x0), (H - padT - padB) / (y1 - y0));
-    Z.k = k;
-    Z.ox = padL - x0 * k + ((W - padL - padR) - (x1 - x0) * k) / 2;
-    Z.oy = padT - y0 * k + ((H - padT - padB) - (y1 - y0) * k) / 2;
-  })();
+    // only the circle: what stays on screen when the view is edge-on
+    const disk = [];
+    for (let i = 0; i < 16; i++) {
+      const t = i / 16 * Math.PI * 2, c = Math.cos(t) * (DISK_R + 10), s = Math.sin(t) * (DISK_R + 10);
+      disk.push([c, s, DISK_B], [c, s, ZB + BALL]);
+    }
+    const fitTo = (pts, padL, padR, padT, padB) => {
+      Z.k = 1; Z.ox = 0; Z.oy = 0;                     // measure in raw projected units
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+      for (const p of pts) { const q = P(...p); x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y); }
+      const k = Math.min((W - padL - padR) / Math.max(x1 - x0, 1e-6), (H - padT - padB) / Math.max(y1 - y0, 1e-6));
+      return { k, ox: padL - x0 * k + ((W - padL - padR) - (x1 - x0) * k) / 2, oy: padT - y0 * k + ((H - padT - padB) - (y1 - y0) * k) / 2 };
+    };
+    const a = fitTo(full, 24, 24, 96, 24), b = fitTo(disk, 150, 150, 120, 120), v = sceneVis();
+    // blend toward framing just the circle as the rest fades out
+    Z.k = b.k + (a.k - b.k) * v; Z.ox = b.ox + (a.ox - b.ox) * v; Z.oy = b.oy + (a.oy - b.oy) * v;
+  }
+  setCamera();
 
   // ---------- state ----------
   const st = { A: 8, w: 1.5, theta: 0, running: true, side: false, top: false, sideA: 0, topA: 0, vecR: false, vecV: false, vecA: false, rA: 0, vA: 0, aA: 0, t: 0, hist: [] };
@@ -419,8 +449,47 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     }
     return null;
   }
-  cv.addEventListener('click', e => { const h = hit(e); if (h) st[h] = !st[h]; });
-  cv.addEventListener('mousemove', e => { cv.style.cursor = hit(e) ? 'pointer' : 'default'; });
+  let drag = null, dragged = false, lampVis = 1, tween = null;
+  const chip = $('viewChip');
+  function viewChanged() {
+    const changed = Math.abs(cam.al - CAM0.al) > 0.5 * DEG || Math.abs(cam.be - CAM0.be) > 0.5 * DEG;
+    chip.textContent = changed ? '기본 시점' : '드래그해서 시점 돌리기';
+    chip.classList.toggle('reset', changed);
+    chip.tabIndex = changed ? 0 : -1;
+  }
+  cv.addEventListener('pointerdown', e => {
+    if (lampVis > 0.5 && hit(e)) return;
+    tween = null;
+    drag = { x: e.clientX, y: e.clientY, al: cam.al, be: cam.be };
+    dragged = false;
+    cv.setPointerCapture(e.pointerId);
+    cv.classList.add('dragging');
+  });
+  cv.addEventListener('pointermove', e => {
+    if (!drag) { cv.style.cursor = lampVis > 0.5 && hit(e) ? 'pointer' : ''; return; }
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (Math.hypot(dx, dy) > 3) dragged = true;
+    let al = drag.al + dx * 0.007, be = drag.be + dy * 0.007;
+    al = Math.max(-15 * DEG, Math.min(90 * DEG, al));
+    be = Math.max(0, Math.min(90 * DEG, be));
+    // settle exactly edge-on when close: straight from the side or straight from above
+    if (al > 86 * DEG) al = 90 * DEG;
+    if (be > 86 * DEG) be = 90 * DEG;
+    cam.al = al; cam.be = be;
+    setCamera(); viewChanged();
+  });
+  const endDrag = () => { drag = null; cv.classList.remove('dragging'); };
+  cv.addEventListener('pointerup', endDrag);
+  cv.addEventListener('pointercancel', endDrag);
+  cv.addEventListener('click', e => {
+    if (dragged) { dragged = false; return; }
+    const h = lampVis > 0.5 && hit(e); if (h) st[h] = !st[h];
+  });
+  function resetView() {
+    tween = { t0: performance.now(), al: cam.al, be: cam.be };
+  }
+  cv.addEventListener('dblclick', resetView);
+  chip.addEventListener('click', resetView);
 
   const layer = document.createElement('canvas');
   const lctx = layer.getContext('2d');
@@ -676,7 +745,8 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
   function draw() {
     const Rr = st.A * PX;
     const bx = Rr * Math.cos(st.theta), by = Rr * Math.sin(st.theta);
-    const sa = st.sideA, ta = st.topA;
+    const vis = sceneVis(); lampVis = vis;
+    const sa = st.sideA * vis, ta = st.topA * vis;
     ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
 
@@ -730,8 +800,12 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     }
 
     // --- floor screen
-    box(-190, 190, FLR_Y - 12, FLR_Y, -40, 60, [240, 242, 245], { face: { '+y': '#f4f5f8' }, edge: '#dcdfe5' });
-    const fl = P(-190, FLR_Y - 6, 60); label('스크린', fl.x - 10, fl.y, 'right');
+    if (vis > 0.01) {
+      ctx.globalAlpha = vis;
+      box(-190, 190, FLR_Y - 12, FLR_Y, -40, 60, [240, 242, 245], { face: { '+y': '#f4f5f8' }, edge: '#dcdfe5' });
+      const fl = P(-190, FLR_Y - 6, 60); label('스크린', fl.x - 10, fl.y, 'right');
+      ctx.globalAlpha = 1;
+    }
     if (ta > 0.01) {
       ctx.globalAlpha = ta;
       poly([P(-HALF, FLR_Y, BZ0), P(HALF, FLR_Y, BZ0), P(HALF, FLR_Y, BZ1), P(-HALF, FLR_Y, BZ1)], 'rgba(255, 208, 96, 0.6)');
@@ -787,8 +861,12 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     }
 
     // --- right screen
-    box(SCR_X, SCR_X + 12, -190, 190, -40, 60, [240, 242, 245], { face: { '-x': '#f4f5f8' }, edge: '#dcdfe5' });
-    const sl = P(SCR_X + 6, -190, 60); label('스크린', sl.x, sl.y + 18, 'center');
+    if (vis > 0.01) {
+      ctx.globalAlpha = vis;
+      box(SCR_X, SCR_X + 12, -190, 190, -40, 60, [240, 242, 245], { face: { '-x': '#f4f5f8' }, edge: '#dcdfe5' });
+      const sl = P(SCR_X + 6, -190, 60); label('스크린', sl.x, sl.y + 18, 'center');
+      ctx.globalAlpha = 1;
+    }
     if (sa > 0.01) {
       ctx.globalAlpha = sa;
       poly([P(SCR_X - 0.5, -HALF, BZ0), P(SCR_X - 0.5, HALF, BZ0), P(SCR_X - 0.5, HALF, BZ1), P(SCR_X - 0.5, -HALF, BZ1)], 'rgba(255, 208, 96, 0.6)');
@@ -827,11 +905,13 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     ctx.strokeStyle = C.ink; ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore();
     const th = ((st.theta % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
     const arc = []; for (let i = 0; i <= 40; i++) { const t = th * i / 40; arc.push(P(30 * Math.cos(t), 30 * Math.sin(t), DISK_F)); }
+    ctx.globalAlpha = vis;
     path(ctx, arc, false); ctx.strokeStyle = C.accent; ctx.lineWidth = 2; ctx.stroke();
     const wl = P(44 * Math.cos(th / 2), 44 * Math.sin(th / 2), DISK_F);
     label('ωt', wl.x, wl.y, 'center', C.accent, 16, 700);
     const xl = P(DISK_R - 2, 12, DISK_F), yl = P(12, DISK_R - 2, DISK_F);
     label('x', xl.x, xl.y, 'center'); label('y', yl.x, yl.y, 'center');
+    ctx.globalAlpha = 1;
 
     // --- light sheets
     lctx.clearRect(0, 0, W, H);
@@ -844,7 +924,7 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     const pin = P(0, 0, DISK_F);
     ctx.fillStyle = C.ink; ctx.beginPath(); ctx.arc(pin.x, pin.y, 5 * pin.s, 0, Math.PI * 2); ctx.fill();
     const al = P(bx / 2 - 14 * Math.sin(st.theta), by / 2 + 14 * Math.cos(st.theta), DISK_F);
-    if (st.rA < 0.5) label('A', al.x, al.y, 'center', C.ink, 17, 700);
+    if (st.rA < 0.5) { ctx.globalAlpha = vis; label('A', al.x, al.y, 'center', C.ink, 17, 700); ctx.globalAlpha = 1; }
     ctx.save(); ctx.shadowColor = 'rgba(28,34,48,0.3)'; ctx.shadowBlur = 8;
     poly(ring([bx + 5, by - 7, DISK_F], [1, 0, 0], [0, 1, 0], 14, 24), 'rgba(28,34,48,0.16)');
     ctx.restore();
@@ -908,8 +988,12 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
 
     for (const f of late) f();
     ctx.globalAlpha = 1;
-    lampSide();
-    lampTop();
+    if (vis > 0.01) {
+      ctx.save(); ctx.globalAlpha = vis;
+      lampSide();
+      lampTop();
+      ctx.restore();
+    }
   }
 
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -930,6 +1014,13 @@ button:focus-visible, input:focus-visible, canvas:focus-visible { outline: 3px s
     st.rA += ((st.vecR ? 1 : 0) - st.rA) * k;
     st.vA += ((st.vecV ? 1 : 0) - st.vA) * k;
     st.aA += ((st.vecA ? 1 : 0) - st.aA) * k;
+    if (tween) {
+      const u = Math.min(1, (now - tween.t0) / 450), e = u * u * (3 - 2 * u);
+      cam.al = tween.al + (CAM0.al - tween.al) * e;
+      cam.be = tween.be + (CAM0.be - tween.be) * e;
+      setCamera(); viewChanged();
+      if (u >= 1) tween = null;
+    }
     if (!document.getElementById('viewSim').hidden) draw();
     requestAnimationFrame(loop);
   }
