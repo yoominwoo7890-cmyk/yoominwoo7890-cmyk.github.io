@@ -26,6 +26,8 @@
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   }
   .btn:hover { background: #f8f8f8; }
+  .btn:focus { outline: none; }
+  .btn.on:hover { background: #1f5f9e; }
   .btn:disabled { color: #bbb; cursor: default; background: #fff; }
   .btn svg { width: 16px; height: 16px; }
   .btn.on { background: #1f5f9e; border-color: #1f5f9e; color: #fff; }
@@ -57,6 +59,7 @@
     <div class="sp"></div>
     <button class="btn" id="add">+ 측정기</button>
     <button class="btn" id="snd" title="소리 켜기"></button>
+    <button class="btn" id="slow" title="천천히 보기">천천히</button>
     <button class="btn" id="play" title="일시정지"></button>
     <button class="btn" id="reset" title="처음으로">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8a5.5 5.5 0 1 0 1.7-4"/><path d="M2.5 2.5v3h3"/></svg>
@@ -604,6 +607,9 @@
   const ICON_PLAY = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 2.8v10.4c0 .6.6.9 1.1.6l8-5.2c.5-.3.5-.9 0-1.2l-8-5.2c-.5-.3-1.1 0-1.1.6z"/></svg>';
   function setPlay() { playBtn.innerHTML = running ? ICON_PAUSE : ICON_PLAY; playBtn.title = running ? '일시정지' : '재생'; }
   playBtn.addEventListener('click', () => { running = !running; setPlay(); });
+  let slow = false;
+  const slowBtn = document.getElementById('slow');
+  slowBtn.addEventListener('click', () => { slow = !slow; slowBtn.classList.toggle('on', slow); });
 
   // ---------- 소리 ----------
   const sndBtn = document.getElementById('snd');
@@ -706,7 +712,7 @@
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
-    if (running) step(dt);
+    if (running) step(dt * (slow ? 0.25 : 1));
     draw();
     syncSlider();
     updateSound();
