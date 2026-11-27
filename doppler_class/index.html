@@ -1,0 +1,1643 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<script>window.__DOPPLER_DEMO__ = false; window.DOPPLER_SUBMIT_URL = ""; window.DOPPLER_MIC_PAGE = "";</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: 참고 코드(운동 분석기)의 체계 — 흰 종이 + 회색 무대, 오른쪽 단계 레일, 단계별 콘솔, 아래 결과 블록.
+   의도적으로 밝은 단일 테마. 파랑 = 접근(청색편이), 빨강 = 후퇴(적색편이). */
+:root{
+  --paper:#ffffff;
+  --surface:#f7f8fa;
+  --surface2:#eef1f5;
+  --rule:#dde2ea;
+  --rule-soft:#ebeef3;
+  --ink:#141922;
+  --body:#3e4653;
+  --muted:#7b8492;
+  --faint:#a6adb9;
+  --red:#d13c36;
+  --red-soft:#fdf0ef;
+  --blue:#2b57b5;
+  --blue-soft:#eef2fb;
+  --blue-line:#d5dff5;
+  --green:#1b8358;
+  --green-soft:#edf7f2;
+  --amber-soft:#fdf6e8;
+  --amber-ink:#7d5606;
+  --ui:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,-apple-system,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  --shadow:0 1px 2px rgba(20,25,34,.04),0 4px 12px rgba(20,25,34,.05);
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+[hidden]{display:none!important}
+body{
+  margin:0;background:var(--paper);color:var(--body);font-family:var(--ui);
+  font-size:14.5px;line-height:1.6;-webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{color:var(--ink);margin:0}
+
+header{border-bottom:1px solid var(--rule);background:var(--paper)}
+.hd{max-width:1200px;margin:0 auto;padding-block:16px;
+  padding-left:max(22px,env(safe-area-inset-left,0px));padding-right:max(22px,env(safe-area-inset-right,0px))}
+.hdrow{display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap}
+.mode{display:inline-flex;align-items:center;gap:9px}
+.mode .k{font-weight:600}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:8px;overflow:hidden;background:var(--paper);box-shadow:var(--shadow)}
+.seg button{font-family:var(--ui);font-size:13.5px;font-weight:600;color:var(--body);background:none;border:0;padding:9px 16px;min-height:42px;cursor:pointer;transition:.13s;touch-action:manipulation}
+.seg button+button{border-left:1px solid var(--rule)}
+.seg button:hover{background:var(--surface)}
+.seg button[aria-pressed="true"]{background:var(--blue);color:#fff}
+.brand{display:flex;align-items:baseline;gap:11px;flex-wrap:wrap}
+.brand h1{font-size:19px;font-weight:700;letter-spacing:-.02em}
+.brand span{font-size:12.5px;color:var(--muted)}
+
+.shell{
+  display:grid;grid-template-columns:minmax(0,1fr) 220px;gap:26px;
+  max-width:1200px;margin:0 auto;align-items:start;padding-block:20px 90px;
+  padding-left:max(22px,env(safe-area-inset-left,0px));padding-right:max(22px,env(safe-area-inset-right,0px));
+}
+main{min-width:0}
+
+.rail{position:sticky;top:calc(env(safe-area-inset-top,0px) + 18px);display:flex;flex-direction:column;border-left:2px solid var(--rule)}
+.rail .rt{font-size:10.5px;font-weight:700;letter-spacing:.14em;color:var(--faint);padding:0 0 9px 16px;text-transform:uppercase}
+.rail button{
+  position:relative;display:flex;align-items:center;gap:11px;width:100%;
+  background:none;border:0;padding:12px 12px 12px 16px;cursor:pointer;text-align:left;
+  font-family:var(--ui);font-size:13.5px;font-weight:600;color:var(--faint);
+  transition:.15s;min-height:52px;border-radius:0 7px 7px 0;
+}
+.rail button::before{content:'';position:absolute;left:-2px;top:50%;transform:translateY(-50%);width:8px;height:1px;background:var(--rule);transition:.15s}
+.rail button b{
+  flex:0 0 auto;width:27px;height:27px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-size:11px;font-weight:600;border:1px solid var(--rule);color:var(--faint);background:var(--paper);transition:.15s;
+}
+.rail button:not(:disabled):hover{color:var(--body);background:var(--surface)}
+.rail button.done{color:var(--muted)}
+.rail button.done b{border-color:#bfd0ec;color:var(--blue);background:var(--blue-soft)}
+.rail button.on{color:var(--blue);background:var(--blue-soft)}
+.rail button.on b{background:var(--blue);border-color:var(--blue);color:#fff}
+.rail button.on::before{width:15px;height:3px;background:var(--blue);border-radius:2px}
+.rail button:disabled{opacity:.4;cursor:not-allowed}
+@media(max-width:900px){
+  .shell{grid-template-columns:minmax(0,1fr);gap:14px;padding-block:16px 80px;
+    padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .hd{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .rail{position:static;order:-1;flex-direction:row;overflow-x:auto;border-left:0;border-bottom:2px solid var(--rule)}
+  .rail::-webkit-scrollbar{height:0}
+  .rail .rt{display:none}
+  .rail button{flex:0 0 auto;width:auto;min-height:46px;border-radius:7px 7px 0 0;padding:8px 13px;font-size:13px}
+  .rail button::before{left:50%;top:auto;bottom:-2px;transform:translateX(-50%);width:8px;height:1px}
+  .rail button.on::before{width:100%;height:3px}
+}
+
+.guide{display:flex;gap:13px;align-items:flex-start;background:var(--blue-soft);border:1px solid var(--blue-line);border-radius:7px;padding:13px 15px;margin-bottom:16px}
+.guide .n{flex:0 0 auto;width:23px;height:23px;border-radius:50%;background:var(--blue);color:#fff;font-family:var(--mono);font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-top:2px}
+.guide strong{display:block;color:var(--ink);font-size:14.5px;font-weight:600;margin-bottom:1px}
+.guide strong{font-size:15px}
+.guide ol{margin:8px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px;counter-reset:g}
+.guide li{counter-increment:g;display:flex;gap:9px;align-items:flex-start;font-size:13.5px;color:var(--body);line-height:1.5}
+.guide li::before{content:counter(g);flex:0 0 auto;width:19px;height:19px;border-radius:5px;background:var(--paper);border:1px solid var(--blue-line);color:var(--blue);font-family:var(--mono);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.guide li b{color:var(--ink);font-weight:700}
+.guide li b.a{color:var(--blue)} .guide li b.r{color:var(--red)}
+.guide li code{font-family:var(--mono);font-size:12.5px;color:var(--ink);background:var(--paper);border:1px solid var(--blue-line);border-radius:4px;padding:0 5px}
+ul.nlist{margin:10px 0 0;padding:0 0 0 18px;display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);line-height:1.55}
+ul.nlist b{color:var(--body)}
+
+.stage{position:relative;background:var(--surface2);border:1px solid var(--rule);border-radius:8px 8px 0 0;overflow:hidden}
+.stage.solo{border-radius:8px}
+#mainCanvas{display:block;width:100%;touch-action:none;background:var(--paper)}
+.empty{
+  min-height:320px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;padding:28px;
+  background-image:linear-gradient(var(--rule-soft) 1px,transparent 1px),linear-gradient(90deg,var(--rule-soft) 1px,transparent 1px);
+  background-size:22px 22px;background-color:#fbfcfd;
+}
+.empty h3{font-size:17px;font-weight:700}
+.empty p{margin:0;font-size:13px;color:var(--muted);max-width:420px;line-height:1.6}
+.empty .row{justify-content:center}
+.empty.drag{background-color:var(--blue-soft)}
+.badge{position:absolute;top:10px;left:62px;font-family:var(--mono);font-size:11px;background:rgba(255,255,255,.94);border:1px solid var(--rule);color:var(--body);padding:3px 9px;border-radius:4px;pointer-events:none;box-shadow:var(--shadow);max-width:calc(100% - 80px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.badge.demo{border-color:#f0e3c2;background:var(--amber-soft);color:var(--amber-ink)}
+.hint{font-size:12.5px;background:var(--paper);border-top:1px solid var(--rule-soft);padding:8px 14px;color:var(--muted)}
+@media(max-width:600px){.hint{display:none}}
+.spin{position:absolute;inset:0;background:rgba(255,255,255,.9);display:none;align-items:center;justify-content:center;flex-direction:column;gap:11px;z-index:5}
+.spin.on{display:flex}
+.spin .t{font-size:13px;font-weight:600;color:var(--ink)}
+.bar{width:210px;max-width:70%;height:4px;background:var(--surface2);border-radius:2px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--blue);width:0%;transition:width .12s}
+
+.console{background:var(--surface);border:1px solid var(--rule);border-top:0;border-radius:0 0 8px 8px;padding:15px 16px}
+.panel{display:none;flex-direction:column;gap:13px}
+.panel.on{display:flex}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row.end{margin-top:2px;padding-top:12px;border-top:1px solid var(--rule-soft)}
+label.f{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--body);white-space:nowrap}
+.k{color:var(--muted);font-size:12.5px}
+
+button.b{
+  font-family:var(--ui);font-size:14px;font-weight:600;background:var(--paper);color:var(--ink);border:1px solid var(--rule);
+  padding:11px 17px;min-height:46px;border-radius:7px;cursor:pointer;transition:.13s;box-shadow:var(--shadow);touch-action:manipulation;
+}
+button.b:hover:not(:disabled){border-color:#c3cbd8;background:#fdfdfe}
+button.b:active:not(:disabled){transform:translateY(1px)}
+button.b:disabled{opacity:.4;cursor:not-allowed;box-shadow:none}
+button.b.pri{background:var(--blue);color:#fff;border-color:var(--blue)}
+button.b.pri:hover:not(:disabled){background:#2449a0;border-color:#2449a0}
+button.b.sm{font-size:13px;padding:8px 13px;min-height:40px}
+button.b.sm.sel{background:var(--ink);color:#fff;border-color:var(--ink)}
+input[type=number],input[type=text],select{
+  font-family:var(--mono);font-size:14px;background:var(--paper);color:var(--ink);
+  border:1px solid var(--rule);border-radius:6px;padding:10px 11px;width:96px;min-height:44px;
+}
+select{font-family:var(--ui);width:auto;min-width:150px;cursor:pointer}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.val{font-family:var(--mono);font-size:12.5px;color:var(--ink);font-variant-numeric:tabular-nums}
+.val.q{color:var(--muted)}
+.note{font-size:12.5px;color:var(--muted);line-height:1.55}
+.note b{color:var(--body)}
+.callout{font-size:12.5px;border-radius:6px;padding:9px 12px;line-height:1.55;background:var(--amber-soft);border:1px solid #f0e3c2;color:var(--amber-ink)}
+.callout.ok{background:var(--green-soft);border-color:#cfe8dd;color:#14663f}
+.grp{border:1px solid var(--rule);background:var(--paper);border-radius:6px;padding:10px 12px;display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.grp .tag{font-size:12px;color:var(--muted);font-weight:600;margin-right:2px}
+.adv{display:none;flex-direction:column;gap:11px;border-left:2px solid var(--rule);padding-left:12px;margin-left:2px}
+.adv.on{display:flex}
+button.link{background:none;border:0;box-shadow:none;padding:2px 0;cursor:pointer;font-family:var(--ui);font-size:12.5px;font-weight:600;color:var(--blue);align-self:flex-start}
+button.link:hover{text-decoration:underline}
+
+.block{margin-top:30px}
+.blockhd{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--rule);padding-bottom:8px;margin-bottom:12px}
+.blockhd h2{font-size:15px;font-weight:700;letter-spacing:-.01em}
+.blockhd .meta{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+
+.sum{background:var(--paper);border:1px solid var(--rule);border-radius:8px;box-shadow:var(--shadow);display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.5fr);overflow:hidden}
+.vbox{padding:20px 22px;display:flex;flex-direction:column;justify-content:center;gap:4px;border-right:1px solid var(--rule-soft)}
+.lab{font-size:12.5px;font-weight:600;color:var(--muted);display:flex;align-items:center;gap:7px}
+.vbox .big{display:flex;align-items:baseline;gap:8px}
+.vbox .big strong{font-family:var(--mono);font-size:46px;font-weight:500;color:var(--ink);line-height:1.1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.vbox .big span{font-size:15px;color:var(--muted)}
+.vbox .pm{font-family:var(--mono);font-size:13px;color:var(--body)}
+.vbox .pm.q{color:var(--muted);font-family:var(--ui);font-size:12.5px}
+.stats{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.stat{padding:15px 20px;display:flex;flex-direction:column;gap:3px;border-bottom:1px solid var(--rule-soft);min-width:0}
+.stat:nth-child(odd){border-right:1px solid var(--rule-soft)}
+.stat:nth-last-child(-n+2){border-bottom:0}
+.stat b{font-family:var(--mono);font-size:21px;font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.stat b small{font-size:12.5px;font-weight:400;color:var(--muted);margin-left:5px}
+.dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:var(--faint)}
+.dot.a{background:var(--blue)} .dot.r{background:var(--red)}
+.calc{grid-column:1/-1;border-top:1px solid var(--rule);background:var(--surface);padding:11px 20px;display:flex;gap:14px;align-items:baseline;overflow-x:auto}
+.calc .k{flex:0 0 auto;font-size:12px;font-weight:600}
+.calc code{font-family:var(--mono);font-size:13.5px;color:var(--ink);white-space:nowrap}
+@media(max-width:720px){
+  .sum{grid-template-columns:minmax(0,1fr)}
+  .vbox{border-right:0;border-bottom:1px solid var(--rule-soft)}
+  .stat{padding:13px 16px}
+  .calc{padding:11px 16px}
+}
+.sum.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.sum.three .stat{border-bottom:0;border-right:1px solid var(--rule-soft)}
+.sum.three .stat:last-child{border-right:0}
+@media(max-width:720px){
+  .sum.three{grid-template-columns:minmax(0,1fr)}
+  .sum.three .stat{border-right:0;border-bottom:1px solid var(--rule-soft)}
+  .sum.three .stat:last-child{border-bottom:0}
+}
+.a{color:var(--blue)!important} .r{color:var(--red)!important}
+
+.twrap{width:100%;overflow-x:auto;border:1px solid var(--rule);border-radius:8px;box-shadow:var(--shadow)}
+table.rt{width:100%;border-collapse:collapse;font-size:14px;background:var(--paper)}
+.rt th{font-family:var(--ui);font-size:12.5px;font-weight:600;color:var(--body);background:var(--surface);padding:9px 16px;text-align:right;white-space:nowrap}
+.rt th small{font-family:var(--mono);font-size:11px;font-weight:400;color:var(--muted);margin-left:4px}
+.rt thead tr:last-child th{border-bottom:1px solid var(--rule)}
+.rt thead tr.g th{padding-bottom:0;text-align:center}
+.rt thead tr.g th span{display:block;padding-bottom:6px;border-bottom:2px solid currentColor}
+.rt th.ga{color:var(--blue)} .rt th.gr{color:var(--red)}
+.rt td{font-family:var(--mono);padding:11px 16px;text-align:right;border-bottom:1px solid var(--rule-soft);color:var(--ink);white-space:nowrap;font-variant-numeric:tabular-nums}
+.rt th:first-child,.rt td:first-child{text-align:center;width:4.5em}
+.rt td:first-child{font-family:var(--ui);color:var(--muted)}
+.rt td.t{color:var(--muted)}
+.rt .sl{border-left:1px solid var(--rule-soft)}
+.rt td.v{font-weight:600}
+.rt tbody tr:nth-child(even) td{background:#fbfcfd}
+.rt tbody tr:hover td{background:var(--blue-soft)}
+.rt tfoot td{background:var(--surface);font-weight:600;border-top:1px solid var(--rule);border-bottom:0}
+.rt tfoot td:first-child{color:var(--ink);font-weight:700}
+.rt tfoot small{font-weight:400;color:var(--muted);font-size:12px;margin-left:5px}
+.rt td.emptyrow{text-align:center;color:var(--faint);padding:26px 0;font-family:var(--ui);font-size:13px;width:auto}
+
+.scopebox{background:var(--paper);border:1px solid var(--rule);border-radius:7px;padding:10px 11px 8px;box-shadow:var(--shadow)}
+.scopebox .cap{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;padding:0 1px 7px}
+.scopebox .cap b{font-size:13px;font-weight:600;color:var(--ink)}
+.scopebox .cap span{font-family:var(--mono);font-size:11px;color:var(--muted)}
+#scopeCanvas{display:block;width:100%}
+.orbit{background:var(--paper);border:1px solid var(--rule);border-radius:8px;box-shadow:var(--shadow);display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);overflow:hidden}
+.orbit .cv{position:relative;background:#fbfcfd;border-right:1px solid var(--rule-soft);min-width:0}
+#orbitCanvas{display:block;width:100%}
+.orbit .side{padding:16px 18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.now{border-radius:7px;padding:12px 14px;border:1px solid var(--rule);background:var(--surface);transition:background .2s,border-color .2s}
+.now .lab{margin-bottom:4px}
+.now b{display:block;font-size:20px;font-weight:700;color:var(--ink);letter-spacing:-.01em}
+.now span.f{font-family:var(--mono);font-size:13px;color:var(--body)}
+.now.ap{background:var(--blue-soft);border-color:#c9d6f2}.now.ap b{color:var(--blue)}
+.now.re{background:var(--red-soft);border-color:#f3cfcd}.now.re b{color:var(--red)}
+.gauge{position:relative;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--red),#e9ecf1 50%,var(--blue));margin:10px 0 2px}
+.gauge i{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;background:var(--ink);border:2px solid #fff;box-shadow:0 0 0 1px var(--rule);transform:translate(-50%,-50%);left:50%}
+.gscale{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--muted)}
+ul.keys{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:7px;font-size:13px;color:var(--body)}
+ul.keys li{display:flex;gap:9px;align-items:flex-start;line-height:1.5}
+ul.keys i{flex:0 0 auto;margin-top:4px;width:22px;height:0;border-top:4px solid}
+ul.keys i.dotk{width:12px;height:12px;border:0;border-radius:50%;margin-top:3px}
+.orbit .ctrl{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}
+@media(max-width:760px){.orbit{grid-template-columns:minmax(0,1fr)}.orbit .cv{border-right:0;border-bottom:1px solid var(--rule-soft)}}
+.who{display:inline-flex;align-items:center;gap:10px;font-size:13px;color:var(--body);background:var(--surface);border:1px solid var(--rule);border-radius:8px;padding:6px 6px 6px 12px}
+.who b{font-family:var(--mono);color:var(--ink);font-weight:600}
+.who button{font-family:var(--ui);font-size:12.5px;font-weight:600;color:var(--blue);background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:5px 10px;cursor:pointer}
+.hdright{display:flex;align-items:center;gap:12px 18px;flex-wrap:wrap}
+
+.gate{position:fixed;inset:0;z-index:50;background:rgba(238,241,245,.96);display:flex;align-items:center;justify-content:center;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px;overflow-y:auto}
+.gatecard{width:100%;max-width:400px;background:var(--paper);border:1px solid var(--rule);border-radius:10px;box-shadow:0 8px 30px rgba(20,25,34,.10);padding:26px 24px 22px;display:flex;flex-direction:column;gap:16px}
+.gatecard h2{font-size:19px;font-weight:700;letter-spacing:-.02em}
+.gatecard p{margin:0;font-size:13px;color:var(--muted);line-height:1.55}
+.gatecard label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--body)}
+.gatecard input{width:100%;font-family:var(--ui);font-size:16px;min-height:46px}
+.gatecard input#sid{font-family:var(--mono)}
+.gatecard .err{font-size:12.5px;color:var(--red);min-height:1.2em}
+.gatecard button.b{width:100%}
+
+.submit{margin-top:12px;background:var(--paper);border:1px solid var(--rule);border-radius:8px;box-shadow:var(--shadow);padding:14px 16px;display:flex;align-items:center;gap:12px 16px;flex-wrap:wrap}
+.submit .info{flex:1 1 260px;min-width:0;display:flex;flex-direction:column;gap:2px}
+.submit .info b{font-size:14px;color:var(--ink)}
+.submit .info span{font-size:12.5px;color:var(--muted);line-height:1.5}
+.submit .st{font-size:13px;font-weight:600}
+.submit .st.ok{color:var(--green)} .submit .st.bad{color:var(--red)} .submit .st.wait{color:var(--muted)}
+.submit.done{border-color:#cfe8dd;background:var(--green-soft)}
+.demobar{background:var(--amber-soft);border-bottom:1px solid #f0e3c2;color:var(--amber-ink);font-size:13px;padding-block:9px;text-align:center;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.demobar b{color:var(--amber-ink)}
+.empty button.link{font-size:13px;align-self:center}
+button.b.rec{color:var(--red);border-color:#f3cfcd}
+button.b.rec:hover:not(:disabled){background:var(--red-soft);border-color:#eab5b2}
+.recbox{min-height:320px;padding:28px 24px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;text-align:center;background:#fff}
+.rechd{display:flex;align-items:baseline;gap:10px}
+.rechd .dot{width:12px;height:12px;border-radius:50%;background:var(--red);align-self:center;animation:blink 1.2s ease-in-out infinite}
+.rechd b{font-size:17px;color:var(--ink)}
+.rectime{font-family:var(--mono);font-size:30px;font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums;margin-left:6px}
+.meter{width:100%;max-width:420px;height:12px;border-radius:6px;background:var(--surface2);overflow:hidden;border:1px solid var(--rule)}
+.meter i{display:block;height:100%;width:0;background:var(--green);transition:width .08s}
+.meter i.hot{background:#d08a00}
+.meter i.clip{background:var(--red)}
+.recinfo{display:flex;gap:6px 16px;flex-wrap:wrap;justify-content:center;font-family:var(--mono);font-size:13px;color:var(--body)}
+.recinfo #recWarn{color:var(--red);font-family:var(--ui);font-weight:600}
+.rectip{margin:0;font-size:13px;color:var(--muted);max-width:440px;line-height:1.55}
+.rectip b{color:var(--body)}
+@keyframes blink{50%{opacity:.25}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}.rechd .dot{animation:none}}
+</style>
+</head>
+<body>
+<header>
+  <div class="hd">
+    <div class="hdrow">
+      <div class="brand">
+        <h1>도플러 녹음 분석기</h1>
+        <span>녹음 파일로 음원의 진동수 변화와 속도 측정</span>
+      </div>
+      <div class="hdright">
+      <div class="who" id="who" hidden><span><b id="whoId"></b> <span id="whoName"></span></span><button type="button" id="whoChange">변경</button></div>
+      <div class="mode">
+        <span class="k">음원의 운동</span>
+        <div class="seg" role="group" aria-label="음원의 운동 방식">
+          <button type="button" id="mCirc" aria-pressed="true">원운동</button>
+          <button type="button" id="mLin" aria-pressed="false">직선 운동</button>
+        </div>
+      </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="demobar" id="demoBar" hidden><b>교사 시연 모드</b> · 예시 녹음으로 앱 사용 과정을 보여 줍니다. 이 화면에서는 실험값이 제출되지 않습니다.</div>
+<div class="gate" id="gate" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
+  <form class="gatecard" id="gateForm" novalidate>
+    <div>
+      <h2 id="gateTitle">도플러 녹음 분석기</h2>
+      <p>실험값을 제출할 때 함께 기록됩니다. 학번과 이름을 정확히 적어 주세요.</p>
+    </div>
+    <label for="sid">학번<input type="text" id="sid" inputmode="numeric" autocomplete="off" maxlength="20" placeholder="숫자로 입력"></label>
+    <label for="sname">이름<input type="text" id="sname" autocomplete="off" maxlength="20" placeholder="이름"></label>
+    <div class="err" id="gateErr" role="alert"></div>
+    <button type="submit" class="b pri" id="gateGo">입장하기</button>
+  </form>
+</div>
+
+<div class="shell">
+<main>
+  <div class="guide">
+    <div class="n" id="gNum">1</div>
+    <div><strong id="gTitle"></strong><ol id="gList"></ol></div>
+  </div>
+
+  <div class="stage solo" id="stage">
+    <div class="empty" id="empty">
+      <h3>녹음 파일을 선택하세요</h3>
+      <p>이 화면에서 <b>바로 녹음</b>하거나, 녹음 앱으로 녹음한 m4a, wav, mp3 파일을 올리세요.<br>소리는 이 기기 안에서만 분석되며 어디로도 전송되지 않습니다.</p>
+      <div class="callout ok" style="max-width:440px;text-align:left"><b id="tipB">권장 길이 5~15초</b><span id="tipT"> · 회전이 일정한 부분만 남기기</span></div>
+      <div class="row">
+        <button class="b" id="demo" hidden>예시 녹음 열기</button>
+        <button class="b rec" id="recBtn">● 바로 녹음</button>
+        <button class="b pri" id="pick">녹음 파일 선택</button>
+      </div>
+      <div class="callout" id="recErr" hidden style="max-width:460px;text-align:left"></div>
+      <button type="button" class="link" id="demoWav" hidden>예시 녹음 파일(.wav) 내려받기</button>
+      <p>파일을 이 영역에 끌어 놓아도 됩니다.</p>
+    </div>
+    <div class="recbox" id="recBox" hidden>
+      <div class="rechd"><i class="dot"></i><b id="recState">녹음 중</b><span class="rectime" id="recTime">0.0 s</span></div>
+      <div class="meter" aria-hidden="true"><i id="recLvl"></i></div>
+      <div class="recinfo"><span id="recPitch">들리는 음 —</span><span id="recWarn"></span></div>
+      <p class="rectip" id="recTip"></p>
+      <div class="row">
+        <button class="b" id="recCancel">취소</button>
+        <button class="b pri" id="recStop" disabled>녹음 끝내기</button>
+      </div>
+    </div>
+    <canvas id="mainCanvas" hidden></canvas>
+    <div class="badge" id="badge" hidden></div>
+    <div class="hint" id="hint" hidden></div>
+    <div class="spin" id="spin"><div class="t" id="spinT">분석 중</div><div class="bar"><i id="spinB"></i></div></div>
+  </div>
+
+  <div class="console" id="console" hidden>
+    <div class="panel" id="p-open">
+      <div class="row">
+        <button class="b rec" id="recBtn2">● 다시 녹음</button>
+        <button class="b pri" id="pick2">다른 녹음 열기</button>
+        <button class="b" id="demo2" hidden>예시 녹음 열기</button>
+        <button class="b" id="resume">이어서 하기</button>
+      </div>
+      <div class="note">다른 파일을 열면 지금까지 고른 구간과 결과는 지워지고 처음부터 다시 시작합니다.</div>
+    </div>
+
+    <div class="panel" id="p-sel">
+      <div class="row">
+        <button class="b sm pri" id="playBtn" aria-pressed="false">▶ 소리 듣기</button>
+        <button class="b sm" id="selAll">전체 구간</button>
+        <span class="val" id="selV">—</span>
+      </div>
+      <div class="callout" id="lenInfo" hidden></div>
+      <div class="grp" id="tempGrp">
+        <span class="tag">교실 온도</span>
+        <label class="f"><input type="number" id="temp0" step="0.1" min="-10" max="45" inputmode="decimal" placeholder="온도" aria-label="교실 온도 (°C)"><span class="k">°C</span></label>
+        <span class="k" id="cPrev">음속 계산에 쓰입니다</span>
+      </div>
+      <div class="callout" id="tempErr" hidden></div>
+      <button class="link adv-t" data-t="adv-sel">＋ 세부 설정 (분석 창 길이, 음원 진동수)</button>
+      <div class="adv" id="adv-sel">
+        <div class="row">
+          <label class="f"><span class="k">분석 창 길이</span>
+            <select id="win"><option value="0.05">0.05초 (빠른 변화)</option><option value="0.1" selected>0.10초 (권장)</option><option value="0.2">0.20초 (잡음 많을 때)</option></select>
+          </label>
+          <label class="f"><span class="k">음원 진동수</span><input type="number" id="fguess" min="50" max="12000" step="1" placeholder="자동"><span class="k">Hz</span></label>
+        </div>
+        <div class="note">음원 진동수는 비워 두면 자동으로 찾습니다. 다른 소리가 더 크게 잡힐 때만 직접 적으세요.</div>
+      </div>
+      <div class="row end"><button class="b pri" id="toTrack">다음 — 진동수 분석</button></div>
+    </div>
+
+    <div class="panel" id="p-track">
+      <div class="grp">
+        <span class="tag">세로축</span>
+        <button class="b sm sel" id="showF">진동수 f (Hz)</button>
+        <button class="b sm" id="showT">주기 T (μs)</button>
+      </div>
+      <div class="callout ok" id="trackInfo" hidden></div>
+      <div class="scopebox">
+        <div class="cap"><b>파형 확대</b><span id="scopeCap">그래프를 클릭하세요</span></div>
+        <canvas id="scopeCanvas"></canvas>
+      </div>
+      <div class="row end">
+        <button class="b" id="backSel">구간 다시 고르기</button>
+        <button class="b pri" id="toResult">다음 — 속도 계산</button>
+      </div>
+    </div>
+
+    <div class="panel" id="p-result">
+      <div class="grp">
+        <span class="tag">실험 조건</span>
+        <label class="f"><span class="k">교실 온도</span><input type="number" id="temp" step="0.1" min="-10" max="45" inputmode="decimal" placeholder="온도"><span class="k">°C</span></label>
+      </div>
+      <div class="callout" id="resWarn" hidden></div>
+      <div class="row end">
+        <button class="b" id="backSel2">구간 다시 고르기</button>
+        <button class="b" id="copyCsv">결과 표 복사</button>
+        <button class="b pri" id="saveCsv" hidden>CSV 저장</button>
+        <span class="val q" id="csvMsg"></span>
+      </div>
+    </div>
+  </div>
+
+  <div id="resBlock" hidden>
+    <div class="block">
+      <div class="blockhd"><h2>속도 계산</h2><span class="meta" id="resMeta"></span></div>
+      <div class="sum">
+        <div class="vbox">
+          <span class="lab">도플러로 구한 음원 속도</span>
+          <div class="big"><strong id="vMain">—</strong><span>m/s</span></div>
+          <span class="pm" id="vSig"></span>
+        </div>
+        <div class="stats">
+          <div class="stat"><span class="lab"><i class="dot a"></i><span id="l1">f₁ 접근 (최댓값 평균)</span></span><b id="f1Out">—</b></div>
+          <div class="stat"><span class="lab"><i class="dot r"></i><span id="l2">f₂ 후퇴 (최솟값 평균)</span></span><b id="f2Out">—</b></div>
+          <div class="stat"><span class="lab">Δf = f₁ − f₂</span><b id="dfOut">—</b></div>
+          <div class="stat"><span class="lab"><i class="dot"></i><span id="l0">f₀ 전체 평균</span></span><b id="f0Out">—</b></div>
+        </div>
+        <div class="calc"><span class="k">계산</span><code id="calcLine">—</code></div>
+      </div>
+      <div class="submit" id="submitBox">
+        <div class="info">
+          <b id="subTitle">실험값 제출</b>
+          <span id="subDesc">위 속도 계산 값이 학번·이름과 함께 선생님께 제출됩니다.</span>
+        </div>
+        <span class="st" id="subStatus" role="status"></span>
+        <button type="button" class="b pri" id="submitBtn" disabled>실험값 제출</button>
+      </div>
+    </div>
+
+    <div class="block" id="orbitBlock">
+      <div class="blockhd"><h2>원운동에서 접근과 후퇴</h2><span class="meta" id="orbitMeta"></span></div>
+      <div class="orbit">
+        <div class="cv"><canvas id="orbitCanvas" aria-label="원운동하는 음원과 휴대폰의 위치, 접근·후퇴 구간 애니메이션"></canvas></div>
+        <div class="side">
+          <div class="now" id="nowBox">
+            <span class="lab">지금 음원은</span>
+            <b id="nowTxt">—</b>
+            <span class="f" id="nowF">—</span>
+            <div class="gauge" aria-hidden="true"><i id="gDot"></i></div>
+            <div class="gscale"><span id="gLo">f₂</span><span id="gMid">f₀</span><span id="gHi">f₁</span></div>
+          </div>
+          <ul class="keys">
+            <li><i style="border-color:var(--blue)"></i><span><b class="a">파란 반원</b> = 휴대폰 쪽으로 다가오는 구간 · 진동수가 높게 들림</span></li>
+            <li><i style="border-color:var(--red)"></i><span><b class="r">빨간 반원</b> = 휴대폰에서 멀어지는 구간 · 진동수가 낮게 들림</span></li>
+            <li><i class="dotk" style="background:var(--blue)"></i><span><b>f₁</b> = 휴대폰을 향해 곧장 다가오는 순간 (진동수 최대)</span></li>
+            <li><i class="dotk" style="background:var(--red)"></i><span><b>f₂</b> = 휴대폰에서 곧장 멀어지는 순간 (진동수 최소)</span></li>
+          </ul>
+          <div class="ctrl">
+            <button class="b sm" id="orbPlay">일시 정지</button>
+          </div>
+        </div>
+      </div>
+      <ul class="nlist">
+        <li>회전 주기와 f₁·f₂는 측정값을 썼습니다 · 휴대폰과의 거리, 회전 방향은 설명용 배치입니다</li>
+        <li>잘 보이도록 실제 회전보다 <b>3배 느리게</b> 돌립니다</li>
+        <li>음원 주위의 <b>원(파면)</b>은 소리의 마루입니다 · 차이가 잘 보이도록 음원 속도를 크게 과장했습니다</li>
+      </ul>
+    </div>
+
+    <div class="block" id="linBlock" hidden>
+      <div class="blockhd"><h2>지나가는 순간</h2><span class="meta" id="linMeta"></span></div>
+      <div class="sum three">
+        <div class="stat"><span class="lab">가장 가까이 지나간 시각 t₀</span><b id="t0Out">—</b></div>
+        <div class="stat"><span class="lab">가장 가까운 거리 d</span><b id="dOut">—</b></div>
+        <div class="stat"><span class="lab">맞춤 곡선과의 차이 (RMS)</span><b id="rmsOut">—</b></div>
+      </div>
+      <ul class="nlist">
+        <li><b>f₁, f₂</b> = 음원이 아주 멀리 있을 때의 진동수 · 맞춤 곡선의 양 끝 값</li>
+        <li><b>d</b> = 진동수가 바뀌는 빠르기로 추정한 값 · 줄자로 잰 거리와 비교해 보세요</li>
+        <li><b>±</b> = 곡선 맞춤의 표준오차</li>
+      </ul>
+    </div>
+
+    <div class="block" id="circBlock">
+      <div class="blockhd"><h2>바퀴별 측정값</h2><span class="meta" id="tblMeta"></span></div>
+      <div class="twrap">
+        <table class="rt">
+          <thead>
+            <tr class="g"><th rowspan="2">바퀴</th><th colspan="2" class="ga sl"><span>접근 · 진동수 최대</span></th><th colspan="2" class="gr sl"><span>후퇴 · 진동수 최소</span></th><th rowspan="2" class="sl">Δf<small>Hz</small></th><th rowspan="2">속도 v<small>m/s</small></th></tr>
+            <tr><th class="sl">시각<small>s</small></th><th>f₁<small>Hz</small></th><th class="sl">시각<small>s</small></th><th>f₂<small>Hz</small></th></tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+          <tfoot id="tfoot"></tfoot>
+        </table>
+      </div>
+      <ul class="nlist">
+        <li><b>진동수 최대</b> = 음원이 센서 쪽으로 곧장 다가오는 순간</li>
+        <li><b>진동수 최소</b> = 음원이 센서에서 곧장 멀어지는 순간</li>
+        <li>평균 행의 <b>±</b> = 바퀴별 값의 표준오차</li>
+      </ul>
+    </div>
+  </div>
+</main>
+
+<nav class="rail" id="rail" aria-label="진행 단계">
+  <div class="rt">진행 단계</div>
+  <button data-s="0" class="on"><b>01</b>녹음 열기</button>
+  <button data-s="1" disabled><b>02</b>구간 고르기</button>
+  <button data-s="2" disabled><b>03</b>진동수 분석</button>
+  <button data-s="3" disabled><b>04</b>속도 계산</button>
+</nav>
+</div>
+
+<input type="file" id="file" accept="audio/*,.m4a,.wav,.mp3,.aac,.ogg,.webm" hidden>
+
+<script>
+"use strict";
+(() => {
+const DEMO = window.__DOPPLER_DEMO__ === true;
+const $ = (s) => document.querySelector(s), $$ = (s) => [...document.querySelectorAll(s)];
+const COL = { ink:"#141922", body:"#3e4653", muted:"#7b8492", faint:"#a6adb9", rule:"#dde2ea", soft:"#ebeef3", blue:"#2b57b5", red:"#d13c36", selFill:"rgba(43,87,181,.10)", paper:"#ffffff", green:"#1b8358" };
+const MONO = '"IBM Plex Mono",ui-monospace,monospace';
+
+const S = { mode:"circular", playT:null, x:null, fs:0, name:"", demo:false, env:null, fpeak:0, track:null, sel:null, scopeT:null, showT:false, result:null, step:0, maxStep:0, drag:null };
+
+// each step: [title, items]; an item is a list of parts — plain text, {b:"bold"}, {b:"..", c:"a"|"r"}, or {code:".."}
+const GUIDES = { circular: [
+  ["녹음 파일을 엽니다", [
+    ["다른 기기에서 ", {b:"2000~4000 Hz 사인파"}, "를 틀고 줄에 묶어 돌립니다"],
+    ["휴대폰을 ", {b:"고정"}, "한 채 기본 녹음 앱으로 녹음합니다 · ", {b:"음성 강조·잡음 제거는 끄기"}],
+    ["회전이 일정한 부분만 ", {b:"5~15초"}, "로 잘라서 올립니다"],
+    ["또는 ", {b:"● 바로 녹음"}, "으로 이 화면에서 녹음합니다 · 회전이 일정해진 뒤 누르고 5~15초 뒤 끝내기"],
+  ]],
+  ["분석할 구간을 고릅니다", [
+    ["그래프는 ", {b:"시간에 따른 소리 크기"}, "입니다"],
+    [{b:"회전이 일정한 부분"}, "을 드래그해 고릅니다 · 시작·멈춤 순간은 빼기"],
+    ["구간은 ", {b:"5~15초"}, "가 가장 좋습니다 · 미리 잘라 둔 파일이면 ", {b:"전체 구간"}, " 그대로"],
+    [{b:"▶ 소리 듣기"}, "로 고른 구간을 들어 봅니다 · 음원이 ", {b:"다가올 때 높고", c:"a"}, " ", {b:"멀어질 때 낮게", c:"r"}, " 들립니다"],
+    [{b:"교실 온도"}, "를 입력합니다 · 음속 c = 331.3 + 0.606 × 온도 계산에 쓰입니다"],
+  ]],
+  ["시간에 따른 진동수를 확인합니다", [
+    ["다가올 때 ", {b:"진동수 ↑", c:"a"}, ", 멀어질 때 ", {b:"진동수 ↓", c:"r"}],
+    ["원운동이면 그래프가 ", {b:"규칙적인 물결"}, " 모양이어야 합니다"],
+    ["그래프를 ", {b:"클릭"}, "하면 그 시점의 실제 파형이 아래에 나옵니다"],
+  ]],
+  ["음원 속도를 계산합니다", [
+    [{b:"파란 점", c:"a"}, " = 바퀴마다 진동수 최대 (접근, f₁)"],
+    [{b:"빨간 점", c:"r"}, " = 바퀴마다 진동수 최소 (후퇴, f₂)"],
+    [{code:"v = c·(f₁ − f₂)/(f₁ + f₂)"}, " 로 계산 · 결과는 ", {b:"아래 표"}, "에서 확인"],
+  ]],
+], linear: [
+  ["녹음 파일을 엽니다", [
+    ["다른 기기에서 ", {b:"2000~4000 Hz 사인파"}, "를 틀고 카트에 싣거나 들고 ", {b:"일정한 속도"}, "로 움직입니다"],
+    ["휴대폰을 ", {b:"고정"}, "하고 음원이 그 ", {b:"옆을 가까이 지나가게"}, " 합니다 · ", {b:"음성 강조·잡음 제거는 끄기"}],
+    ["다가올 때부터 멀어진 뒤까지 ", {b:"3~10초"}, "로 잘라서 올립니다"],
+    ["또는 ", {b:"● 바로 녹음"}, "으로 이 화면에서 녹음합니다 · 음원이 출발하기 전에 누르고 지나간 뒤 끝내기"],
+  ]],
+  ["분석할 구간을 고릅니다", [
+    ["그래프는 ", {b:"시간에 따른 소리 크기"}, "입니다 · 가장 큰 봉우리가 ", {b:"지나가는 순간"}],
+    ["봉우리의 ", {b:"앞과 뒤가 모두"}, " 들어가게 드래그합니다 · 출발·정지 순간은 빼기"],
+    ["구간은 ", {b:"3~10초"}, "가 가장 좋습니다 · 미리 잘라 둔 파일이면 ", {b:"전체 구간"}, " 그대로"],
+    [{b:"▶ 소리 듣기"}, "로 고른 구간을 들어 봅니다 · 지나가는 순간 소리가 ", {b:"높은 음", c:"a"}, "에서 ", {b:"낮은 음", c:"r"}, "으로 바뀝니다"],
+    [{b:"교실 온도"}, "를 입력합니다 · 음속 c = 331.3 + 0.606 × 온도 계산에 쓰입니다"],
+  ]],
+  ["시간에 따른 진동수를 확인합니다", [
+    ["다가올 때 ", {b:"진동수 ↑", c:"a"}, ", 지나간 뒤 ", {b:"진동수 ↓", c:"r"}],
+    ["직선 운동이면 그래프가 ", {b:"높은 값에서 낮은 값으로 한 번 내려가는"}, " 모양이어야 합니다"],
+    ["그래프를 ", {b:"클릭"}, "하면 그 시점의 실제 파형이 아래에 나옵니다"],
+  ]],
+  ["음원 속도를 계산합니다", [
+    ["측정한 진동수에 ", {b:"이론 곡선을 맞춰"}, " 양 끝 값을 찾습니다 (초록 띠)"],
+    [{b:"파란 점선", c:"a"}, " = 멀리서 다가올 때의 f₁ · ", {b:"빨간 점선", c:"r"}, " = 멀어진 뒤의 f₂"],
+    [{code:"v = c·(f₁ − f₂)/(f₁ + f₂)"}, " 로 계산 · 결과는 ", {b:"아래"}, "에서 확인"],
+  ]],
+] };
+function renderGuide(title, items){
+  $("#gTitle").textContent = title;
+  const ol = $("#gList"); ol.innerHTML = "";
+  for (const parts of items){
+    const li = document.createElement("li"), span = document.createElement("span");
+    for (const p of parts){
+      if (typeof p === "string"){ span.appendChild(document.createTextNode(p)); continue; }
+      const el = document.createElement(p.code ? "code" : "b");
+      el.textContent = p.code || p.b; if (p.c) el.className = p.c; span.appendChild(el);
+    }
+    li.appendChild(span); ol.appendChild(li);
+  }
+}
+const HINTS = {
+  circular: [null, "드래그해서 분석 구간 선택 · 클릭하면 그 시점 파형 보기", "클릭하면 그 시점의 실제 파형을 아래에서 보여줍니다", "파란 점 = 바퀴별 최댓값(접근) · 빨간 점 = 최솟값(후퇴)"],
+  linear:   [null, "드래그해서 분석 구간 선택 · 클릭하면 그 시점 파형 보기", "클릭하면 그 시점의 실제 파형을 아래에서 보여줍니다", "검은 선 = 측정값 · 초록 띠 = 맞춤 곡선 · 세로 점선 = 가장 가까이 지나간 순간"],
+};
+
+// ---------- FFT & signal ----------
+const twCache = new Map();
+function fft(re, im){
+  const n = re.length;
+  for (let i = 1, j = 0; i < n; i++){ let bit = n >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit;
+    if (i < j){ let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+  let tw = twCache.get(n);
+  if (!tw){ tw = { c:new Float64Array(n/2), s:new Float64Array(n/2) }; for (let k = 0; k < n/2; k++){ tw.c[k] = Math.cos(-2*Math.PI*k/n); tw.s[k] = Math.sin(-2*Math.PI*k/n); } twCache.set(n, tw); }
+  for (let len = 2; len <= n; len <<= 1){ const half = len >> 1, step = n/len;
+    for (let i = 0; i < n; i += len) for (let k = 0; k < half; k++){
+      const wr = tw.c[k*step], wi = tw.s[k*step], a = i + k, b = a + half;
+      const xr = re[b]*wr - im[b]*wi, xi = re[b]*wi + im[b]*wr;
+      re[b] = re[a] - xr; im[b] = im[a] - xi; re[a] += xr; im[a] += xi; } }
+}
+const nextPow2 = (n) => 1 << Math.ceil(Math.log2(Math.max(2, n)));
+const hann = (n) => { const w = new Float64Array(n); for (let i = 0; i < n; i++) w[i] = 0.5 - 0.5*Math.cos(2*Math.PI*i/(n-1)); return w; };
+function peakInBand(mag, i0, i1){
+  let k = i0; for (let i = i0; i <= i1; i++) if (mag[i] > mag[k]) k = i;
+  let p = 0;
+  if (k > 0 && k < mag.length - 1){ const a = Math.log(mag[k-1]+1e-20), b = Math.log(mag[k]+1e-20), c = Math.log(mag[k+1]+1e-20), d = a - 2*b + c; if (d < 0) p = 0.5*(a-c)/d; }
+  return { k, p, m:mag[k], edge:k === i0 || k === i1 };
+}
+function detectPeak(x, fs){
+  const N = 1 << Math.floor(Math.log2(Math.min(x.length, 65536)));
+  const start = Math.max(0, Math.floor(x.length/2 - N/2));
+  const re = new Float64Array(N), im = new Float64Array(N), w = hann(N);
+  for (let i = 0; i < N; i++) re[i] = x[start+i]*w[i];
+  fft(re, im);
+  const mag = new Float64Array(N/2); for (let i = 0; i < N/2; i++) mag[i] = Math.hypot(re[i], im[i]);
+  const lo = Math.ceil(80*N/fs), hi = Math.min(N/2-2, Math.floor(Math.min(12000, fs/2.2)*N/fs));
+  const pk = peakInBand(mag, lo, hi); return (pk.k + pk.p)*fs/N;
+}
+function decimate(x, fs, fp){
+  const D = Math.max(1, Math.floor(fs/Math.max(6*fp, 1500)));
+  if (D === 1) return { y:x, fs2:fs };
+  const L = 8*D + 1, fc = 0.42/D, h = new Float64Array(L), M = (L-1)/2; let sum = 0;
+  for (let i = 0; i < L; i++){ const n = i - M, s = n === 0 ? 2*fc : Math.sin(2*Math.PI*fc*n)/(Math.PI*n);
+    h[i] = s*(0.42 - 0.5*Math.cos(2*Math.PI*i/(L-1)) + 0.08*Math.cos(4*Math.PI*i/(L-1))); sum += h[i]; }
+  for (let i = 0; i < L; i++) h[i] /= sum;
+  const n2 = Math.floor(x.length/D), y = new Float32Array(n2);
+  for (let j = 0; j < n2; j++){ const c = j*D; let acc = 0; for (let i = 0; i < L; i++){ const k = c + i - M; if (k >= 0 && k < x.length) acc += x[k]*h[i]; } y[j] = acc; }
+  return { y, fs2:fs/D };
+}
+function envelope(x, fs){
+  const hop = Math.max(1, Math.round(fs*0.01)), n = Math.floor(x.length/hop), e = new Float32Array(n);
+  for (let j = 0; j < n; j++){ let s = 0; for (let i = j*hop; i < (j+1)*hop; i++) s += x[i]*x[i]; e[j] = Math.sqrt(s/hop); }
+  return { e, hop:hop/fs };
+}
+const tick = () => new Promise((r) => setTimeout(r, 0));
+async function track(x, fs, fp, winSec, onProgress){
+  const { y, fs2 } = decimate(x, fs, fp);
+  const hopSec = Math.max(0.01, x.length/fs/3000);
+  const W = Math.max(32, Math.round(winSec*fs2)), hop = Math.max(1, Math.round(hopSec*fs2));
+  const N = Math.max(1024, nextPow2(W*8)), w = hann(W);
+  const lo = Math.max(1, Math.floor(fp*0.9*N/fs2)), hi = Math.min(N/2-2, Math.ceil(fp*1.1*N/fs2));
+  const frames = Math.max(0, Math.floor((y.length - W)/hop) + 1);
+  const t = new Float64Array(frames), f = new Float64Array(frames), mag = new Float64Array(frames), edge = new Uint8Array(frames);
+  const re = new Float64Array(N), im = new Float64Array(N), m = new Float64Array(N/2);
+  for (let j = 0; j < frames; j++){
+    re.fill(0); im.fill(0);
+    const o = j*hop; let mean = 0; for (let i = 0; i < W; i++) mean += y[o+i]; mean /= W;
+    for (let i = 0; i < W; i++) re[i] = (y[o+i] - mean)*w[i];
+    fft(re, im);
+    for (let i = lo-1; i <= hi+1; i++) m[i] = Math.hypot(re[i], im[i]);
+    const pk = peakInBand(m, lo, hi);
+    t[j] = (o + W/2)/fs2; f[j] = (pk.k + pk.p)*fs2/N; mag[j] = pk.m; edge[j] = pk.edge ? 1 : 0;
+    if (j % 300 === 299){ onProgress(j/frames); await tick(); }
+  }
+  const sorted = Array.from(mag).sort((a,b) => a-b), med = sorted[Math.floor(sorted.length/2)] || 0;
+  const valid = new Uint8Array(frames);
+  for (let j = 0; j < frames; j++) valid[j] = !edge[j] && mag[j] > 0.25*med ? 1 : 0;
+  const f3 = Float64Array.from(f);
+  for (let j = 1; j < frames-1; j++) if (valid[j-1] && valid[j] && valid[j+1]){ const a = [f[j-1], f[j], f[j+1]].sort((p,q) => p-q); f3[j] = a[1]; }
+  return { t, f:f3, valid, hop:hopSec, win:winSec };
+}
+
+// ---------- analysis ----------
+const totalDur = () => S.x ? S.x.length/S.fs : 0;
+const selRange = () => S.sel || [0, totalDur()];
+function analyzeSel(){
+  const tr = S.track; if (!tr){ S.result = null; return; }
+  const [ta, tb] = selRange();
+  const idx = []; for (let j = 0; j < tr.t.length; j++) if (tr.t[j] >= ta && tr.t[j] <= tb) idx.push(j);
+  const vi = idx.filter((j) => tr.valid[j]);
+  const res = {};
+  if (vi.length < 10){ res.err = "선택 구간에 진동수가 잡힌 점이 너무 적습니다. 구간을 넓히거나 녹음 음량을 확인하세요."; S.result = res; return; }
+  const fv = vi.map((j) => tr.f[j]), mean = fv.reduce((a,b) => a+b, 0)/fv.length;
+  res.f0 = mean;
+  if (S.mode === "linear"){ S.result = analyzeLinear(tr, vi, ta, tb, mean); return; }
+  const ser = new Float64Array(idx.length); let last = mean;
+  idx.forEach((j, i) => { if (tr.valid[j]) last = tr.f[j]; ser[i] = last - mean; });
+  const dt = tr.hop, maxLag = Math.min(Math.floor(5/dt), Math.floor(ser.length/2)), minLag = Math.ceil(0.25/dt);
+  let rot = null;
+  if (maxLag > minLag + 2){
+    let e0 = 0; for (let i = 0; i < ser.length; i++) e0 += ser[i]*ser[i];
+    const ac = new Float64Array(maxLag+1);
+    for (let L = minLag; L <= maxLag; L++){ let s = 0; for (let i = 0; i + L < ser.length; i++) s += ser[i]*ser[i+L]; ac[L] = s/e0*ser.length/(ser.length - L); }
+    let g = -1; for (let L = minLag; L <= maxLag; L++) g = Math.max(g, ac[L]);
+    if (g > 0.3) for (let L = minLag+1; L < maxLag; L++) if (ac[L] >= ac[L-1] && ac[L] >= ac[L+1] && ac[L] > 0.8*g){
+      const d = ac[L-1] - 2*ac[L] + ac[L+1], p = d < 0 ? 0.5*(ac[L-1] - ac[L+1])/d : 0; rot = (L + p)*dt; break; }
+  }
+  res.rot = rot;
+  if (rot && (tb - ta) >= 2*rot){
+    const maxes = [], mins = [];
+    for (let s = ta; s + rot <= tb + 1e-9; s += rot){
+      let bx = null, bn = null;
+      for (const j of vi){ if (tr.t[j] < s || tr.t[j] >= s + rot) continue;
+        if (!bx || tr.f[j] > bx.f) bx = { t:tr.t[j], f:tr.f[j] };
+        if (!bn || tr.f[j] < bn.f) bn = { t:tr.t[j], f:tr.f[j] }; }
+      if (bx && bn){ maxes.push(bx); mins.push(bn); }
+    }
+    const stat = (a) => { const m = a.reduce((p,q) => p+q, 0)/a.length; const sd = a.length > 1 ? Math.sqrt(a.reduce((p,q) => p + (q-m)**2, 0)/(a.length-1)) : NaN; return { m, se:sd/Math.sqrt(a.length) }; };
+    const s1 = stat(maxes.map((p) => p.f)), s2 = stat(mins.map((p) => p.f));
+    Object.assign(res, { f1:s1.m, sf1:s1.se, f2:s2.m, sf2:s2.se, maxes, mins, method:`바퀴별 평균 · ${maxes.length}바퀴` });
+  } else {
+    const s = [...fv].sort((a,b) => a-b), q = (p) => s[Math.min(s.length-1, Math.max(0, Math.round(p*(s.length-1))))];
+    Object.assign(res, { f1:q(0.97), f2:q(0.03), sf1:NaN, sf2:NaN, method:"상·하위 3% 값", noRot:true });
+  }
+  S.result = res;
+}
+
+// Straight-line pass at constant speed v, closest distance d at time t0:
+//   f(t) = f0 / (1 + β·s),  β = v/c,  s = u/√(u² + τ²),  u = t − t0,  τ = d/v
+// so 1/f is linear in s. Search (t0, τ) on a grid, solve the linear part exactly, then refine.
+function inv4(A){
+  const n = 4, M = A.map((r, i) => [...r, ...[0,1,2,3].map((k) => k === i ? 1 : 0)]);
+  for (let c = 0; c < n; c++){
+    let p = c; for (let r = c+1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[p][c])) p = r;
+    if (Math.abs(M[p][c]) < 1e-300) return null;
+    [M[c], M[p]] = [M[p], M[c]];
+    const d = M[c][c]; for (let k = 0; k < 2*n; k++) M[c][k] /= d;
+    for (let r = 0; r < n; r++) if (r !== c){ const f = M[r][c]; if (f) for (let k = 0; k < 2*n; k++) M[r][k] -= f*M[c][k]; }
+  }
+  return M.map((r) => r.slice(n));
+}
+function analyzeLinear(tr, vi, ta, tb, fm){
+  const n = vi.length, T = new Float64Array(n), Z = new Float64Array(n);
+  let sz = 0, szz = 0;
+  for (let i = 0; i < n; i++){ T[i] = tr.t[vi[i]]; Z[i] = fm/tr.f[vi[i]] - 1; sz += Z[i]; szz += Z[i]*Z[i]; }
+  const solve = (t0, tau) => {
+    let ss = 0, sss = 0, ssz = 0;
+    for (let i = 0; i < n; i++){ const u = T[i] - t0, s = u/Math.sqrt(u*u + tau*tau); ss += s; sss += s*s; ssz += s*Z[i]; }
+    const den = n*sss - ss*ss; if (den < 1e-9*n*n) return null;
+    const b = (n*ssz - ss*sz)/den, a = (sz - b*ss)/n;
+    if (!(b > 0)) return null;
+    return { t0, tau, a, b, sse: szz - a*sz - b*ssz };
+  };
+  const span = tb - ta; let best = null;
+  const tryIt = (t0, tau) => { const r = solve(t0, tau); if (r && (!best || r.sse < best.sse)) best = r; };
+  for (let i = 0; i <= 80; i++) for (let k = 0; k <= 40; k++) tryIt(ta - 0.2*span + 1.4*span*i/80, 0.02*Math.pow(1000, k/40));
+  if (!best) return { f0:fm, err:"진동수가 높았다가 낮아지는 모양을 찾지 못했습니다. 음원이 휴대폰 옆을 지나가는 구간을 골랐는지 확인하세요." };
+  let dT = 1.4*span/80, dL = Math.log(1000)/40;
+  for (let round = 0; round < 4; round++){
+    const c0 = best.t0, l0 = Math.log(best.tau);
+    for (let i = -10; i <= 10; i++) for (let k = -10; k <= 10; k++) tryIt(c0 + dT*i/10, Math.exp(l0 + dL*k/10));
+    dT /= 8; dL /= 8;
+  }
+  const { t0, tau, a, b } = best;
+  const sOf = (t) => { const u = t - t0; return u/Math.sqrt(u*u + tau*tau); };
+  const fit = (t) => fm/(1 + a + b*sOf(t));
+  let sse = 0, sqHz = 0, sMin = Infinity, sMax = -Infinity;
+  const A = [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]];
+  for (let i = 0; i < n; i++){
+    const u = T[i] - t0, q = Math.pow(u*u + tau*tau, 1.5), s = sOf(T[i]), e = Z[i] - a - b*s;
+    sse += e*e; sqHz += (tr.f[vi[i]] - fit(T[i]))**2; sMin = Math.min(sMin, s); sMax = Math.max(sMax, s);
+    const g = [1, s, -b*tau*tau/q, -b*u*tau/q];
+    for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) A[r][k] += g[r]*g[k];
+  }
+  const beta = b/(1 + a), f0 = fm/(1 + a), f1 = fm/(1 + a - b), f2 = fm/(1 + a + b);
+  let sbeta = NaN, sf1 = NaN, sf2 = NaN;
+  const C = n > 8 ? inv4(A) : null;
+  if (C){
+    // neighbouring frequency points share most of their analysis window, so they are not independent
+    const sig2 = sse/(n - 4)*Math.max(1, (tr.win || 0.1)/tr.hop);
+    const ga = -b/((1 + a)*(1 + a)), gb = 1/(1 + a);
+    const vb = sig2*(ga*ga*C[0][0] + gb*gb*C[1][1] + 2*ga*gb*C[0][1]);
+    const v1 = sig2*(C[0][0] + C[1][1] - 2*C[0][1]), v2 = sig2*(C[0][0] + C[1][1] + 2*C[0][1]);
+    if (vb > 0) sbeta = Math.sqrt(vb);
+    if (v1 > 0) sf1 = f1*f1/fm*Math.sqrt(v1);
+    if (v2 > 0) sf2 = f2*f2/fm*Math.sqrt(v2);
+  }
+  return { linear:true, f0, f1, f2, sf1, sf2, beta, sbeta, t0, tau, rms:Math.sqrt(sqHz/n), sMin, sMax, fit, method:"곡선 맞춤" };
+}
+
+// ---------- canvas helpers ----------
+const CAN = $("#mainCanvas"), SC = $("#scopeCanvas");
+function sizeCanvas(cv, h){
+  const dpr = window.devicePixelRatio || 1, w = cv.clientWidth || cv.parentElement.clientWidth || 800;
+  if (cv.width !== Math.round(w*dpr) || cv.height !== Math.round(h*dpr)){ cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); }
+  cv.style.height = h + "px";
+  const ctx = cv.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); return { ctx, w, h };
+}
+function niceTicks(a, b, n){
+  const span = b - a || 1, raw = span/n, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1,2,5,10].map((m) => m*mag).find((s) => span/s <= n) || 10*mag;
+  const out = []; for (let v = Math.ceil(a/step)*step; v <= b + 1e-9; v += step) out.push(+v.toFixed(10));
+  return { out, step };
+}
+const PAD = { l:62, r:16, t:46, b:34 };
+function axes(ctx, w, h, x0, x1, y0, y1, yLabel, pad){
+  const P = pad || PAD;
+  const X = (v) => P.l + (v - x0)/(x1 - x0)*(w - P.l - P.r), Y = (v) => h - P.b - (v - y0)/(y1 - y0)*(h - P.t - P.b);
+  ctx.fillStyle = COL.paper; ctx.fillRect(0, 0, w, h);
+  ctx.font = `11px ${MONO}`; ctx.lineWidth = 1;
+  const yt = niceTicks(y0, y1, 5), ydec = Math.max(0, -Math.floor(Math.log10(yt.step)));
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  for (const v of yt.out){ const y = Y(v); ctx.strokeStyle = COL.soft; ctx.beginPath(); ctx.moveTo(P.l, y); ctx.lineTo(w - P.r, y); ctx.stroke(); ctx.fillStyle = COL.muted; ctx.fillText(v.toFixed(ydec), P.l - 8, y); }
+  const xt = niceTicks(x0, x1, Math.max(3, Math.floor((w - P.l)/95))), xdec = Math.max(0, -Math.floor(Math.log10(xt.step)));
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  for (const v of xt.out){ const x = X(v); ctx.strokeStyle = COL.soft; ctx.beginPath(); ctx.moveTo(x, P.t); ctx.lineTo(x, h - P.b); ctx.stroke(); ctx.fillStyle = COL.muted; ctx.fillText(v.toFixed(xdec), x, h - P.b + 7); }
+  ctx.strokeStyle = COL.rule; ctx.beginPath(); ctx.moveTo(P.l, P.t); ctx.lineTo(P.l, h - P.b); ctx.lineTo(w - P.r, h - P.b); ctx.stroke();
+  ctx.fillStyle = COL.muted; ctx.textAlign = "right"; ctx.textBaseline = "bottom"; ctx.fillText("시간 (s)", w - P.r, h - 2);
+  ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.font = `600 11px ${MONO}`; ctx.fillStyle = COL.body; ctx.fillText(yLabel, 10, P.t - 12);
+  return { X, Y, P };
+}
+const mainH = () => Math.round(Math.min(420, Math.max(260, (CAN.clientWidth || 800)*0.46)));
+
+function drawOverview(){
+  const { ctx, w, h } = sizeCanvas(CAN, mainH());
+  const dur = totalDur(), e = S.env.e; let mx = 0; for (const v of e) mx = Math.max(mx, v);
+  const { X, Y, P } = axes(ctx, w, h, 0, dur, 0, (mx || 1)*1.12, "소리 크기 (RMS)");
+  const [ta, tb] = selRange();
+  if (S.sel){ ctx.fillStyle = COL.selFill; ctx.fillRect(X(ta), P.t, X(tb) - X(ta), h - P.t - P.b);
+    ctx.strokeStyle = COL.blue; ctx.lineWidth = 2; [ta, tb].forEach((t) => { ctx.beginPath(); ctx.moveTo(X(t), P.t); ctx.lineTo(X(t), h - P.b); ctx.stroke(); }); }
+  ctx.fillStyle = "rgba(43,87,181,.55)"; ctx.beginPath(); ctx.moveTo(X(0), Y(0));
+  for (let j = 0; j < e.length; j++) ctx.lineTo(X(j*S.env.hop), Y(e[j]));
+  ctx.lineTo(X(dur), Y(0)); ctx.closePath(); ctx.fill();
+  if (S.drag){ const a = Math.min(S.drag.a, S.drag.b), b = Math.max(S.drag.a, S.drag.b);
+    ctx.setLineDash([5,4]); ctx.strokeStyle = COL.blue; ctx.lineWidth = 1.5; ctx.strokeRect(X(a), P.t, X(b) - X(a), h - P.t - P.b); ctx.setLineDash([]); }
+  if (S.scopeT != null && S.playT == null){ ctx.strokeStyle = COL.ink; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X(S.scopeT), P.t); ctx.lineTo(X(S.scopeT), h - P.b); ctx.stroke(); }
+  if (S.playT != null){ // playhead while the recording is playing
+    const x = X(S.playT); ctx.strokeStyle = COL.red; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, P.t); ctx.lineTo(x, h - P.b); ctx.stroke();
+    ctx.fillStyle = COL.red; ctx.beginPath(); ctx.moveTo(x - 6, P.t - 8); ctx.lineTo(x + 6, P.t - 8); ctx.lineTo(x, P.t); ctx.closePath(); ctx.fill();
+    ctx.font = `600 11px ${MONO}`; ctx.textAlign = x > w - 90 ? "right" : "left"; ctx.textBaseline = "bottom"; ctx.fillText(`${S.playT.toFixed(1)} s`, x + (x > w - 90 ? -9 : 9), P.t - 1);
+  }
+  CAN._map = { x0:0, x1:dur, P, w };
+}
+
+function drawTrack(withExtremes){
+  const { ctx, w, h } = sizeCanvas(CAN, mainH());
+  const tr = S.track, [ta, tb] = selRange(), r = S.result || {};
+  const conv = (f) => S.showT ? 1e6/f : f;
+  const vals = []; for (let j = 0; j < tr.t.length; j++) if (tr.valid[j] && tr.t[j] >= ta && tr.t[j] <= tb) vals.push(conv(tr.f[j]));
+  if (!vals.length){ axes(ctx, w, h, ta, tb, 0, 1, ""); CAN._map = null; return; }
+  vals.sort((a,b) => a-b);
+  let y0 = vals[Math.floor(vals.length*0.005)], y1 = vals[Math.ceil(vals.length*0.995) - 1];
+  if (withExtremes && r.linear){ // keep both end values of the fitted curve in view
+    for (const f of [r.f1, r.f2]) if (Number.isFinite(f) && Math.abs(f - r.f0) < 0.2*r.f0){ y0 = Math.min(y0, conv(f)); y1 = Math.max(y1, conv(f)); }
+  }
+  const pad = Math.max((y1 - y0)*0.18, S.showT ? 2 : 0.5); y0 -= pad; y1 += pad;
+  const { X, Y, P } = axes(ctx, w, h, ta, tb, y0, y1, S.showT ? "주기 T (μs)" : "진동수 f (Hz)");
+  ctx.save(); ctx.beginPath(); ctx.rect(P.l, P.t, w - P.l - P.r, h - P.t - P.b); ctx.clip();
+  if (withExtremes){
+    const hl = (f, col) => { if (!Number.isFinite(f)) return; ctx.strokeStyle = col; ctx.setLineDash([6,4]); ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(P.l, Y(conv(f))); ctx.lineTo(w - P.r, Y(conv(f))); ctx.stroke(); ctx.setLineDash([]); };
+    hl(r.f0, COL.faint); hl(r.f1, COL.blue); hl(r.f2, COL.red);
+    if (r.linear){
+      ctx.strokeStyle = COL.green; ctx.lineWidth = 5; ctx.globalAlpha = 0.45; ctx.lineJoin = "round"; ctx.beginPath();
+      for (let k = 0; k <= 300; k++){ const t = ta + (tb - ta)*k/300, x = X(t), y = Y(conv(r.fit(t))); if (k) ctx.lineTo(x, y); else ctx.moveTo(x, y); }
+      ctx.stroke(); ctx.globalAlpha = 1;
+    }
+  }
+  ctx.strokeStyle = COL.ink; ctx.lineWidth = 1.5; ctx.lineJoin = "round"; ctx.beginPath();
+  let pen = false;
+  for (let j = 0; j < tr.t.length; j++){
+    if (tr.t[j] < ta || tr.t[j] > tb) continue;
+    if (!tr.valid[j]){ pen = false; continue; }
+    const x = X(tr.t[j]), y = Y(conv(tr.f[j])); if (pen) ctx.lineTo(x, y); else { ctx.moveTo(x, y); pen = true; }
+  }
+  ctx.stroke();
+  if (withExtremes){
+    const dot = (p, col) => { ctx.fillStyle = col; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(X(p.t), Y(conv(p.f)), 5.5, 0, Math.PI*2); ctx.fill(); ctx.stroke(); };
+    (r.maxes || []).forEach((p) => dot(p, COL.blue)); (r.mins || []).forEach((p) => dot(p, COL.red));
+    if (r.linear){
+      if (r.t0 >= ta && r.t0 <= tb){ ctx.strokeStyle = COL.muted; ctx.lineWidth = 1; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(X(r.t0), P.t); ctx.lineTo(X(r.t0), h - P.b); ctx.stroke(); ctx.setLineDash([]);
+        ctx.fillStyle = COL.muted; ctx.font = `600 11px ${MONO}`; ctx.textAlign = "left"; ctx.textBaseline = "top"; ctx.fillText("t₀", X(r.t0) + 5, P.t + 4); }
+    }
+  }
+  if (S.step === 2 && S.scopeT != null && S.scopeT >= ta && S.scopeT <= tb){ ctx.strokeStyle = COL.muted; ctx.lineWidth = 1; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.moveTo(X(S.scopeT), P.t); ctx.lineTo(X(S.scopeT), h - P.b); ctx.stroke(); ctx.setLineDash([]); }
+  ctx.restore();
+  if (withExtremes && w > 520){
+    ctx.font = `600 11px ${MONO}`; ctx.textBaseline = "bottom"; ctx.textAlign = "right";
+    let xx = w - P.r;
+    const items = r.linear ? [[COL.green, "맞춤 곡선", true], [COL.red, "f₂ 후퇴"], [COL.blue, "f₁ 접근"], [COL.faint, "f₀ 음원"]]
+                           : [[COL.red, "f₂ 후퇴"], [COL.blue, "f₁ 접근"], [COL.faint, "f₀ 평균"]];
+    for (const [c, t, solid] of items){
+      ctx.fillStyle = c; ctx.fillText(t, xx, P.t - 12); const tw = ctx.measureText(t).width;
+      ctx.strokeStyle = c; ctx.setLineDash(solid ? [] : [5,3]); ctx.lineWidth = solid ? 5 : 1.6; ctx.globalAlpha = solid ? 0.45 : 1; ctx.beginPath(); ctx.moveTo(xx - tw - 24, P.t - 17); ctx.lineTo(xx - tw - 6, P.t - 17); ctx.stroke(); ctx.setLineDash([]);
+      ctx.globalAlpha = 1; xx -= tw + 40; }
+  }
+  CAN._map = { x0:ta, x1:tb, P, w };
+}
+
+function drawScope(){
+  const { ctx, w, h } = sizeCanvas(SC, 190);
+  if (!S.x || S.scopeT == null){ ctx.fillStyle = COL.paper; ctx.fillRect(0, 0, w, h); ctx.fillStyle = COL.faint; ctx.font = `13px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText("위 그래프를 클릭하면 파형이 나타납니다", w/2, h/2); return; }
+  const fs = S.fs, i0 = Math.max(0, Math.floor((S.scopeT - 0.01)*fs)), i1 = Math.min(S.x.length - 1, Math.ceil((S.scopeT + 0.01)*fs));
+  let mn = Infinity, mx = -Infinity; for (let i = i0; i <= i1; i++){ mn = Math.min(mn, S.x[i]); mx = Math.max(mx, S.x[i]); }
+  const pad = (mx - mn)*0.12 || 0.01;
+  const { X, Y, P } = axes(ctx, w, h, i0/fs, i1/fs, mn - pad, mx + pad, "음압 (상대값)", { l:62, r:16, t:30, b:34 });
+  ctx.save(); ctx.beginPath(); ctx.rect(P.l, P.t, w - P.l - P.r, h - P.t - P.b); ctx.clip();
+  ctx.strokeStyle = COL.blue; ctx.lineWidth = 1.5; ctx.beginPath();
+  for (let i = i0; i <= i1; i++){ const x = X(i/fs), y = Y(S.x[i]); if (i === i0) ctx.moveTo(x, y); else ctx.lineTo(x, y); }
+  ctx.stroke(); ctx.restore();
+  let cap = `${S.scopeT.toFixed(3)} s 전후 20 ms · ${Math.round(fs)} Hz 샘플링`;
+  const tr = S.track;
+  if (tr){ let best = -1, bd = Infinity; for (let j = 0; j < tr.t.length; j++){ const d = Math.abs(tr.t[j] - S.scopeT); if (d < bd){ bd = d; best = j; } }
+    if (best >= 0 && tr.valid[best]) cap += ` · f ≈ ${tr.f[best].toFixed(1)} Hz, T ≈ ${(1e6/tr.f[best]).toFixed(1)} μs`; }
+  $("#scopeCap").textContent = cap;
+}
+
+function render(){
+  if (!S.x) return;
+  if (S.step <= 1 || !S.track) drawOverview();
+  else drawTrack(S.step === 3);
+  if (S.step === 2) drawScope();
+  const [ta, tb] = selRange();
+  $("#selV").textContent = `${ta.toFixed(2)} → ${tb.toFixed(2)} s (${(tb - ta).toFixed(2)}초)`;
+}
+
+// ---------- circular-motion animation ----------
+// Source moves counter-clockwise on a circle of radius R; the phone sits on the right at distance D = 2.4R.
+// Radial speed toward the phone: v_r = v·(−D sin θ)/|M − P|, so the lower half approaches and the upper half recedes;
+// the extremes are the tangent points θ = ∓arccos(R/D).
+const orbit = (() => {
+  const cv = $("#orbitCanvas"), KD = 2.4;
+  let raf = 0, last = 0, theta = Math.PI*0.6, playing = true, rings = [], emitAcc = 0;
+  let P = { rot:1.15, f0:3000, f1:3040, f2:2960, v:5, c:344, ok:false };
+  try { if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) playing = false; } catch (e) {}
+  const thA = -Math.acos(1/KD), thR = Math.acos(1/KD);
+  function freqAt(th){ // predicted frequency heard at angle θ, using the measured speed and f₀
+    const px = Math.cos(th), py = Math.sin(th), dx = KD - px, dy = -py, dist = Math.hypot(dx, dy);
+    const vr = P.v*(-Math.sin(th)*KD)/dist; // toward the phone (scaled: R = 1)
+    return P.f0*P.c/(P.c - vr);
+  }
+  function geometry(w, h){
+    const R = Math.min(h*0.36, w*0.24), cx = Math.min(w*0.40, w - KD*R - 34), cy = h*0.52;
+    return { R, cx, cy, mx: cx + KD*R, my: cy };
+  }
+  function arrow(ctx, x0, y0, x1, y1, col, wdt){
+    const a = Math.atan2(y1 - y0, x1 - x0), hl = 9;
+    ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = wdt; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - hl*0.6*Math.cos(a), y1 - hl*0.6*Math.sin(a)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x1 - hl*Math.cos(a - 0.45), y1 - hl*Math.sin(a - 0.45)); ctx.lineTo(x1 - hl*Math.cos(a + 0.45), y1 - hl*Math.sin(a + 0.45)); ctx.closePath(); ctx.fill();
+  }
+  function phone(ctx, x, y){
+    ctx.save(); ctx.translate(x, y);
+    ctx.fillStyle = "#fff"; ctx.strokeStyle = COL.ink; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect ? ctx.roundRect(-11, -19, 22, 38, 4) : ctx.rect(-11, -19, 22, 38); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = COL.ink; ctx.beginPath(); ctx.arc(0, 13, 2.2, 0, Math.PI*2); ctx.fill();
+    ctx.fillRect(-4, -15, 8, 2);
+    ctx.font = `600 12px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("휴대폰", 0, 25);
+    ctx.restore();
+  }
+  function draw(){
+    const w = cv.clientWidth || 600, h = Math.round(Math.min(360, Math.max(250, w*0.62)));
+    const { ctx } = sizeCanvas(cv, h), g = geometry(w, h), { R, cx, cy, mx, my } = g;
+    const Y = (th) => cy - R*Math.sin(th), X = (th) => cx + R*Math.cos(th);
+    ctx.fillStyle = "#fbfcfd"; ctx.fillRect(0, 0, w, h);
+    // wavefronts
+    ctx.lineWidth = 2;
+    for (const r of rings){ const a = Math.max(0, 1 - r.r/(R*3.2)); if (a <= 0) continue;
+      ctx.strokeStyle = `rgba(20,25,34,${0.15 + 0.6*a})`; ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, Math.PI*2); ctx.stroke(); }
+    // approach / recede halves (canvas y is flipped: lower half on screen = sin θ < 0)
+    ctx.lineWidth = 7; ctx.lineCap = "round";
+    ctx.strokeStyle = COL.blue; ctx.globalAlpha = 0.85; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI, false); ctx.stroke();
+    ctx.strokeStyle = COL.red; ctx.beginPath(); ctx.arc(cx, cy, R, Math.PI, Math.PI*2, false); ctx.stroke(); ctx.globalAlpha = 1; ctx.lineCap = "butt";
+    // rotation direction
+    ctx.fillStyle = COL.muted; ctx.font = `11px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.strokeStyle = COL.faint; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(cx, cy, R*0.32, -Math.PI*0.15, -Math.PI*1.35, true); ctx.stroke();
+    { const e = -Math.PI*1.35, ex = cx + R*0.32*Math.cos(e), ey = cy + R*0.32*Math.sin(e), tx = Math.sin(e), ty = -Math.cos(e); arrow(ctx, ex - tx*8, ey - ty*8, ex, ey, COL.faint, 1.2); }
+    ctx.fillText("회전", cx, cy);
+    // centre and string
+    ctx.fillStyle = COL.faint; ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI*2); ctx.fill();
+    // tangent lines from the phone to f₁ and f₂ points
+    ctx.setLineDash([4,4]); ctx.lineWidth = 1.2;
+    ctx.strokeStyle = COL.blue; ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(X(thA), Y(thA)); ctx.stroke();
+    ctx.strokeStyle = COL.red; ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(X(thR), Y(thR)); ctx.stroke(); ctx.setLineDash([]);
+    // labels at the extremes
+    const mark = (th, col, label, dy) => {
+      const x = X(th), y = Y(th);
+      ctx.fillStyle = col; ctx.strokeStyle = "#fff"; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(x, y, 6.5, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.font = `700 12px ${MONO}`; ctx.textAlign = "center"; ctx.textBaseline = dy > 0 ? "top" : "bottom";
+      ctx.fillStyle = col; ctx.fillText(label, x, y + dy);
+    };
+    mark(thA, COL.blue, "f₁ 접근 최대", 12); mark(thR, COL.red, "f₂ 후퇴 최대", -12);
+    phone(ctx, mx, my);
+    // the source
+    const sx = X(theta), sy = Y(theta);
+    ctx.strokeStyle = COL.faint; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(sx, sy); ctx.stroke();
+    const approaching = Math.sin(theta) < 0, col = approaching ? COL.blue : COL.red;
+    const tx = -Math.sin(theta), ty = -Math.cos(theta); // screen-space tangent for counter-clockwise motion
+    arrow(ctx, sx, sy, sx + tx*R*0.55, sy + ty*R*0.55, COL.ink, 2);
+    ctx.font = `600 11px ${MONO}`; ctx.fillStyle = COL.ink; ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText("v", sx + tx*R*0.62 + 3, sy + ty*R*0.62);
+    ctx.fillStyle = col; ctx.strokeStyle = "#fff"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(sx, sy, 11, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#fff"; ctx.font = `700 10px ${MONO}`; ctx.textAlign = "center"; ctx.fillText("♪", sx, sy + 0.5);
+    // readout
+    const f = freqAt(theta), box = $("#nowBox");
+    const near = Math.abs(Math.sin(theta)) < 0.12;
+    $("#nowTxt").textContent = near ? (Math.cos(theta) > 0 ? "휴대폰 앞을 지나는 중" : "휴대폰 반대편을 지나는 중") : approaching ? "다가오는 중 (접근)" : "멀어지는 중 (후퇴)";
+    box.className = "now" + (near ? "" : approaching ? " ap" : " re");
+    $("#nowF").textContent = P.ok ? `이 순간 들리는 진동수 ≈ ${f.toFixed(1)} Hz` : "";
+    const lo = freqAt(thR), hi = freqAt(thA), pct = hi > lo ? (f - lo)/(hi - lo) : 0.5;
+    $("#gDot").style.left = (Math.min(1, Math.max(0, pct))*100).toFixed(1) + "%";
+    draw.g = g;
+  }
+  function stepAnim(now){
+    raf = 0;
+    if ($("#orbitBlock").hidden || !playing) return;
+    const dt = Math.min(0.05, (now - (last || now))/1000); last = now;
+    const period = Math.max(0.4, P.rot || 1.15)*3, om = 2*Math.PI/period;
+    theta = (theta + om*dt) % (2*Math.PI);
+    const g = draw.g;
+    if (g){ // visual wave speed: 2.2 × the drawn source speed, so the bunching is easy to see
+      const vs = om*g.R, cs = vs*2.2; emitAcc += dt;
+      const gap = period/14;
+      while (emitAcc >= gap){ emitAcc -= gap; rings.push({ x:g.cx + g.R*Math.cos(theta), y:g.cy - g.R*Math.sin(theta), r:0 }); }
+      for (const r of rings) r.r += cs*dt;
+      rings = rings.filter((r) => r.r < g.R*3.2);
+    }
+    draw();
+    raf = requestAnimationFrame(stepAnim);
+  }
+  function kick(){ if (!raf && playing && !$("#orbitBlock").hidden){ last = 0; raf = requestAnimationFrame(stepAnim); } }
+  $("#orbPlay").onclick = () => { playing = !playing; $("#orbPlay").textContent = playing ? "일시 정지" : "재생"; if (playing) kick(); };
+  if (!playing) $("#orbPlay").textContent = "재생";
+  window.addEventListener("resize", () => { rings = []; if (!$("#orbitBlock").hidden) draw(); });
+  return {
+    update(r, c){
+      if ($("#orbitBlock").hidden){ return; }
+      const ok = r && Number.isFinite(r.f1) && Number.isFinite(c);
+      P = ok ? { rot:r.rot || 1.15, f0:(r.f1 + r.f2)/2, f1:r.f1, f2:r.f2, c, v:c*(r.f1 - r.f2)/(r.f1 + r.f2), ok:true } : { ...P, ok:false };
+      $("#orbitMeta").textContent = ok ? (r.rot ? `회전 주기 ${r.rot.toFixed(2)} s (측정값)` : "회전 주기 미검출 · 1.15 s로 표시") : "";
+      $("#gLo").textContent = ok ? `f₂ ${r.f2.toFixed(0)}` : "f₂"; $("#gHi").textContent = ok ? `f₁ ${r.f1.toFixed(0)}` : "f₁";
+      $("#gMid").textContent = ok ? `${P.f0.toFixed(0)} Hz` : "f₀";
+      rings = []; draw(); kick();
+    },
+  };
+})();
+
+// ---------- results ----------
+const fmtF = (f) => Number.isFinite(f) ? f.toFixed(1) : "—";
+const pm = (x, d, unit) => { const lim = Math.pow(10, -d), u = unit ? " " + unit : ""; return x < lim/2 ? `± ${lim.toFixed(d)}${u} 미만` : `± ${x.toFixed(d)}${u}`; };
+function numInto(el, main, unit, pm){
+  el.textContent = main;
+  if (main === "—") return;
+  const sm = document.createElement("small"); sm.textContent = pm || unit; el.appendChild(sm);
+}
+function cell(tr, text, cls){ const td = document.createElement("td"); td.textContent = text; if (cls) td.className = cls; tr.appendChild(td); return td; }
+function renderResults(){
+  const T = tempOk() ? tempVal() : NaN, c = Number.isFinite(T) ? 331.3 + 0.606*T : NaN;
+  const r = S.result || {};
+  const has = Number.isFinite(r.f1), hasSe = Number.isFinite(r.sf1) && Number.isFinite(r.sf2);
+  numInto($("#f1Out"), fmtF(r.f1), "Hz", hasSe ? pm(r.sf1, 1, "Hz") : null);
+  numInto($("#f2Out"), fmtF(r.f2), "Hz", hasSe ? pm(r.sf2, 1, "Hz") : null);
+  numInto($("#dfOut"), has ? (r.f1 - r.f2).toFixed(1) : "—", "Hz");
+  numInto($("#f0Out"), fmtF(r.f0), "Hz");
+  const [ta, tb] = selRange();
+  $("#resMeta").textContent = `구간 ${ta.toFixed(2)}–${tb.toFixed(2)} s` + (r.rot && S.mode !== "linear" ? ` · 회전 주기 ${r.rot.toFixed(3)} s` : "") + ` · ${r.method || "—"}`;
+  const lin = S.mode === "linear";
+  $("#l1").textContent = lin ? "f₁ 접근 (멀리서 다가올 때)" : "f₁ 접근 (최댓값 평균)";
+  $("#l2").textContent = lin ? "f₂ 후퇴 (멀어진 뒤)" : "f₂ 후퇴 (최솟값 평균)";
+  $("#l0").textContent = lin ? "f₀ 음원 진동수 (맞춤값)" : "f₀ 전체 평균";
+  $("#circBlock").hidden = lin; $("#orbitBlock").hidden = lin; $("#linBlock").hidden = !lin;
+  orbit.update(r, c);
+  let v = NaN, svOut = NaN;
+  const sig = $("#vSig");
+  if (has && Number.isFinite(c)){
+    v = c*(r.f1 - r.f2)/(r.f1 + r.f2); $("#vMain").textContent = v.toFixed(2);
+    const sv = lin ? c*r.sbeta : hasSe ? 2*c*Math.sqrt((r.f2*r.sf1)**2 + (r.f1*r.sf2)**2)/(r.f1 + r.f2)**2 : NaN;
+    svOut = sv;
+    if (Number.isFinite(sv)){ sig.textContent = pm(sv, 2, "m/s"); sig.className = "pm"; }
+    else { sig.textContent = lin ? "불확도는 계산하지 못했습니다" : "회전 주기를 찾지 못해 불확도는 생략했습니다"; sig.className = "pm q"; }
+    $("#calcLine").textContent = `v = c·(f₁ − f₂)/(f₁ + f₂) = ${c.toFixed(1)} × (${r.f1.toFixed(1)} − ${r.f2.toFixed(1)}) / (${r.f1.toFixed(1)} + ${r.f2.toFixed(1)}) = ${v.toFixed(2)} m/s  (음속 c, ${T} °C)`;
+  } else {
+    $("#vMain").textContent = "—"; sig.textContent = Number.isFinite(c) ? "" : "교실 온도를 −10~45 °C 사이로 입력하세요"; sig.className = "pm q";
+    $("#calcLine").textContent = "—";
+  }
+  const warn = $("#resWarn");
+  let msg = r.err || "";
+  if (!msg && lin && has){
+    if (r.sMax < 0.7 || r.sMin > -0.7) msg = (r.sMin > -0.7 ? "다가오는 구간" : "멀어지는 구간") + "이 충분히 들어 있지 않습니다. 지나가기 전부터 지나간 뒤까지 넓게 고르면 더 정확합니다.";
+    else if (r.f1 - r.f2 < 2) msg = "Δf가 매우 작습니다. 음원 진동수를 2000~4000 Hz로 올리거나 더 빠르게 움직여 보세요.";
+    else if (r.rms > 0.25*(r.f1 - r.f2)) msg = "측정값이 맞춤 곡선에서 많이 벗어납니다. 속도가 일정하지 않았거나 잡음·반사음이 섞였을 수 있습니다.";
+  } else if (!msg && !lin){
+    msg = r.noRot ? "회전 주기를 찾지 못했습니다. 원운동이 아니거나 구간에 2바퀴 미만이 들어 있습니다. 상·하위 3% 값으로 대신 계산했습니다. 직선으로 지나가는 실험이면 위에서 '직선 운동'을 고르세요."
+      : (has && r.f1 - r.f2 < 2 ? "Δf가 매우 작습니다. 음원 진동수를 2000~4000 Hz로 올리거나 더 빠르게 돌려 보세요." : "");
+  }
+  warn.hidden = !msg; warn.textContent = msg;
+  const num = (x, d) => Number.isFinite(x) ? +x.toFixed(d) : null;
+  S.out = (has && Number.isFinite(c) && Number.isFinite(v)) ? {
+    mode: lin ? "직선 운동" : "원운동",
+    v: num(v, 3), sv: num(svOut, 4), f1: num(r.f1, 2), sf1: num(r.sf1, 3), f2: num(r.f2, 2), sf2: num(r.sf2, 3),
+    df: num(r.f1 - r.f2, 2), f0: num(r.f0, 2), tempC: num(T, 1), c: num(c, 2),
+    rot: lin ? null : num(r.rot, 4), cycles: lin ? null : (r.maxes ? r.maxes.length : null),
+    t0: lin && r.linear ? num(r.t0, 3) : null, d: lin && r.linear ? num(v*r.tau, 3) : null, rms: lin && r.linear ? num(r.rms, 2) : null,
+    selStart: num(ta, 2), selEnd: num(tb, 2), method: r.method || "", fileName: S.name || "",
+    duration: num(totalDur(), 2), warning: msg || "",
+  } : null;
+  syncSubmit();
+  if (lin){
+    const ok = r.linear && Number.isFinite(c);
+    numInto($("#t0Out"), ok ? r.t0.toFixed(2) : "—", "s");
+    numInto($("#dOut"), ok ? (v*r.tau).toFixed(2) : "—", "m");
+    numInto($("#rmsOut"), ok ? r.rms.toFixed(1) : "—", "Hz");
+    $("#linMeta").textContent = ok ? `d = v × ${r.tau.toFixed(3)} s` : "";
+    return;
+  }
+  const body = $("#tbody"), foot = $("#tfoot"); body.innerHTML = ""; foot.innerHTML = "";
+  if (r.maxes && r.maxes.length && Number.isFinite(c)){
+    r.maxes.forEach((p, i) => { const q = r.mins[i], vv = c*(p.f - q.f)/(p.f + q.f);
+      const tr = document.createElement("tr");
+      cell(tr, `${i + 1}`); cell(tr, p.t.toFixed(3), "t sl"); cell(tr, p.f.toFixed(1), "a");
+      cell(tr, q.t.toFixed(3), "t sl"); cell(tr, q.f.toFixed(1), "r"); cell(tr, (p.f - q.f).toFixed(1), "sl"); cell(tr, vv.toFixed(2), "v");
+      body.appendChild(tr); });
+    const tr = document.createElement("tr");
+    cell(tr, "평균"); cell(tr, "", "sl");
+    const c1 = cell(tr, r.f1.toFixed(1), "a"); if (hasSe){ const sm = document.createElement("small"); sm.textContent = pm(r.sf1, 1); c1.appendChild(sm); }
+    cell(tr, "", "sl");
+    const c2 = cell(tr, r.f2.toFixed(1), "r"); if (hasSe){ const sm = document.createElement("small"); sm.textContent = pm(r.sf2, 1); c2.appendChild(sm); }
+    cell(tr, (r.f1 - r.f2).toFixed(1), "sl"); cell(tr, Number.isFinite(v) ? v.toFixed(2) : "—", "v");
+    foot.appendChild(tr);
+    $("#tblMeta").textContent = `${r.maxes.length}바퀴`;
+  } else {
+    const tr = document.createElement("tr"), td = cell(tr, "회전이 2바퀴 이상 들어가면 바퀴별 값이 채워집니다", "emptyrow");
+    td.colSpan = 7; body.appendChild(tr); $("#tblMeta").textContent = "";
+  }
+}
+
+// ---------- steps ----------
+function busy(on, txt, pct){ $("#spin").classList.toggle("on", !!on); if (txt) $("#spinT").textContent = txt; $("#spinB").style.width = (pct || 0) + "%"; }
+function setHint(t){ const h = $("#hint"); h.hidden = !t; if (t) h.textContent = t; }
+function syncRail(){
+  $$("#rail button").forEach((b) => { const i = +b.dataset.s;
+    b.classList.toggle("on", i === S.step); b.classList.toggle("done", i !== S.step && i <= S.maxStep); b.disabled = i > S.maxStep; });
+}
+function setStep(n){
+  if (n !== 1) stopPlay(true);
+  S.step = n; S.maxStep = Math.max(S.maxStep, n);
+  syncRail();
+  ["open","sel","track","result"].forEach((k, i) => $("#p-" + k).classList.toggle("on", i === n));
+  $("#gNum").textContent = n + 1; renderGuide(GUIDES[S.mode][n][0], GUIDES[S.mode][n][1]);
+  const loaded = !!S.x;
+  $("#empty").hidden = loaded; CAN.hidden = !loaded; $("#console").hidden = !loaded; $("#stage").classList.toggle("solo", !loaded);
+  $("#badge").hidden = !loaded;
+  setHint(loaded ? HINTS[S.mode][n] : null);
+  $("#resBlock").hidden = !(n === 3 && S.result);
+  CAN.style.cursor = n === 1 ? "col-resize" : n === 2 ? "crosshair" : "default";
+  if (n === 3) renderResults();
+  render();
+}
+function invalidateTrack(){ S.track = null; S.result = null; S.maxStep = Math.min(S.maxStep, 1); syncRail(); }
+
+let job = 0;
+async function runTrack(){
+  const my = ++job;
+  const g = parseFloat($("#fguess").value);
+  S.fpeak = Number.isFinite(g) && g > 0 ? g : detectPeak(S.x, S.fs);
+  const label = `진동수 분석 중 · 음원 약 ${S.fpeak.toFixed(0)} Hz`;
+  busy(true, label, 0);
+  await tick();
+  const tr = await track(S.x, S.fs, S.fpeak, parseFloat($("#win").value), (p) => { if (my === job) busy(true, label, p*100); });
+  if (my !== job) return false;
+  busy(false);
+  S.track = tr;
+  const [ta, tb] = selRange();
+  let nv = 0, nt = 0; for (let j = 0; j < tr.t.length; j++) if (tr.t[j] >= ta && tr.t[j] <= tb){ nt++; nv += tr.valid[j]; }
+  const pct = nt ? nv/nt*100 : 0, low = S.fpeak < 1000, weak = pct < 60;
+  const info = $("#trackInfo"); info.hidden = false; info.className = "callout" + (low || weak ? "" : " ok");
+  info.textContent = `음원 약 ${S.fpeak.toFixed(1)} Hz · 진동수가 잡힌 구간 ${pct.toFixed(0)}%` +
+    (weak ? " · 잡히지 않은 구간이 많습니다. 음량을 키우거나 분석 창을 0.2초로 늘려 보세요." : "") +
+    (low ? " · 음원이 1000 Hz보다 낮아 변화가 작습니다. 2000~4000 Hz를 권장합니다." : "");
+  if (S.scopeT == null || S.scopeT < ta || S.scopeT > tb) S.scopeT = (ta + tb)/2;
+  analyzeSel();
+  return true;
+}
+
+function updateLenInfo(){
+  const li = $("#lenInfo");
+  if (!S.x || S.demo){ li.hidden = true; return; }
+  const dur = totalDur(), d = dur.toFixed(1), lin = S.mode === "linear";
+  const say = (ok, t) => { li.className = "callout" + (ok ? " ok" : ""); li.textContent = t; };
+  li.hidden = false;
+  if (lin){
+    if (dur < 1.5) say(false, `녹음이 ${d}초로 너무 짧습니다. 다가올 때부터 멀어진 뒤까지 3~10초가 들어가게 다시 녹음하거나 덜 잘라 주세요.`);
+    else if (dur < 3) say(false, `녹음이 ${d}초입니다. 계산은 되지만 지나가기 전·후 구간이 짧아 오차가 커질 수 있습니다. 권장 길이는 3~10초입니다.`);
+    else if (dur <= 10) say(true, `녹음 길이 ${d}초 · 권장 길이(3~10초)입니다.`);
+    else if (dur <= 30) say(true, `녹음 길이 ${d}초 · 음원이 지나가는 순간의 앞뒤 3~10초 구간만 골라 주세요.`);
+    else say(false, `녹음이 ${d}초로 깁니다. 30초를 넘으면 진동수 계산 간격이 넓어져 정밀도가 떨어집니다. 지나가는 순간의 앞뒤 3~10초만 남기고 잘라서 다시 올리는 것을 권장합니다.`);
+  } else {
+    if (dur < 3) say(false, `녹음이 ${d}초로 너무 짧습니다. 회전이 최소 3바퀴 들어가도록 5~15초로 다시 녹음하거나 덜 잘라 주세요.`);
+    else if (dur < 5) say(false, `녹음이 ${d}초입니다. 계산은 되지만 바퀴 수가 적어 오차(±)가 커질 수 있습니다. 권장 길이는 5~15초입니다.`);
+    else if (dur <= 15) say(true, `녹음 길이 ${d}초 · 권장 길이(5~15초)입니다.`);
+    else if (dur <= 30) say(true, `녹음 길이 ${d}초 · 분석은 정밀하게 되지만, 회전이 일정한 5~15초 구간만 골라 주세요.`);
+    else say(false, `녹음이 ${d}초로 깁니다. 30초를 넘으면 진동수 계산 간격이 넓어져 정밀도가 떨어집니다. 회전이 일정한 5~15초만 남기고 잘라서 다시 올리는 것을 권장합니다.`);
+  }
+}
+function setAudio(x, fs, name, demo){
+  job++; busy(false); stopPlay(true);
+  S.x = x; S.fs = fs; S.name = name; S.demo = demo; S.env = envelope(x, fs);
+  S.sel = !demo ? null : S.mode === "linear" ? [0.4, 5.4] : [2.2, 7.85]; S.scopeT = null; S.track = null; S.result = null; S.maxStep = 0;
+  $("#trackInfo").hidden = true;
+  updateLenInfo();
+  resetSubmit();
+  const badge = $("#badge"); badge.className = "badge" + (demo ? " demo" : "");
+  badge.textContent = !demo ? `${name} · ${(x.length/fs).toFixed(2)} s · ${Math.round(fs)} Hz`
+    : S.mode === "linear" ? "합성 예시 · 3000 Hz · 가장 가까운 거리 0.50 m · 2.0 m/s" : "합성 예시 · 3000 Hz · 1.13초/바퀴 · 5.0 m/s";
+  setStep(1);
+}
+
+async function loadFile(file){
+  const fresh = !S.x;
+  if (fresh){ $("#empty").hidden = true; CAN.hidden = false; }
+  busy(true, "파일 읽는 중", 10);
+  try {
+    const buf = await file.arrayBuffer();
+    const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const ac = new Ctx(1, 1, 48000);
+    const ab = await new Promise((res, rej) => { const p = ac.decodeAudioData(buf, res, rej); if (p && p.then) p.then(res, rej); });
+    const n = ab.length, x = new Float32Array(n);
+    for (let c = 0; c < ab.numberOfChannels; c++){ const d = ab.getChannelData(c); for (let i = 0; i < n; i++) x[i] += d[i]/ab.numberOfChannels; }
+    const maxLen = Math.min(n, Math.round(ab.sampleRate*90));
+    busy(false);
+    setAudio(maxLen < n ? x.subarray(0, maxLen) : x, ab.sampleRate, file.name + (maxLen < n ? " (앞 90초)" : ""), false);
+  } catch (e) {
+    busy(false);
+    if (fresh){ $("#empty").hidden = false; CAN.hidden = true; }
+    renderGuide("이 파일을 읽지 못했습니다", [
+      ["파일 형식이 ", {b:"m4a, wav, mp3"}, "인지 확인하세요"],
+      ["아이폰 음성 메모는 ", {b:"공유 → 파일에 저장"}, "으로 m4a 파일을 꺼낼 수 있습니다"],
+      ["녹음이 아주 길면 읽지 못할 수 있습니다 · ", {b:"5~15초"}, "로 잘라서 다시 올리세요"],
+    ]);
+  }
+}
+
+// synthetic demo: 3000 Hz source on a 0.90 m circle, 1.13 s per turn, mic 2 m from centre, starts turning at 1.6 s
+function makeDemo(){
+  const fs = 48000, dur = 9, n = fs*dur, x = new Float32Array(n);
+  const c = 331.3 + 0.606*22, f0 = 3000, r = 0.9, Trot = 1.13, D = 2.0, om = 2*Math.PI/Trot;
+  let seed = 12345; const rnd = () => { seed = (seed*1664525 + 1013904223) >>> 0; return seed/4294967296; };
+  let ph = 0;
+  for (let i = 0; i < n; i++){
+    const t = i/fs, moving = t >= 1.6, ang = om*Math.max(0, t - 1.6);
+    const sx = r*Math.cos(ang), sy = r*Math.sin(ang);
+    const vx = moving ? -r*om*Math.sin(ang) : 0, vy = moving ? r*om*Math.cos(ang) : 0;
+    const dx = D - sx, dy = -sy, dist = Math.hypot(dx, dy), vr = (vx*dx + vy*dy)/dist;
+    ph += 2*Math.PI*(f0*c/(c - vr))/fs;
+    const fade = t < 0.3 ? t/0.3 : t > dur - 0.6 ? Math.max(0, (dur - t)/0.6) : 1;
+    x[i] = fade*0.35*(1.2/dist)*Math.sin(ph) + 0.06*(rnd() - 0.5);
+  }
+  return { x, fs };
+}
+// synthetic demo: 3000 Hz source passing the mic in a straight line at 2.0 m/s, closest distance 0.50 m at t = 3 s.
+// The sound heard at time t left the source earlier, at te where t = te + r(te)/c.
+function makeDemoLinear(){
+  const fs = 48000, dur = 6, n = fs*dur, x = new Float32Array(n);
+  const c = 331.3 + 0.606*22, f0 = 3000, v = 2.0, d = 0.5, tp = 3.0;
+  let seed = 24680; const rnd = () => { seed = (seed*1664525 + 1013904223) >>> 0; return seed/4294967296; };
+  for (let i = 0; i < n; i++){
+    const t = i/fs; let te = t, r = d;
+    for (let k = 0; k < 4; k++){ r = Math.hypot(d, v*(te - tp)); te = t - r/c; }
+    const fade = t < 0.3 ? t/0.3 : t > dur - 0.5 ? Math.max(0, (dur - t)/0.5) : 1;
+    x[i] = fade*0.4*(d/r)*Math.sin(2*Math.PI*f0*te) + 0.03*(rnd() - 0.5);
+  }
+  return { x, fs };
+}
+function loadDemo(){ const d = S.mode === "linear" ? makeDemoLinear() : makeDemo(); setAudio(d.x, d.fs, "합성 예시 녹음", true); }
+
+function applyModeUI(){
+  const lin = S.mode === "linear";
+  $("#mCirc").setAttribute("aria-pressed", String(!lin)); $("#mLin").setAttribute("aria-pressed", String(lin));
+  $("#tipB").textContent = lin ? "권장 길이 3~10초" : "권장 길이 5~15초";
+  $("#tipT").textContent = lin ? " · 다가올 때부터 멀어진 뒤까지" : " · 회전이 일정한 부분만 남기기";
+}
+async function setMode(m){
+  if (m !== "linear" && m !== "circular" || m === S.mode) return;
+  S.mode = m; applyModeUI();
+  try { history.replaceState(null, "", "#" + m); } catch (e) {}
+  if (!S.x){ setStep(S.step); return; }
+  if (S.demo){ // the example recording belongs to its mode: swap it and come back to the same step
+    const prev = S.step; loadDemo();
+    if (prev >= 2 && await runTrack()){ S.maxStep = 3; setStep(prev); }
+    return;
+  }
+  updateLenInfo();
+  if (S.track) analyzeSel();
+  setStep(S.step);
+}
+
+// ---------- playback ----------
+const PLAY = { ctx:null, src:null, t0:0, off:0, end:0, raf:0 };
+function playLabel(on){ const b = $("#playBtn"); b.textContent = on ? "■ 정지" : "▶ 소리 듣기"; b.setAttribute("aria-pressed", String(on)); }
+function stopPlay(quiet){
+  if (PLAY.src){ const s = PLAY.src; PLAY.src = null; s.onended = null; try { s.stop(); } catch (e) {} }
+  cancelAnimationFrame(PLAY.raf); PLAY.raf = 0;
+  const was = S.playT != null; S.playT = null; playLabel(false);
+  if (was && !quiet && S.x && S.step <= 1) drawOverview();
+}
+function startPlay(){
+  if (!S.x) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC){ $("#selV").textContent = "이 브라우저에서는 소리를 재생할 수 없습니다"; return; }
+  stopPlay(true);
+  if (!PLAY.ctx) PLAY.ctx = new AC();
+  if (PLAY.ctx.state === "suspended" && PLAY.ctx.resume) PLAY.ctx.resume();
+  const [ta, tb] = selRange(), fs = S.fs, i0 = Math.max(0, Math.floor(ta*fs)), i1 = Math.min(S.x.length, Math.ceil(tb*fs)), n = i1 - i0;
+  if (n < fs*0.05) return;
+  // level the loudness (recordings are often quiet) and fade 10 ms at both ends so it doesn't click
+  let pk = 0; for (let i = i0; i < i1; i++){ const a = Math.abs(S.x[i]); if (a > pk) pk = a; }
+  const g = pk > 0 ? Math.min(8, 0.7/pk) : 1, fade = Math.min(Math.round(fs*0.01), n >> 2);
+  const buf = PLAY.ctx.createBuffer(1, n, fs), ch = buf.getChannelData(0);
+  for (let i = 0; i < n; i++){ const e = i < fade ? i/fade : i > n - fade ? (n - i)/fade : 1; ch[i] = S.x[i0 + i]*g*e; }
+  const src = PLAY.ctx.createBufferSource(); src.buffer = buf; src.connect(PLAY.ctx.destination);
+  src.onended = () => { if (PLAY.src === src) stopPlay(); };
+  PLAY.src = src; PLAY.off = i0/fs; PLAY.end = i1/fs; PLAY.t0 = PLAY.ctx.currentTime + 0.03;
+  src.start(PLAY.t0); playLabel(true);
+  const frame = () => {
+    if (PLAY.src !== src) return;
+    S.playT = Math.min(PLAY.end, PLAY.off + Math.max(0, PLAY.ctx.currentTime - PLAY.t0));
+    if (S.step <= 1) drawOverview();
+    PLAY.raf = requestAnimationFrame(frame);
+  };
+  PLAY.raf = requestAnimationFrame(frame);
+}
+$("#playBtn").onclick = () => { if (PLAY.src) stopPlay(); else startPlay(); };
+
+// ---------- live recording ----------
+// Raw PCM straight from the microphone, with the browser's voice processing switched off:
+// echo cancellation, noise suppression and auto gain would distort or remove a steady tone.
+const REC = { on:false, stream:null, ctx:null, src:null, node:null, sink:null, chunks:[], n:0, fs:0, lvl:0, peak:0, raf:0, lastPitch:0, MAX:60 };
+function recErr(t, link){
+  const e = $("#recErr"); e.hidden = !t; e.textContent = t || "";
+  if (t && link){ const a = document.createElement("a"); a.href = link; a.target = "_top"; a.rel = "noopener"; a.className = "b pri"; a.textContent = "녹음되는 화면으로 열기"; a.style.marginTop = "10px"; a.style.display = "inline-flex"; e.appendChild(document.createElement("br")); e.appendChild(a); }
+  if (t && !S.x){ $("#empty").hidden = false; }
+}
+function micBlockedByFrame(){ try { const fp = document.permissionsPolicy || document.featurePolicy; return !!(fp && fp.allowsFeature && !fp.allowsFeature("microphone")); } catch (e) { return false; } }
+function micPageLink(){ // set by Code.gs: the same page hosted outside Apps Script, with this web app's address
+  const u = window.DOPPLER_MIC_PAGE; if (typeof u !== "string" || !/^https:\/\//.test(u)) return "";
+  try { const x = new URL(u); if (STU.id){ x.searchParams.set("sid", STU.id); x.searchParams.set("sname", STU.name); } if (S.mode === "linear") x.hash = "linear"; return x.toString(); } catch (e) { return ""; }
+}
+function frameMicMessage(){
+  const link = micPageLink();
+  recErr(link ? "이 화면은 구글 Apps Script 안에서 열려 있어 마이크를 쓸 수 없습니다. 아래 버튼으로 같은 앱을 녹음이 되는 화면으로 여세요. 학번·이름과 제출 기능은 그대로입니다."
+              : "이 화면에서는 브라우저가 마이크를 막고 있습니다. 녹음 앱으로 녹음한 뒤 '녹음 파일 선택'으로 올려 주세요.", link);
+}
+function showRecUI(on){
+  $("#recBox").hidden = !on;
+  if (on){ $("#empty").hidden = true; CAN.hidden = true; $("#console").hidden = true; $("#badge").hidden = true; setHint(null); $("#stage").classList.add("solo"); }
+}
+async function startRec(){
+  recErr("");
+  const md = navigator.mediaDevices;
+  if (!md || !md.getUserMedia){ recErr("이 브라우저에서는 바로 녹음을 쓸 수 없습니다. 녹음 앱으로 녹음한 뒤 '녹음 파일 선택'으로 올려 주세요."); return; }
+  if (micBlockedByFrame()){ frameMicMessage(); return; }
+  stopPlay(true);
+  let stream;
+  try { stream = await md.getUserMedia({ audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false, channelCount:1 } }); }
+  catch (e){
+    const n = e && e.name;
+    if ((n === "NotAllowedError" || n === "SecurityError") && inAppsScript()){ frameMicMessage(); return; }
+    recErr(n === "NotAllowedError" || n === "SecurityError" ? "마이크를 쓸 수 없습니다. 브라우저 주소창의 자물쇠(또는 설정)에서 마이크를 허용한 뒤 다시 누르세요. 안 되면 녹음 앱으로 녹음해 파일로 올려 주세요."
+      : n === "NotFoundError" ? "마이크를 찾지 못했습니다. 녹음 앱으로 녹음해 파일로 올려 주세요."
+      : "마이크를 켜지 못했습니다. 다른 앱이 마이크를 쓰고 있지 않은지 확인하거나, 녹음 앱으로 녹음해 파일로 올려 주세요.");
+    return;
+  }
+  const AC = window.AudioContext || window.webkitAudioContext;
+  const ctx = new AC();
+  try { if (ctx.state === "suspended") await ctx.resume(); } catch (e) {}
+  const src = ctx.createMediaStreamSource(stream), node = ctx.createScriptProcessor(4096, 1, 1), sink = ctx.createGain();
+  sink.gain.value = 0; // keep the processor running without sending the microphone to the speaker
+  Object.assign(REC, { on:true, stream, ctx, src, node, sink, chunks:[], n:0, fs:ctx.sampleRate, lvl:0, peak:0, lastPitch:0 });
+  node.onaudioprocess = (e) => {
+    if (!REC.on) return;
+    const d = e.inputBuffer.getChannelData(0), c = new Float32Array(d);
+    REC.chunks.push(c); REC.n += c.length;
+    let p = 0; for (let i = 0; i < c.length; i++){ const a = Math.abs(c[i]); if (a > p) p = a; }
+    REC.lvl = Math.max(p, REC.lvl*0.8); if (REC.n > REC.fs*0.3) REC.peak = Math.max(REC.peak, p);
+    if (REC.n >= REC.fs*REC.MAX) finishRec();
+  };
+  src.connect(node); node.connect(sink); sink.connect(ctx.destination);
+  $("#recState").textContent = "녹음 중"; $("#recStop").disabled = true; $("#recWarn").textContent = ""; $("#recPitch").textContent = "들리는 음 —";
+  $("#recTip").innerHTML = "";
+  const tip = S.mode === "linear"
+    ? [["음원이 "], ["출발하기 전부터 지나간 뒤까지", 1], [" 녹음하세요 · "], ["3~10초", 1], [" 권장 · 휴대폰은 움직이지 마세요"]]
+    : [["음원을 돌려 "], ["속도가 일정해졌을 때", 1], [" 시작하고 "], ["5~15초", 1], [" 뒤 끝내세요 · 휴대폰은 움직이지 마세요"]];
+  for (const [t, bold] of tip){ const el = document.createElement(bold ? "b" : "span"); el.textContent = t; $("#recTip").appendChild(el); }
+  showRecUI(true);
+  const tick = () => {
+    if (!REC.on) return;
+    const sec = REC.n/REC.fs;
+    $("#recTime").textContent = `${sec.toFixed(1)} s`;
+    $("#recStop").disabled = sec < 1;
+    $("#recLvl").style.width = Math.min(100, Math.sqrt(REC.lvl)*100).toFixed(1) + "%"; $("#recLvl").className = REC.lvl > 0.98 ? "clip" : REC.lvl > 0.7 ? "hot" : "";
+    $("#recWarn").textContent = REC.lvl > 0.98 ? "소리가 너무 커서 잘립니다 · 음량을 줄이세요" : sec > 1.5 && REC.peak < 0.01 ? "소리가 거의 들리지 않습니다" : sec > REC.MAX - 10 ? `${Math.ceil(REC.MAX - sec)}초 뒤 자동으로 끝납니다` : "";
+    const now = performance.now();
+    if (now - REC.lastPitch > 250 && REC.n > 8192){ // pitch of the last ~0.17 s, so students see the tone is being picked up
+      REC.lastPitch = now;
+      const need = 8192, buf = new Float32Array(need); let k = need, i = REC.chunks.length - 1;
+      while (k > 0 && i >= 0){ const ch = REC.chunks[i--], take = Math.min(k, ch.length); buf.set(ch.subarray(ch.length - take), k - take); k -= take; }
+      if (REC.lvl > 0.01) $("#recPitch").textContent = `들리는 음 ≈ ${detectPeak(buf, REC.fs).toFixed(0)} Hz`;
+    }
+    REC.raf = requestAnimationFrame(tick);
+  };
+  REC.raf = requestAnimationFrame(tick);
+}
+function releaseRec(){
+  REC.on = false; cancelAnimationFrame(REC.raf);
+  try { REC.src && REC.src.disconnect(); REC.node && REC.node.disconnect(); REC.sink && REC.sink.disconnect(); } catch (e) {}
+  if (REC.node) REC.node.onaudioprocess = null;
+  if (REC.stream) REC.stream.getTracks().forEach((t) => t.stop());
+  if (REC.ctx && REC.ctx.close) REC.ctx.close().catch(() => {});
+  REC.stream = REC.ctx = REC.src = REC.node = REC.sink = null;
+}
+function cancelRec(){
+  releaseRec(); REC.chunks = []; REC.n = 0;
+  $("#recBox").hidden = true; setStep(S.step);
+}
+function finishRec(){
+  if (!REC.on) return;
+  const fs = REC.fs, chunks = REC.chunks, n = REC.n;
+  releaseRec(); REC.chunks = []; REC.n = 0;
+  const skip = Math.min(Math.round(fs*0.15), Math.max(0, n - fs)); // drop the start-up click of the microphone
+  const x = new Float32Array(n - skip); let o = -skip;
+  for (const c of chunks){ for (let i = 0; i < c.length; i++, o++) if (o >= 0) x[o] = c[i]; }
+  $("#recBox").hidden = true;
+  if (x.length < fs*1){ setStep(S.step); recErr("녹음이 너무 짧습니다. 다시 녹음해 주세요."); return; }
+  const d = new Date(), two = (k) => String(k).padStart(2, "0");
+  setAudio(x, fs, `바로 녹음 ${two(d.getHours())}:${two(d.getMinutes())}`, false);
+}
+$("#recBtn").onclick = $("#recBtn2").onclick = startRec;
+$("#recStop").onclick = finishRec;
+$("#recCancel").onclick = cancelRec;
+document.addEventListener("visibilitychange", () => { if (document.hidden && REC.on){ $("#recState").textContent = "화면이 꺼져 녹음을 멈췄습니다"; finishRec(); } });
+
+// ---------- events ----------
+$("#mCirc").onclick = () => setMode("circular");
+$("#mLin").onclick = () => setMode("linear");
+window.addEventListener("hashchange", () => setMode((window.location.hash || "").slice(1)));
+$("#pick").onclick = $("#pick2").onclick = () => $("#file").click();
+$("#demo").onclick = $("#demo2").onclick = loadDemo;
+$("#demoWav").onclick = () => { // the same synthetic recording as a 16-bit WAV, so the upload step can be shown too
+  const d = S.mode === "linear" ? makeDemoLinear() : makeDemo(), n = d.x.length, buf = new ArrayBuffer(44 + n*2), v = new DataView(buf);
+  const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  str(0, "RIFF"); v.setUint32(4, 36 + n*2, true); str(8, "WAVE"); str(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, d.fs, true); v.setUint32(28, d.fs*2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, "data"); v.setUint32(40, n*2, true);
+  for (let i = 0; i < n; i++) v.setInt16(44 + i*2, Math.max(-1, Math.min(1, d.x[i]))*32767, true);
+  const url = URL.createObjectURL(new Blob([buf], { type:"audio/wav" })), a = document.createElement("a");
+  a.href = url; a.download = S.mode === "linear" ? "doppler_example_linear_3000Hz.wav" : "doppler_example_circular_3000Hz.wav"; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+};
+$("#resume").onclick = () => setStep(Math.max(1, S.maxStep));
+$("#file").onchange = (e) => { const f = e.target.files[0]; if (f) loadFile(f); e.target.value = ""; };
+const stage = $("#stage");
+stage.addEventListener("dragover", (e) => { e.preventDefault(); $("#empty").classList.add("drag"); });
+stage.addEventListener("dragleave", () => $("#empty").classList.remove("drag"));
+stage.addEventListener("drop", (e) => { e.preventDefault(); $("#empty").classList.remove("drag"); const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) loadFile(f); });
+$$("#rail button").forEach((b) => b.onclick = () => { const n = +b.dataset.s; if (n >= 2 && !S.track) return; setStep(n); });
+$$(".adv-t").forEach((b) => b.onclick = () => { const el = document.getElementById(b.dataset.t); el.classList.toggle("on"); b.textContent = (el.classList.contains("on") ? "－" : "＋") + b.textContent.slice(1); });
+$("#selAll").onclick = () => { S.sel = null; if (S.track) analyzeSel(); if (PLAY.src) startPlay(); render(); };
+$("#win").onchange = $("#fguess").onchange = () => invalidateTrack();
+$("#toTrack").onclick = async () => {
+  if (!tempOk()){ const e = $("#tempErr"); e.hidden = false; e.textContent = "교실 온도를 입력하세요. 음속을 계산하는 데 필요합니다. (−10~45 °C)"; $("#temp0").focus(); return; }
+  if (!S.track){ if (!(await runTrack())) return; } else analyzeSel(); setStep(2); };
+$("#backSel").onclick = $("#backSel2").onclick = () => setStep(1);
+$("#toResult").onclick = () => { analyzeSel(); setStep(3); };
+$("#showF").onclick = () => { S.showT = false; $("#showF").classList.add("sel"); $("#showT").classList.remove("sel"); render(); };
+$("#showT").onclick = () => { S.showT = true; $("#showT").classList.add("sel"); $("#showF").classList.remove("sel"); render(); };
+// one temperature, two inputs: step 2 (before analysis) and step 4 (results); both stay in sync
+const TKEY = "doppler.tempC";
+const tempVal = () => { const v = parseFloat($("#temp").value); return Number.isFinite(v) ? v : NaN; };
+const tempOk = () => { const v = tempVal(); return Number.isFinite(v) && v >= -10 && v <= 45; };
+function setTemp(v, from){
+  for (const id of ["#temp0", "#temp"]) if ($(id) !== from) $(id).value = v;
+  const t = tempVal(), ok = tempOk();
+  $("#cPrev").textContent = ok ? `음속 c = 331.3 + 0.606 × ${t} = ${(331.3 + 0.606*t).toFixed(1)} m/s` : Number.isFinite(t) ? "−10~45 °C 사이로 입력하세요" : "음속 계산에 쓰입니다";
+  if (ok){ $("#tempErr").hidden = true; try { localStorage.setItem(TKEY, String(t)); } catch (e) {} }
+  if (S.step === 3) renderResults();
+}
+["#temp0", "#temp"].forEach((id) => $(id).addEventListener("input", (e) => setTemp(e.target.value, e.target)));
+(() => { let saved = ""; try { saved = localStorage.getItem(TKEY) || ""; } catch (e) {} setTemp(DEMO && !saved ? "22" : saved, null); })();
+
+const tAt = (e) => { const m = CAN._map; if (!m) return null; const r = CAN.getBoundingClientRect(), px = e.clientX - r.left; const f = (px - m.P.l)/(m.w - m.P.l - m.P.r); return m.x0 + Math.min(1, Math.max(0, f))*(m.x1 - m.x0); };
+CAN.addEventListener("pointerdown", (e) => {
+  const t = tAt(e); if (!S.x || t == null) return;
+  if (S.step === 1){ S.drag = { a:t, b:t }; CAN.setPointerCapture(e.pointerId); }
+  else if (S.step === 2){ S.scopeT = t; render(); }
+});
+CAN.addEventListener("pointermove", (e) => { if (S.drag){ const t = tAt(e); if (t != null){ S.drag.b = t; drawOverview(); } } });
+CAN.addEventListener("pointerup", (e) => {
+  if (!S.drag) return;
+  const a = S.drag.a, b = tAt(e) ?? S.drag.b; S.drag = null;
+  if (Math.abs(b - a) > 0.3){ S.sel = [Math.min(a, b), Math.max(a, b)]; if (S.track) analyzeSel(); if (PLAY.src) startPlay(); }
+  else S.scopeT = b;
+  render();
+});
+
+// ---------- CSV ----------
+function csvText(){
+  const tr = S.track; if (!tr) return "";
+  const lines = ["time_s,f_Hz,T_us,valid"];
+  for (let j = 0; j < tr.t.length; j++) lines.push(`${tr.t[j].toFixed(4)},${tr.f[j].toFixed(3)},${(1e6/tr.f[j]).toFixed(2)},${tr.valid[j]}`);
+  return lines.join("\n");
+}
+$("#copyCsv").onclick = () => {
+  const t = csvText(); if (!t) return;
+  const done = (m) => $("#csvMsg").textContent = m;
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(() => done("복사했습니다. 엑셀에 붙여넣으세요."), () => done("복사가 막혀 있습니다. CSV 저장을 이용하세요."));
+  else done("복사가 막혀 있습니다.");
+};
+(async () => {
+  try {
+    const dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null;
+    const btn = $("#saveCsv"); btn.hidden = false;
+    if (!dl){
+      btn.onclick = () => { const t = csvText(); if (!t) return;
+        const url = URL.createObjectURL(new Blob(["\ufeff" + t], { type:"text/csv;charset=utf-8" }));
+        const a = document.createElement("a"); a.href = url; a.download = "doppler_f_t.csv"; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 2000); $("#csvMsg").textContent = "저장했습니다. 저장이 안 되면 결과 표 복사를 이용하세요."; };
+      return;
+    }
+    btn.onclick = async () => { const t = csvText(); if (!t) return;
+      try { await dl.save({ filename:"doppler_f_t.csv", data:t }); $("#csvMsg").textContent = "저장했습니다."; }
+      catch (e) { if (e && (e.code === "unavailable" || e.code === "not_granted")) btn.hidden = true; else if (e && e.code !== "declined") $("#csvMsg").textContent = "저장하지 못했습니다. 결과 표 복사를 이용하세요."; } };
+  } catch (e) {}
+})();
+
+let rz; window.addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(render, 120); });
+
+// ---------- student & submission ----------
+const KEY = "doppler.student";
+const STU = { id:"", name:"" };
+function loadStu(){ try { const v = JSON.parse(localStorage.getItem(KEY) || "null"); if (v && v.id) return v; } catch (e) {} return null; }
+function saveStu(){ try { localStorage.setItem(KEY, JSON.stringify(STU)); } catch (e) {} }
+function openGate(){
+  let prev = loadStu() || STU;
+  try { const q = new URLSearchParams(location.search), id = q.get("sid"), nm = q.get("sname"); if (id) prev = { id, name: nm || prev.name || "" }; } catch (e) {}
+  $("#sid").value = prev.id || ""; $("#sname").value = prev.name || ""; $("#gateErr").textContent = "";
+  $("#gate").hidden = false; setTimeout(() => ($("#sid").value ? $("#sname") : $("#sid")).focus(), 30);
+}
+$("#gateForm").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const id = $("#sid").value.trim().replace(/\s+/g, ""), name = $("#sname").value.trim().replace(/\s+/g, " ");
+  const err = !id ? "학번을 적어 주세요." : !/^[0-9A-Za-z-]{1,20}$/.test(id) ? "학번은 숫자(와 영문, -)로만 적어 주세요."
+    : !name ? "이름을 적어 주세요." : name.length > 20 ? "이름은 20자 이내로 적어 주세요." : "";
+  if (err){ $("#gateErr").textContent = err; return; }
+  STU.id = id; STU.name = name; saveStu();
+  $("#whoId").textContent = id; $("#whoName").textContent = name; $("#who").hidden = false;
+  $("#gate").hidden = true; resetSubmit();
+});
+$("#whoChange").onclick = openGate;
+
+let lastSubmitted = "";
+const outSig = () => S.out ? JSON.stringify([STU.id, STU.name, S.out]) : "";
+const inAppsScript = () => !!(window.google && google.script && google.script.run);
+// Outside Apps Script (e.g. GitHub Pages, where the microphone works) results are POSTed to the web app.
+// Its address comes from DOPPLER_SUBMIT_URL or from ?api=… in the link the teacher hands out.
+const APIKEY = "doppler.api";
+function submitUrl(){
+  const ok = (u) => typeof u === "string" && /^https:\/\/script\.google(usercontent)?\.com\/[^\s"'<>]+$/.test(u);
+  if (ok(window.DOPPLER_SUBMIT_URL)) return window.DOPPLER_SUBMIT_URL;
+  let q = ""; try { q = new URLSearchParams(location.search).get("api") || ""; } catch (e) {}
+  if (ok(q)){ try { localStorage.setItem(APIKEY, q); } catch (e) {} return q; }
+  try { const v = localStorage.getItem(APIKEY) || ""; if (ok(v)) return v; } catch (e) {}
+  return "";
+}
+const hasServer = () => inAppsScript() || !!submitUrl();
+function sendResult(payload){
+  if (inAppsScript()) return new Promise((res, rej) => google.script.run.withSuccessHandler(res).withFailureHandler(rej).submitResult(payload));
+  // text/plain keeps this a "simple" request (no CORS preflight, which Apps Script does not answer)
+  return fetch(submitUrl(), { method:"POST", headers:{ "Content-Type":"text/plain;charset=utf-8" }, body: JSON.stringify({ action:"submit", data:payload }) })
+    .then((r) => { if (!r.ok) throw new Error(`서버 응답 ${r.status}`); return r.json(); })
+    .then((j) => { if (!j || !j.ok) throw new Error((j && j.error) || "서버가 거절했습니다"); return j; })
+    .catch((e) => { throw new Error(e instanceof TypeError ? "인터넷 연결 또는 제출 주소를 확인하세요" : e.message); });
+}
+function setSubStatus(t, cls){ const el = $("#subStatus"); el.textContent = t || ""; el.className = "st" + (cls ? " " + cls : ""); }
+function resetSubmit(){ lastSubmitted = ""; setSubStatus(""); $("#submitBox").classList.remove("done"); syncSubmit(); }
+function syncSubmit(){
+  if (DEMO){ $("#submitBtn").disabled = true; $("#subDesc").textContent = "시연 모드에서는 제출되지 않습니다. 학생 화면에서는 이 버튼으로 값을 제출합니다."; return; }
+  const btn = $("#submitBtn"), ok = !!S.out && !!STU.id;
+  btn.disabled = !ok || btn.dataset.busy === "1";
+  const sameAsLast = ok && lastSubmitted && lastSubmitted === outSig();
+  $("#submitBox").classList.toggle("done", !!sameAsLast);
+  if (!ok){ $("#subDesc").textContent = !STU.id ? "학번과 이름을 먼저 적어 주세요." : "속도가 계산되면 제출할 수 있습니다."; return; }
+  $("#subDesc").textContent = sameAsLast ? "같은 값으로 다시 제출하면 기록이 하나 더 추가됩니다."
+    : `${STU.id} ${STU.name} · ${S.out.mode} · v = ${S.out.v.toFixed(2)} m/s 를 선생님께 제출합니다.`;
+  if (lastSubmitted && !sameAsLast) setSubStatus("값이 바뀌었습니다 · 다시 제출하세요", "wait");
+}
+$("#submitBtn").onclick = () => {
+  if (!S.out || !STU.id) return;
+  if (!hasServer()){ setSubStatus("제출 주소가 없습니다 · 선생님이 알려 준 주소로 다시 여세요", "bad"); return; }
+  const btn = $("#submitBtn"), payload = Object.assign({ studentId:STU.id, name:STU.name }, S.out), sig = outSig();
+  btn.dataset.busy = "1"; btn.disabled = true; btn.textContent = "제출 중…"; setSubStatus("");
+  sendResult(payload)
+    .then((res) => {
+      btn.dataset.busy = ""; btn.textContent = "다시 제출";
+      lastSubmitted = sig;
+      setSubStatus(`제출했습니다 · ${res && res.time ? res.time : ""}` + (res && res.count > 1 ? ` (${res.count}번째 제출)` : ""), "ok");
+      syncSubmit();
+    })
+    .catch((err) => {
+      btn.dataset.busy = ""; btn.textContent = "실험값 제출"; syncSubmit();
+      setSubStatus("제출하지 못했습니다 · " + ((err && err.message) || "잠시 뒤 다시 시도하세요"), "bad");
+    });
+};
+
+(() => {
+  if (window.location && window.location.hash === "#linear") S.mode = "linear";
+  applyModeUI();
+  setStep(0);
+  if (DEMO){
+    ["#demo", "#demo2", "#demoWav", "#demoBar"].forEach((q) => { $(q).hidden = false; });
+    $("#who").hidden = false; $("#whoId").textContent = "시연"; $("#whoName").textContent = "교사"; $("#whoChange").hidden = true;
+    $("#gate").hidden = true;
+  } else openGate();
+})();
+})();
+</script>
+</body>
+</html>
