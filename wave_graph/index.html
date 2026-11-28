@@ -1,0 +1,1710 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>파동 그림 그리기</title>
+<style>
+  :root { --panel:#f6f7f9; --line:#dfe2e7; --accent:#2b6cb0; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif; color:#222; background:#fff; display:flex; height:100vh; overflow:hidden; }
+  #panel { width:390px; min-width:390px; height:100vh; overflow-y:auto; background:var(--panel); border-right:1px solid var(--line); padding:12px 12px 40px; font-size:13px; }
+  #right { flex:1; display:flex; flex-direction:column; min-width:0; }
+  #stage { flex:1; display:flex; align-items:center; justify-content:center; overflow:auto; background:#fff; padding:20px; }
+  #timebar { border-top:1px solid var(--line); background:var(--panel); padding:8px 14px; font-size:13px; }
+  #timebar:empty, #timebar.off { display:none; }
+  .trow { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin:3px 0; }
+  .trow .tl { font-weight:bold; margin-right:2px; }
+  .trow input[type=range] { flex:1; min-width:160px; }
+  .sep { width:1px; height:22px; background:#cfd3d9; margin:0 4px; }
+  .hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  h1 { font-size:16px; margin:0; }
+  details { background:#fff; border:1px solid var(--line); border-radius:8px; margin-bottom:8px; }
+  summary { cursor:pointer; padding:8px 10px; font-weight:bold; user-select:none; }
+  details.sub { border:none; border-top:1px dashed var(--line); border-radius:0; margin:8px 0 0; }
+  details.sub summary { padding:6px 0; font-weight:normal; color:#2b6cb0; font-size:12.5px; }
+  .sec { padding:2px 10px 10px; }
+  .row { display:flex; align-items:center; gap:6px; margin:5px 0; flex-wrap:wrap; }
+  .row > label:first-child:not(.ck) { min-width:104px; color:#444; }
+  label.ck { color:#333; display:inline-flex; align-items:center; gap:4px; }
+  label.sl { color:#444; margin-left:6px; }
+  input[type=number], input[type=text], select { padding:3px 5px; border:1px solid #c5c9d0; border-radius:4px; font-size:13px; font-family:inherit; background:#fff; }
+  input[type=number] { width:70px; }
+  input[type=text] { width:170px; }
+  input.s { width:58px !important; } input.xs { width:44px !important; } input.m { width:96px !important; }
+  .unit { color:#777; font-size:12px; }
+  button { font-family:inherit; font-size:13px; padding:4px 9px; border:1px solid #b9bec7; background:#fff; border-radius:5px; cursor:pointer; }
+  button:hover { background:#eef3fa; }
+  .tip { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; background:#dfe6ef; color:#3d5a80; font-size:11px; font-weight:bold; cursor:help; vertical-align:middle; }
+  .medium { border:1px solid #e3e6ea; border-radius:6px; padding:6px 8px; margin:6px 0; background:#fafbfc; }
+  .medium .head { display:flex; justify-content:space-between; align-items:center; gap:6px; }
+  .hint { color:#777; font-size:11.5px; line-height:1.45; margin:4px 0; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:4px 8px; margin-top:4px; }
+  .fl { display:flex; align-items:center; gap:4px; color:#555; font-size:12px; }
+  .fl > span { min-width:50px; }
+  .fl input[type=number] { width:64px; } .fl input[type=text] { width:88px; } .fl select { max-width:96px; }
+  .seg { display:flex; flex:1; border:1px solid #b9bec7; border-radius:6px; overflow:hidden; }
+  .seg button { flex:1; border:none; border-radius:0; padding:6px 8px; background:#fff; color:#333; }
+  .seg button + button { border-left:1px solid #b9bec7; }
+  .seg button.on { background:var(--accent); color:#fff; font-weight:bold; }
+  .seg button:not(.on):hover { background:#eef3fa; }
+  .topbox { background:#fff; border:1px solid var(--line); border-radius:8px; padding:6px 10px; margin:0 0 8px; }
+  .topbox .row > label:first-child { min-width:52px; font-weight:bold; }
+  #info { font-size:12px; line-height:1.6; }
+  #waveImg { display:block; max-width:none; }
+  #svgWrap { position:relative; line-height:0; }
+  #stage.dragging { justify-content:flex-start; align-items:flex-start; }
+  svg.pv { position:absolute; left:0; top:0; pointer-events:none; z-index:3; overflow:visible; }
+  .pvtip { position:absolute; z-index:6; pointer-events:none; background:rgba(30,40,55,.62); color:#fff; font-size:12px; line-height:1.3; padding:3px 7px; border-radius:5px; white-space:nowrap; }
+  .ah { position:absolute; width:24px; height:24px; border-radius:50%; z-index:5; touch-action:none; }
+  .ah.hx { cursor:ew-resize; } .ah.hy { cursor:ns-resize; }
+  #stage:hover .ah { background:rgba(43,108,176,.13); outline:1.5px dashed rgba(43,108,176,.55); }
+  .ah:hover, .ah.active { background:rgba(43,108,176,.28) !important; }
+  .dg { position:absolute; z-index:4; cursor:move; border-radius:4px; touch-action:none; }
+  .dg.tip { cursor:ew-resize; border-radius:50%; z-index:5; }
+  #stage:hover .dg { outline:1px dashed rgba(43,108,176,.45); }
+  .dg.pt2 { border-radius:50%; } .dg.rot { cursor:grab; }
+  body.ptmode #svgWrap { cursor:crosshair !important; }
+  .dg.delpt { cursor:pointer; } .dg.delpt:hover { background:rgba(210,50,50,.25) !important; outline-color:#d33 !important; }
+  .dg:hover { background:rgba(43,108,176,.10); } .dg.tip:hover { background:rgba(43,108,176,.25); }
+  #topbar { border-bottom:1px solid var(--line); background:var(--panel); padding:6px 14px; font-size:13px; }
+  #topbar .trow { gap:8px 12px; margin:4px 0; }
+  #topbar .seg { flex:none; }
+  #topbar .seg button { padding:5px 12px; white-space:nowrap; }
+  #topbar button { white-space:nowrap; }
+  .tgroup { display:flex; align-items:center; gap:6px; }
+  .grow { flex:1; }
+  .q { display:flex; align-items:center; gap:6px; flex:0 1 250px; min-width:200px; }
+  .q .nf { min-width:100px; }
+  .ql { font-size:12px; color:#444; white-space:nowrap; }
+  .chip { border-radius:14px; padding:3px 11px; font-size:12px; color:#555; }
+  #w2Bar { border-top:1px dashed var(--line); padding-top:6px; }
+  .w2title { font-weight:bold; color:#234; }
+  .chip.on { background:#e3eefb; border-color:var(--accent); color:var(--accent); font-weight:bold; }
+  body.nopanel #panel { display:none; }
+  #panelBtn.on { background:#e3eefb; border-color:var(--accent); color:var(--accent); }
+  /* 슬라이더 + 값 (정확한 숫자칸은 접힘) */
+  .nf { display:inline-flex; align-items:center; gap:5px; flex:1 1 130px; min-width:110px; }
+  .nf input[type=range] { flex:1; min-width:60px; height:18px; margin:0; accent-color:var(--accent); }
+  .nf .val { min-width:42px; padding:1px 6px; font-size:12px; border:1px solid transparent; border-bottom:1px dashed #9aa4b1; border-radius:3px; background:none; color:#234; text-align:right; cursor:text; }
+  .nf .val:hover { background:#eef3fa; border-color:#c5d3e4; }
+  .nf input[type=number] { display:none; width:66px !important; }
+  .nf.edit input[type=number] { display:inline-block; }
+  .nf.edit .val { display:none; }
+  .fl:has(.nf) { grid-column:1/-1; }
+  .fl.ro b { font-weight:normal; color:#234; } .fl .nf { min-width:0; flex:1 1 auto; }
+  .fl > span { min-width:64px; }
+  .fl .nf .val { min-width:34px; }
+  #panel { width:420px; min-width:420px; }
+</style>
+</head>
+<body class="nopanel">
+<div id="panel">
+  <div class="hdr">
+    <h1>⚙ 세부 설정</h1>
+    <button onclick="togglePanel(false)" title="세부 설정 닫기">✕</button>
+  </div>
+
+  <details open class="only1d">
+    <summary>파동</summary>
+    <div class="sec">
+      <div class="row"><label>진동수 f (Hz)</label><input type="number" id="f" step="0.1"></div>
+    </div>
+  </details>
+
+  <!-- ===================== 1차원 ===================== -->
+  <details open class="only1d">
+    <summary>매질 <span class="tip" title="매질마다 속력만 정하면 파장은 주기에 맞춰 λ = vT로 자동 계산됩니다.&#10;경계의 반사 계수는 속력으로 자동 계산됩니다: r = (v투과 − v입사) / (v입사 + v투과) (줄의 경우).&#10;r = 반사파 진폭 ÷ 입사파 진폭, 투과파 진폭 = (1 + r) × 입사파 진폭입니다.&#10;느린 매질로 입사하면 r < 0 → 고정단 반사(반사파가 뒤집힘), 빠른 매질로 입사하면 r > 0 → 자유단 반사(반사파가 그대로)입니다.&#10;매질을 2개 이상 두면 매질 이름과 경계 점선이 자동으로 표시됩니다.&#10;'경계 x'는 그 매질이 끝나는 위치입니다.&#10;진동수는 모든 매질에서 같고, 경계에서 파동은 끊기지 않습니다.">?</span></summary>
+    <div class="sec">
+      <div id="mediaList"></div>
+      <div class="row"><button onclick="addMedium()">+ 매질 추가</button></div>
+      <div class="row"><label>반사파</label>
+        <select data-key="reflShow"><option value="sum">입사파와 합쳐서</option><option value="both">합성파 + 반사파 점선</option><option value="sep">따로 (가는 점선)</option><option value="none">그리지 않음 (진폭만 반영)</option></select></div>
+      <div class="hint">매질 이름은 그림에서 끌어서 옮깁니다.</div>
+      <div class="hint" id="tModeMediaHint" style="display:none">t축 그래프는 관찰 위치가 속한 매질의 진폭으로 그립니다.</div>
+    </div>
+  </details>
+
+  <details open id="frontSec">
+    <summary>파면 그림 <span class="tip" title="마루는 실선·골은 점선 세로선으로 그립니다.&#10;여러 시각을 줄마다 그리려면 '여러 시각 겹치기'를 켜고 곡선 목록에 시각과 줄 이름을 넣으세요.&#10;띠는 '파동 시작 x'부터 가로축 화살표 근처까지 그려집니다.&#10;재생하거나 시간을 넘기면 모든 줄이 함께 움직입니다.">?</span></summary>
+    <div class="sec">
+      <div class="row"><label>띠 높이 (px)</label><input type="number" data-key="stripH" step="2"></div>
+      <div class="row"><label>줄 간격 (px)</label><input type="number" data-key="stripGap" step="2"></div>
+      <div class="row"><label class="ck"><input type="checkbox" data-key="showLegend"> 범례</label>
+        <input type="text" data-key="legendCrest" class="s"><input type="text" data-key="legendTrough" class="s"></div>
+    </div>
+  </details>
+
+  <details open class="only1d">
+    <summary>축 · 눈금</summary>
+    <div class="sec">
+      <div class="row"><label class="ck"><input type="checkbox" data-key="showXAxis"> 가로축 표시</label>
+        <label class="ck" id="showYRow"><input type="checkbox" data-key="showYAxis"> 세로축 표시</label>
+        <span class="tip" title="끄면 그 축의 선·화살표·눈금·숫자·이름이 모두 숨겨집니다.">?</span></div>
+      <div class="row"><label>가로축 표시 범위 <span class="tip" title="슬라이더 값은 보이는 구간의 시작 위치입니다.&#10;움직이면 축 길이·그림 크기는 그대로 두고 보이는 구간 전체가 좌우로 옮겨집니다(파동·눈금도 함께).&#10;축 길이는 그림에서 가로축 화살표를 끌어서 바꿉니다.">?</span></label><input type="number" id="xPan" step="0.5"></div>
+      <div class="row"><label></label><span class="unit" id="xRangeTxt"></span></div>
+      <div class="row"><label>파동 시작 x</label><input type="number" data-key="waveStart" step="0.1"></div>
+      <div class="row" id="front1Row"><label>파동 앞머리 <span class="tip" title="t = 0에 파동이 도달해 있는 맨 앞 위치입니다. 그 앞은 아직 진동하지 않아 파동이 없습니다.&#10;재생하면 앞머리가 파동 속력으로 나아갑니다.&#10;'없음'이면 끝없이 이어진 파동입니다. 오른쪽 칸은 앞머리에 붙는 이름입니다.">?</span></label><input type="number" data-key="front1" data-blank step="0.5" placeholder="없음"><input type="text" data-key="front1Label" class="xs" title="앞머리 이름"><button onclick="S.front1='';syncInputs();draw();" style="padding:2px 7px;font-size:12px" title="앞머리 없애기 (끝없는 파동)">없음</button></div>
+      <div class="row"><label>눈금 간격 <span class="tip" title="0이면 눈금을 그리지 않습니다.">?</span></label><input type="number" data-key="tickStep" step="0.5"></div>
+      <div class="row"><label>숫자 라벨</label>
+        <select data-key="labelMode"><option value="auto">일정 간격</option><option value="custom">직접 입력</option><option value="none">없음</option></select></div>
+      <div class="row" id="labelStepRow"><label>라벨 간격</label><input type="number" data-key="labelStep" step="0.5"></div>
+      <div class="row" id="customRow"><label>직접 입력</label><input type="text" data-key="customLabels" placeholder="예: 1,2,3,4,6,8"></div>
+      <div class="row"><label class="ck"><input type="checkbox" data-key="grid"> 격자 <span class="tip" title="세로 격자선(│)을 아래 간격마다 그립니다. 0이면 그리지 않습니다.&#10;세로선은 세로축에 찍은 눈금의 범위까지 그립니다(눈금이 없으면 세로축 전체).&#10;가로 점선이 필요하면 세로축을 클릭해 눈금을 찍고, 그림을 클릭해 점선을 그리세요.">?</span></label></div>
+      <div class="row"><label>격자 간격</label><input type="number" data-key="gridX" step="0.5"></div>
+      <details class="sub">
+        <summary>축 이름 · 글자 세부 설정</summary>
+        <div class="row"><label>가로축 이름</label><input type="text" data-key="xLabel" class="m">
+          <select data-key="xLabelPos"><option value="below">화살표 아래</option><option value="right">화살표 오른쪽</option></select></div>
+        <div class="row"><label>세로축 이름</label><input type="text" data-key="yLabel" class="m"><span class="tip" title="| 를 넣으면 줄이 바뀝니다. 예: 변위|(m)">?</span></div>
+        <div class="row"><label class="ck"><input type="checkbox" data-key="italicVar"> 축 이름 첫 글자 기울임</label>
+          <label class="ck"><input type="checkbox" data-key="showOrigin"> 원점 "0"</label></div>
+        <div class="row"><label>숫자 위치</label>
+          <select data-key="labelPos"><option value="auto">자동 (파동 피하기)</option><option value="center">눈금 바로 아래</option><option value="right">눈금 오른쪽 아래</option></select>
+          <span class="tip" title="자동: 숫자가 파동 선과 겹치지 않는 자리(바로 아래 → 오른쪽 아래 → 왼쪽 아래 → 위쪽)를 고릅니다.">?</span></div>
+        <div class="row"><label>숫자 가로 이동</label><input type="number" data-key="labelDx" step="1"></div>
+        <div class="row"><label>숫자 세로 이동</label><input type="number" data-key="labelDy" step="1"></div>
+        <div class="row"><label class="ck"><input type="checkbox" data-key="labelHalo"> 글자 흰 테두리 <span class="tip" title="글자 둘레를 흰색으로 감싸서 선 위에 있어도 글자가 보이게 합니다.">?</span></label></div>
+        <div class="row"><label>테두리 두께</label><input type="number" data-key="haloW" step="1"></div>
+      </details>
+    </div>
+  </details>
+
+
+
+  <details id="curveSec">
+    <summary>여러 시각 겹쳐 그리기 <span class="tip" title="켜져 있는 동안에는 아래 목록의 시각(t축 모드에서는 위치)으로 곡선을 겹쳐 그립니다. 파면 그림에서는 목록의 시각마다 한 줄씩 그리고, 범례 글자가 줄 이름이 됩니다.&#10;재생하거나 시간을 넘기면 모든 곡선이 시간 간격을 유지한 채 함께 움직입니다(t = 0일 때 목록의 시각 그대로).&#10;범례 글자에 t=t_0처럼 쓰면 t₀ 아래첨자가 되고, 영문자는 기울임체로 나옵니다.">?</span></summary>
+    <div class="sec">
+      <div class="row"><label class="ck"><input type="checkbox" data-key="multi"> 겹쳐 그리기</label>
+        <span class="unit">범례</span><select data-key="curveLegend"><option value="ur">오른쪽 위</option><option value="ul">왼쪽 위</option><option value="none">없음</option></select></div>
+      <div id="curveList"></div>
+      <div class="row"><button onclick="addCurve()">+ 곡선 추가</button><span class="unit" id="curveUnit"></span></div>
+    </div>
+  </details>
+
+  <!-- ===================== 2차원 ===================== -->
+  <details open class="only2d">
+    <summary>영역 · 격자 · 선 <span class="tip" title="파면은 이 영역 밖으로 나가면 잘립니다.&#10;점, 치수선, 글자는 영역 밖에도 놓을 수 있습니다.">?</span></summary>
+    <div class="sec">
+      <div class="row"><label>영역 x 시작</label><input type="number" data-k2="rx0" step="0.5"></div>
+      <div class="row"><label>영역 x 끝</label><input type="number" data-k2="rx1" step="0.5"></div>
+      <div class="row"><label>영역 y 아래</label><input type="number" data-k2="ry0" step="0.5"></div>
+      <div class="row"><label>영역 y 위</label><input type="number" data-k2="ry1" step="0.5"></div>
+      <div class="row"><label>1단위 크기 (px)</label><input type="number" data-k2="scale" step="2"></div>
+      <div class="row"><label class="ck"><input type="checkbox" data-k2="grid"> 점선 격자</label><label class="ck"><input type="checkbox" data-k2="border"> 테두리</label>
+        <label class="ck"><input type="checkbox" data-k2="showCrest"> 마루</label><label class="ck"><input type="checkbox" data-k2="showTrough"> 골</label></div>
+      <div class="row"><label>격자 간격</label><input type="number" data-k2="gridStep" step="0.5"></div>
+      <div class="row"><label>마루 굵기</label><input type="number" data-k2="crestW" step="0.2"></div>
+      <div class="row"><label>골 굵기</label><input type="number" data-k2="troughW" step="0.2"></div>
+      <div class="row"><label class="ck"><input type="checkbox" data-key="showLegend"> 범례</label>
+        <input type="text" data-key="legendCrest" class="s"><input type="text" data-key="legendTrough" class="s"></div>
+    </div>
+  </details>
+
+  <details open class="only2d">
+    <summary>파원 <span class="tip" title="파면 위치 = 첫 마루 + v·t + nλ (v = λ/T), 골은 마루 사이 λ/2 지점입니다.&#10;최대 r을 비우면 영역 끝까지 그립니다.&#10;평면파의 (x, y)는 발생 장치 중심, 방향은 0° = 오른쪽, 90° = 위, −90° = 아래입니다.&#10;이름에 S_1처럼 쓰면 아래첨자, 글자에 | 를 넣으면 줄바꿈입니다.">?</span></summary>
+    <div class="sec">
+      <div id="srcList"></div>
+      <div class="row"><button onclick="add2D('src')">+ 점파원 (원형파)</button><button onclick="add2D('plane')">+ 평면파 (직선)</button></div>
+    </div>
+  </details>
+
+  <details open class="only2d">
+    <summary>점 (P, Q, R …)</summary>
+    <div class="sec">
+      <div id="ptList"></div>
+      <div class="row"><button onclick="add2D('pt')">+ 점 추가</button></div>
+    </div>
+  </details>
+
+  <details class="only2d">
+    <summary>선분 · 치수선 · 글자 <span class="tip" title="선분의 시작·끝에는 점 이름(P)이나 좌표(3,4)를 씁니다.&#10;치수선은 1 m, 20 cm, d_1 같은 길이 표시입니다.">?</span></summary>
+    <div class="sec">
+      <div id="segList"></div>
+      <div id="dimList"></div>
+      <div id="txtList"></div>
+      <div class="row"><button onclick="add2D('seg')">+ 선분</button><button onclick="add2D('dim')">+ 치수선</button><button onclick="add2D('txt')">+ 글자</button></div>
+    </div>
+  </details>
+
+  <details open>
+    <summary>계산값</summary>
+    <div class="sec"><div id="info"></div></div>
+  </details>
+</div>
+
+<div id="right">
+  <div id="topbar">
+    <div class="trow">
+      <select id="dimSel" hidden><option value="1d">1d</option><option value="2d">2d</option></select>
+      <div class="seg" data-for="dimSel"><button data-v="1d">1차원</button><button data-v="2d">2차원</button></div>
+      <div class="tgroup only1d"><select id="hMode" hidden><option value="x">x</option><option value="t">t</option></select>
+        <div class="seg" data-for="hMode"><button data-v="x">x축 (위치)</button><button data-v="t">t축 (시간)</button></div></div>
+      <div class="tgroup" id="styleRow"><select data-key="style1d" id="styleSel" hidden><option value="graph">g</option><option value="fronts">f</option></select>
+        <div class="seg" data-for="styleSel"><button data-v="graph">변위 그래프</button><button data-v="fronts">파면 (마루·골)</button></div></div>
+      <span class="grow"></span>
+      <button id="panelBtn" onclick="togglePanel()">⚙ 세부 설정</button>
+      <button onclick="resetAll()" title="모드(1차원/2차원 등)는 그대로 두고 설정값만 처음으로 되돌립니다">↺ 초기화</button>
+    </div>
+    <div class="trow">
+      <div class="q"><span class="ql">주기 T (s)</span><input type="number" id="T" step="0.1"></div>
+      <div class="q only1d"><span class="ql">속력 v (첫 매질)</span><input type="number" id="qV" step="0.1"></div>
+      <div class="q only1d"><span class="ql">진폭 A <span class="tip" title="파동이 출발하는 매질의 진폭입니다. 다른 매질의 진폭은 속력으로 정해지는 반사 계수에 따라 자동 계산됩니다.">?</span></span><input type="number" id="qA" step="0.1"></div>
+      <div class="q only2d"><span class="ql">파장 λ (모든 파원)</span><input type="number" id="q2Lambda" step="0.1"></div>
+      <div class="q only1d"><span class="ql">초기 위상 (°) <span class="tip" title="t=0일 때 x=0에서의 위상&#10;0° : 0에서 위로 올라감&#10;90° : 마루&#10;−90° : 골&#10;180° : 0에서 아래로 내려감">?</span></span><input type="number" data-key="phi" step="15"></div>
+      <div class="q" id="obsCtl"><span class="ql">관찰 위치 x <span class="tip" title="t축 그래프는 이 위치에 있는 매질 한 점의 변위를 시간에 따라 그립니다.">?</span></span><input type="number" data-key="obsX" step="0.5"></div>
+      <div class="tgroup only1d"><span class="ql">진행 방향</span>
+        <select data-key="dir" data-type="int" id="dirSel" hidden><option value="1">1</option><option value="-1">-1</option></select>
+        <div class="seg" data-for="dirSel"><button data-v="1">→ +x</button><button data-v="-1">← −x</button></div></div>
+      <div class="q" style="flex-basis:200px;min-width:170px"><span class="ql">글자 크기 <span class="tip" title="그림 안의 모든 글자(축 숫자·이름, 매질 이름, 진행 방향, 범례, 2차원의 파원·점·치수선·글자 등)의 크기를 한 번에 바꿉니다. 단위는 px입니다.">?</span></span><input type="number" id="qFs" step="1"></div>
+    </div>
+    <div class="trow">
+      <span class="ql">표시</span>
+      <button class="chip only1d" data-tog="showXAxis">가로축</button>
+      <button class="chip only1d" data-tog="showYAxis" id="chipY">세로축</button>
+      <button class="chip only1d" data-tog="grid">격자</button>
+      <button class="chip only1d" data-tog="showArrow" id="chipArrow">진행 방향 화살표</button>
+      <button class="chip only1d" data-tog="showLegend" id="chipLegend1">범례</button>
+      <button class="chip only1d" data-tog="w2on" id="chipW2">반대 방향 파동 (정상파)</button>
+      <button class="chip only1d" data-tog="multi" id="chipMulti">여러 시각 겹치기</button>
+      <button class="chip only2d" data-tog2="grid">격자</button>
+      <button class="chip only2d" data-tog2="border">테두리</button>
+      <button class="chip only2d" data-tog2="showCrest">마루</button>
+      <button class="chip only2d" data-tog2="showTrough">골</button>
+      <button class="chip only2d" data-tog="showLegend">범례</button>
+      <button class="chip only2d" id="ptModeBtn" onclick="togglePtMode()" title="켜면 그림을 클릭해 점(P, Q, R …)을 찍고, 이미 있는 점을 클릭하면 지웁니다. 마루·골이 만나는 곳 근처를 클릭하면 교차점에 정확히 붙습니다. Esc로 끕니다.">＋ 점 찍기 · 지우기</button>
+    </div>
+    <div class="trow" id="w2Bar">
+      <span class="ql w2title">두 번째 파동 <span class="tip" title="파동 1과 반대 방향으로 진행하는 파동 2입니다. 겹친 구간에서 합성파(정상파)가 그려집니다.&#10;t = 0에 두 파동이 구간 양 끝에서 동시에 출발합니다(초기 위상 대신 앞머리에서 변위 0이 되게 자동으로 맞춤). 재생하면 만나서 정상파가 되는 과정을 볼 수 있습니다.">?</span></span>
+      <div class="tgroup" id="w2relRow"><span class="ql">위상 <span class="tip" title="첫 번째 파동과 같음: 두 파원이 같은 위상으로 진동합니다 (양쪽 끝에서 출발하면 둘 다 마루부터 나감).&#10;반대: 두 파원이 반대 위상으로 진동합니다 (파동 2는 골부터 나감).">?</span></span>
+        <select data-key="w2rel" id="w2relSel" hidden><option value="same">s</option><option value="opp">o</option></select>
+        <div class="seg" data-for="w2relSel"><button data-v="same">첫 번째 파동과 같음</button><button data-v="opp">반대</button></div></div>
+      <div class="tgroup"><span class="ql">그리기</span>
+        <select data-key="w2show" id="w2showSel" hidden><option value="sum">s</option><option value="sumparts">sp</option><option value="parts">p</option></select>
+        <div class="seg" data-for="w2showSel"><button data-v="sum">합성파</button><button data-v="sumparts">합성파 + 각 파동</button><button data-v="parts">각 파동</button></div></div>
+      <button class="chip" data-tog="envelope">배 진폭 점선</button>
+      <button class="chip" data-tog="nodes">마디 ○</button>
+    </div>
+  </div>
+  <div id="stage"><div id="svgWrap"></div></div>
+  <div id="timebar">
+    <div id="timeCtl">
+      <div class="trow">
+        <span class="tl">시각 t</span><input type="number" id="t" data-key="t" step="0.05" class="s"><span class="unit">s</span><span class="unit" id="tInT"></span>
+        <input type="range" id="tSlider" min="0" max="2" step="0.005"><span class="unit" id="tSliderMax">0 ~ 2T</span>
+      </div>
+      <div class="trow">
+        <button id="playBtn" onclick="togglePlay()">▶ 재생</button>
+        <button onclick="resetPlay()" title="재생을 멈추고 t = 0으로 되돌립니다 (다른 설정은 그대로)">⏹ 재생 초기화</button>
+        <span class="unit">속도</span><input type="number" data-key="playSpeed" step="0.1" class="xs"><span class="unit">배</span>
+        <span class="sep"></span>
+        <button onclick="stepTime(-1)">◀</button><input type="number" data-key="dtVal" step="0.05" class="s"><select data-key="dtUnit"><option value="T">T</option><option value="s">s</option></select><button onclick="stepTime(1)">▶</button>
+        <span class="sep"></span>
+        <button onclick="jumpT(-0.25)">−T/4</button><button onclick="jumpT(0.25)">+T/4</button><button onclick="jumpT(0.5)">+T/2</button><button onclick="jumpT(1)">+T</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DEFAULTS = {
+  W:800, H:240, pad:0,
+  xAxMin:0, xAxMax:8.4, yMin:-1.35, yMax:1.9,
+  waveStart:0, waveEnd:7.7,
+  hMode:'x', obsX:0, axisSaved:{},
+  T:1, t:0, dtVal:0.125, dtUnit:'T', dir:1, phi:0, playSpeed:0.5,
+  amp:1, reflShow:'sum',
+  media:[{name:'매질 A', end:6, lambda:2, v:2, A:1, r:0, labelX:''}],
+  showNames:false, nameY:1.55, showBoundary:true,
+  xLabel:'x(m)', yLabel:'변위', italicVar:true, showOrigin:true,
+  tickStep:0.5, tickEnd:7.5, labelMode:'auto', labelStep:1, customLabels:'', labelPos:'auto', labelHalo:true, haloW:5, labelDx:0, labelDy:0,
+  yTicks:'', yTickLabels:'', yGuides:false, grid:false, gridX:0.5, yLines:[],
+  showArrow:true, arrowText:'진행 방향', arrowX:0.4, arrowLen:1.0, arrowY:1.55,
+  lw:2.5, axisLw:1.5, fs:18, color:'#000000',
+  front1:'', front1Label:'A', w2src:'ends', w2rel:'same', w2on:false, w2A:1, w2phi:0, w2front:'', w2Label:'B', w2show:'sum',
+  envelope:false, nodes:false,
+  showArrow2:true, arrow2X:5, arrow2Len:1.0, arrow2Y:1.55,
+  showXAxis:true, showYAxis:true,
+  multi:false, curves:[], curveLegend:'ur', xLabelPos:'below',
+  dim:'1d', style1d:'graph', frontRows:'0,3', frontRowLabels:'', stripH:46, stripGap:26,
+  showLegend:true, legendCrest:'마루', legendTrough:'골',
+  d2:{ rx0:0, rx1:10, ry0:0, ry1:6, scale:42, grid:true, gridStep:1, border:false,
+    showCrest:true, showTrough:true, crestW:2.2, troughW:2,
+    sources:[
+      {type:'point', name:'S_1', x:2, y:1, lambda:2, r0:0, rmin:1.5, rmax:'', showDot:true, pos:'ul', angle:-90, width:6, bar:true, barText:'물결파|발생 장치'},
+      {type:'point', name:'S_2', x:8, y:1, lambda:2, r0:0, rmin:1.5, rmax:'', showDot:true, pos:'ul', angle:-90, width:6, bar:true, barText:'물결파|발생 장치'}],
+    points:[{name:'P', x:4.25, y:4.31, pos:'ul', dot:true},{name:'Q', x:5, y:4.6, pos:'u', dot:true},{name:'R', x:5.75, y:4.31, pos:'ur', dot:true}],
+    segs:[],
+    dims:[{x1:10.35, y1:0, x2:10.35, y2:1, label:'1 m', ends:'arrowbar', off:10},
+          {x1:9, y1:-0.35, x2:10, y2:-0.35, label:'1 m', ends:'arrowbar', off:12}],
+    texts:[] },
+};
+let S = JSON.parse(JSON.stringify(DEFAULTS));
+
+/* ---------- 계산 ---------- */
+function bounds(i){
+  const m=S.media, last=m.length-1;
+  return [i===0?-Infinity:+m[i-1].end, i===last?Infinity:+m[i].end];
+}
+function integK(a,b){ // ∫_a^b k dx, a<b
+  let s=0;
+  S.media.forEach((m,i)=>{ const [lo,hi]=bounds(i);
+    const ov=Math.min(b,hi)-Math.max(a,lo); if(ov>0) s+=ov*2*Math.PI/m.lambda; });
+  return s;
+}
+function phase(x){ return x>=0? integK(0,x) : -integK(x,0); }
+function yAt(x,A,t=S.t){
+  const w=2*Math.PI/S.T;
+  return A*Math.sin(phase(x) - S.dir*w*t + S.phi*Math.PI/180);
+}
+/* 경계 k(매질 k와 k+1 사이)의 반사 계수: 줄에서 r = (v투과 − v입사) / (v입사 + v투과), 파동 진행 방향 기준 */
+function rAuto(k,d=+S.dir){
+  const a=+S.media[k].v, b=+S.media[k+1].v;
+  return d>0 ? (b-a)/(a+b) : (a-b)/(a+b);
+}
+function reflType(k){
+  const r=rAuto(k);
+  if(Math.abs(r)<1e-9) return '반사 없음 (속력이 같음)';
+  return r<0 ? '고정단 반사 — 반사파가 뒤집힘 (느린 매질로 입사)' : '자유단 반사 — 반사파가 그대로 (빠른 매질로 입사)';
+}
+/* 매질별 진폭: 파동이 출발하는 매질의 진폭 S.amp에서 시작해, 경계를 지날 때마다 투과 진폭 = (1 + r) × 입사 진폭 */
+// d: 진행 방향 (+1 → 왼쪽 매질에서 출발, −1 → 오른쪽 매질에서 출발). 출발 매질의 진폭은 S.amp
+function mediumAmps(d=+S.dir){
+  const n=S.media.length, A=new Array(n), a0=+S.amp, rr=k=>rAuto(k,d);
+  if(d>0){ A[0]=a0; for(let i=0;i<n-1;i++) A[i+1]=A[i]*(1+rr(i)); }
+  else { A[n-1]=a0; for(let i=n-1;i>0;i--) A[i-1]=A[i]*(1+rr(i-1)); }
+  return A;
+}
+function ampAt(x){ return mediumAmps()[mediumIdx(x)]; }
+// 두 번째 파동(반대 방향): 첫 번째 파동과 같은 진폭으로 반대쪽 끝에서 출발
+function amp2At(x){ return mediumAmps(-S.dir)[mediumIdx(x)]; }
+function mediumIdx(x){ for(let i=0;i<S.media.length;i++){ const [lo,hi]=bounds(i); if(x<hi||i===S.media.length-1) return i; } }
+// 가로축 값 u에서의 변위 (x모드: u=위치, 시각 S.t 고정 / t모드: u=시간, 위치 S.obsX 고정)
+/* ---- 앞머리(파면 끝)와 반대 방향 파동 ---- */
+function invPhase(target){ let lo=-1e4, hi=1e4; for(let i=0;i<70;i++){ const m=(lo+hi)/2; if(phase(m)<target) lo=m; else hi=m; } return (lo+hi)/2; }
+const isNum=v=> v!=='' && v!=null && isFinite(+v);
+let frontCache={};
+function frontPos(F0,d,t){       // t=0에 F0에 있던 앞머리가 시각 t에 있는 위치
+  if(!isNum(F0)) return null;
+  const key=F0+'|'+d+'|'+t; if(key in frontCache) return frontCache[key];
+  return frontCache[key]=invPhase(phase(+F0) + d*2*Math.PI/S.T*t);
+}
+/* 정상파 '양쪽 끝에서 동시에 출발': 파동 1·2가 t=0에 구간 양 끝에서 출발 */
+function srcMode(){ return S.w2on; }   // 두 번째 파동은 항상 양쪽 끝에서 동시에 출발
+function effFronts(){            // t=0에서의 앞머리 위치 [파동1, 파동2]
+  if(srcMode()){ const ws=+S.waveStart, we=+S.waveEnd; return +S.dir>0? [ws,we] : [we,ws]; }
+  return [S.front1, S.w2front];
+}
+function effPhases(){            // 라디안 [파동1, 파동2]
+  if(srcMode()){
+    // 앞머리에서 변위 0, 그 뒤 첫 반파가 마루(또는 골)가 되도록 위상을 정함
+    // 파동 1은 마루부터, 파동 2는 '같음'이면 마루부터 / '반대'면 골부터 (두 파원이 같은/반대 위상으로 진동)
+    const [F1,F2]=effFronts(), d1=+S.dir, opp=(S.w2rel==='opp')?Math.PI:0;
+    const ph=(F,d)=>(d>0?Math.PI:0)-phase(+F);
+    return [ph(F1,d1), ph(F2,-d1)+opp];
+  }
+  return [S.phi*Math.PI/180, S.phi*Math.PI/180+((S.w2rel==='opp')?Math.PI:0)];
+}
+function comps(x,t){
+  const w=2*Math.PI/S.T, d1=+S.dir, Ph=phase(x), P=effPhases(), F=effFronts();
+  const AM=mediumAmps(), mi=mediumIdx(x);
+  let y1=AM[mi]*Math.sin(Ph - d1*w*t + P[0]);
+  const f1=frontPos(F[0],d1,t);
+  if(f1!==null && (d1>0? x>f1+1e-9 : x<f1-1e-9)) y1=NaN;
+  // 반사파 (여러 번 반사는 생략)
+  //  매질 mi의 앞쪽 경계에서 되돌아오는 파동
+  let yR=NaN;
+  if(S.reflShow!=='none'){
+    const Pf=isNum(F[0])? phase(+F[0])+d1*w*t : null;
+    const reached=path=> Pf===null || (d1>0? path<=Pf+1e-9 : path>=Pf-1e-9);
+    const add=v=>{ yR=(isFinite(yR)?yR:0)+v; };
+    const bi = d1>0 ? mi : mi-1;
+    if(bi>=0 && bi<S.media.length-1){
+      const r=rAuto(bi), b=+S.media[bi].end, path=2*phase(b)-Ph;
+      if(Math.abs(r)>1e-12 && (d1>0? x<=b : x>=b) && reached(path)) add(r*AM[mi]*Math.sin(path - d1*w*t + P[0]));
+    }
+  }
+  if((S.reflShow==='sum'||S.reflShow==='both') && isFinite(yR)) y1=(isFinite(y1)?y1:0)+yR;
+  let y2=NaN;
+  if(S.w2on){
+    const d2=-d1; y2=amp2At(x)*Math.sin(Ph - d2*w*t + P[1]);
+    const f2=frontPos(F[1],d2,t);
+    if(f2!==null && (d2>0? x>f2+1e-9 : x<f2-1e-9)) y2=NaN;
+  }
+  const sum=(isNaN(y1)&&isNaN(y2))? NaN : (isNaN(y1)?0:y1)+(isNaN(y2)?0:y2);
+  return {y1,y2,sum,yR};
+}
+// p: x모드에서는 시각, t모드에서는 관찰 위치 (생략하면 현재 값)
+function waveXT(u,p){ return S.hMode==='t' ? [p===undefined? +S.obsX : +p, u] : [u, p===undefined? S.t : +p]; }
+function waveY(u,p){ const [x,t]=waveXT(u,p); return comps(x,t).sum; }
+const DASH={solid:'', dashed:'7 5', dotted:'2 4'};
+function activeCurves(){
+  // x축 모드: 각 곡선의 시각에 현재 시각 t를 더해서, 재생하면 모든 곡선이 함께 움직임
+  if(S.multi && S.curves.length) return S.curves.map(c=>({p:+c.p+(S.hMode==='x'? +S.t:0), dash:c.dash, label:c.label}));
+  return [{p:undefined, dash:'solid', label:''}];
+}
+const fmt = n => { if(!isFinite(n)) return '—'; const v=parseFloat((+n).toFixed(4)); return (v<0?'−':'')+Math.abs(v); };
+
+/* ---------- 그리기 ---------- */
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function textEl(x,y,str,anchor='middle',italicFirst=false){
+  const ff=`font-family="'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif"`;
+  let inner=esc(str);
+  if(italicFirst && /^[A-Za-z]/.test(str)){
+    inner=`<tspan font-style="italic" font-family="'Times New Roman',serif" font-size="${S.fs*1.1}">${esc(str[0])}</tspan>${esc(str.slice(1))}`;
+  }
+  // 흰 테두리는 글자 전체 아래에 따로 깔아서, 다음 글자의 테두리가 앞 글자(기울임체 등)를 지우지 않게 함
+  const base=`x="${x.toFixed(2)}" y="${y.toFixed(2)}" font-size="${S.fs}" ${ff} text-anchor="${anchor}"`;
+  const halo = S.labelHalo ? `<text ${base} fill="#fff" stroke="#fff" stroke-width="${(+S.haloW).toFixed(2)}" stroke-linejoin="round">${inner}</text>` : '';
+  return `${halo}<text ${base} fill="#000">${inner}</text>`;
+}
+function arrowHead(x,y,dx,dy,size){
+  const L=Math.hypot(dx,dy)||1, ux=dx/L, uy=dy/L, px=-uy, py=ux;
+  const bx=x-ux*size, by=y-uy*size, h=size*0.45;
+  return `<path d="M${x},${y} L${(bx+px*h).toFixed(2)},${(by+py*h).toFixed(2)} L${(bx-px*h).toFixed(2)},${(by-py*h).toFixed(2)} Z" fill="#000"/>`;
+}
+function parseList(s){ return String(s||'').split(/[,\s]+/).filter(v=>v!=='').map(Number).filter(v=>isFinite(v)); }
+
+function draw(){
+  if(S.dim==='2d') draw2D();
+  else if(S.hMode==='x' && S.style1d==='fronts') drawFronts();
+  else drawGraph();
+  updateTimeUI(); syncMediaRO(); toImage(); placeHandles(); syncQuick(); enhanceNumbers(); refreshSliders(); syncChips();
+}
+
+/* =================================================================
+   축 화살표 끌어서 축 길이 조절
+   (눈금 간격의 픽셀 크기는 그대로 두고 그림 크기를 함께 바꿔서, 화살표가 마우스를 따라옴)
+   ================================================================= */
+let GEOM=null, DRAG=null;
+const AH_TIP={x:'끌어서 가로축 길이 조절 (파동도 함께 늘어남)', yTop:'끌어서 세로축 길이 조절 (위아래 같은 만큼)'};
+function arrowDrags(which,x1,x2,yy,tipAtEnd){
+  const fs=+S.fs, L=Math.min(x1,x2), R=Math.max(x1,x2);
+  GEOM.drags.push({kind:'arrow', which, box:[L, yy-fs*1.3, R-L, fs*1.3+8]});
+  const tx=tipAtEnd? x2 : x1;
+  GEOM.drags.push({kind:'tip', which, tipAtEnd, box:[tx-10, yy-10, 20, 20]});
+}
+let IDRAG=null;
+const DG_TIP={name:'끌어서 매질 이름 옮기기', arrow:'끌어서 진행 방향 화살표 옮기기', tip:'화살촉을 끌어서 화살표 길이 조절',
+  src:'끌어서 파원 옮기기', rot:'끌어서 평면파 발생 장치의 방향·길이 조절', pt:'끌어서 점 옮기기', txt:'끌어서 글자 옮기기',
+  dim1:'끌어서 치수선 끝 옮기기', dim2:'끌어서 치수선 끝 옮기기', dimm:'끌어서 치수선 옮기기'};
+function start2DDrag(e,it){
+  e.preventDefault(); e.stopPropagation();
+  const q=it.ref;
+  if(PTMODE && it.kind==='pt'){ const i=S.d2.points.indexOf(q); if(i>=0) S.d2.points.splice(i,1);
+    // 그 점을 쓰는 선분도 함께 삭제
+    S.d2.segs=S.d2.segs.filter(sg=>sg.from!==q.name && sg.to!==q.name);
+    render2DLists(); draw(); return; }
+  D2DRAG={it, x0:e.clientX, y0:e.clientY, sc:GEOM.sc, snap:JSON.parse(JSON.stringify(q))};
+  FREEZE2D=LAST2D? {...LAST2D} : null;
+  document.body.style.cursor='move';
+  window.addEventListener('pointermove',move2DDrag);
+  window.addEventListener('pointerup',()=>{ window.removeEventListener('pointermove',move2DDrag);
+    D2DRAG=null; FREEZE2D=null; document.body.style.cursor=''; render2DLists(); draw(); },{once:true});
+}
+function move2DDrag(e){
+  if(!D2DRAG) return;
+  const {it,sc,snap:o}=D2DRAG, q=it.ref, dx=(e.clientX-D2DRAG.x0)/sc, dy=-(e.clientY-D2DRAG.y0)/sc;
+  const r=v=>+(Math.round(v/0.05)*0.05).toFixed(3);
+  if(it.kind==='src'||it.kind==='pt'||it.kind==='txt'){ q.x=r(+o.x+dx); q.y=r(+o.y+dy); }
+  else if(it.kind==='dim1'){ q.x1=r(+o.x1+dx); q.y1=r(+o.y1+dy); }
+  else if(it.kind==='dim2'){ q.x2=r(+o.x2+dx); q.y2=r(+o.y2+dy); }
+  else if(it.kind==='dimm'){ q.x1=r(+o.x1+dx); q.y1=r(+o.y1+dy); q.x2=r(+o.x2+dx); q.y2=r(+o.y2+dy); }
+  else if(it.kind==='rot'){
+    // 막대 끝을 끌면: 막대 방향이 마우스 쪽을 향하고, 길이 = 중심까지 거리 × 2. 진행 방향은 막대에 수직
+    const a0=o.angle*Math.PI/180, h0=num(o.width,6)/2;
+    const ex=-Math.sin(a0)*h0+dx, ey=Math.cos(a0)*h0+dy, L=Math.hypot(ex,ey);
+    if(L>0.1){ let a=Math.atan2(-ex,ey)*180/Math.PI; a=Math.round(a/5)*5; q.angle=((a+540)%360)-180; q.width=r(Math.max(0.5,2*L)); }
+  }
+  draw();
+}
+function startItemDrag(e,it){
+  e.preventDefault(); e.stopPropagation();
+  const k=it.which===2? ['arrow2X','arrow2Len','arrow2Y'] : ['arrowX','arrowLen','arrowY'];
+  IDRAG={it, k, x0:e.clientX, y0:e.clientY, sx:GEOM.scaleX, sy:GEOM.scaleY,
+    ax0:+S[k[0]], len0:+S[k[1]], ay0:+S[k[2]]};
+  document.body.style.cursor = it.kind==='tip'? 'ew-resize' : 'move';
+  window.addEventListener('pointermove',moveItemDrag);
+  window.addEventListener('pointerup',()=>{ window.removeEventListener('pointermove',moveItemDrag); IDRAG=null; document.body.style.cursor=''; draw(); },{once:true});
+}
+function moveItemDrag(e){
+  if(!IDRAG) return;
+  const d=IDRAG, it=d.it, dx=(e.clientX-d.x0)/d.sx, dy=-(e.clientY-d.y0)/d.sy, r=v=>+(Math.round(v/0.05)*0.05).toFixed(3);
+  if(it.kind==='name'){
+    const m=S.media[it.i]; if(!m) return;
+    m.labelX=r(it.lx0+dx); if(it.vert) m.labelY=r(it.ly0+dy);
+  } else if(it.kind==='arrow'){
+    S[d.k[0]]=r(d.ax0+dx); S[d.k[2]]=r(d.ay0+dy);
+  } else {
+    if(it.tipAtEnd) S[d.k[1]]=Math.max(0.2, r(d.len0+dx));
+    else { const nx=Math.min(r(d.ax0+dx), d.ax0+d.len0-0.2); S[d.k[0]]=nx; S[d.k[1]]=r(d.len0-(nx-d.ax0)); }
+  }
+  draw();
+}
+/* =================================================================
+   세로축 눈금 · 점선을 마우스로 추가/삭제
+   - 세로축 위: 반투명 눈금 + 값 미리보기 → 클릭하면 눈금 추가 (기존 눈금 위면 삭제)
+   - 그림 안: 가까운 눈금에서 커서까지 반투명 가로 점선 → 클릭하면 점선 그리기 (기존 점선 위면 삭제)
+   ================================================================= */
+let HOV=null;
+function yTickList(){ return parseList(S.yTicks); }
+function yLabelList(){ return String(S.yTickLabels||'').split(',').map(v=>v.trim()); }
+function snapY(v,A){
+  const pxTol=7/A.sy, cands=[];
+  mediumAmps().forEach(a=>cands.push(a,-a));
+  if(S.w2on){ const a=Math.max(...mediumAmps())+Math.max(...mediumAmps(-S.dir)); cands.push(a,-a); }
+  for(const c of cands) if(Math.abs(v-c)<pxTol) return c;
+  return +(Math.round(v/0.1)*0.1).toFixed(4);
+}
+function hoverCalc(e){
+  if(S.dim==='2d' && PTMODE && GEOM && GEOM.d2map && !D2DRAG){
+    const img=document.getElementById('waveImg'); if(!img) return null;
+    const rc=img.getBoundingClientRect(), px=e.clientX-rc.left, py=e.clientY-rc.top, M=GEOM.d2map;
+    const [x,y,snapKind]=snapPoint2D(M.xOf(px),M.yOf(py),GEOM.sc);
+    return {mode:'addPt', x, y, snapKind, px:M.X(x), py:M.Y(y), name:nextPtName()};
+  }
+  if(!GEOM || !GEOM.axis || DRAG || IDRAG) return null;
+  const A=GEOM.axis, img=document.getElementById('waveImg'); if(!img) return null;
+  const r=img.getBoundingClientRect(), px=e.clientX-r.left, py=e.clientY-r.top;
+  A.sy=GEOM.scaleY;
+  if(!A.SY || py<A.top-6 || py>A.bot+6) return null;
+  const ticks=yTickList();
+  if(Math.abs(px-A.ax)<=10){                       // 세로축 위
+    const hit=ticks.findIndex(v=>Math.abs(A.Y(v)-py)<=6);
+    if(hit>=0) return {mode:'delTick', i:hit, v:ticks[hit], px, py};
+    const v=snapY(A.yOf(py),A);
+    if(Math.abs(v)<1e-9) return null;
+    return {mode:'addTick', v, px, py};
+  }
+  if(px<A.ax+10 || px>A.plotR) return null;           // 그림 안
+  const L=S.yLines||[];
+  const hl=L.findIndex(l=>Math.abs(A.Y(l.y)-py)<=5 && px>=A.ax && px<=A.X(l.x)+6);
+  if(hl>=0) return {mode:'delLine', i:hl, l:L[hl], px, py};
+  let best=null; ticks.forEach(v=>{ const d=Math.abs(A.Y(v)-py); if(d<=12 && (!best||d<best.d)) best={v,d}; });
+  if(!best) return null;
+  const x=+(Math.round(A.xOf(px)/0.05)*0.05).toFixed(4);
+  return {mode:'addLine', v:best.v, x, px, py};
+}
+function renderHover(h){
+  const wrap=document.getElementById('svgWrap');
+  wrap.querySelectorAll('svg.pv, .pvtip').forEach(e=>e.remove());
+  wrap.style.cursor = h? 'pointer' : '';
+  if(!h) return;
+  const A=GEOM.axis, img=document.getElementById('waveImg');
+  const W=img.width, H=img.height, ns='http://www.w3.org/2000/svg';
+  let inner='', tip='';
+  if(h.mode==='addPt'){
+    inner=`<circle cx="${h.px}" cy="${h.py}" r="4.5" fill="#2b6cb0" opacity=".6"/>`+(h.snapKind? `<circle cx="${h.px}" cy="${h.py}" r="9" fill="none" stroke="#2b6cb0" stroke-width="1.5" opacity=".55"/>`:'');
+    tip=`${h.name} (${fmt(h.x)}, ${fmt(h.y)})`+(h.snapKind? ` <span style="opacity:.8">· ${h.snapKind}</span>`:'')+` <span style="opacity:.75">· 클릭해서 점 추가</span>`;
+  }
+  if(h.mode==='addTick'){ const y=A.Y(h.v);
+    inner=`<line x1="${A.ax-5}" y1="${y}" x2="${A.ax+5}" y2="${y}" stroke="#2b6cb0" stroke-width="2.5" opacity=".55"/>`;
+    tip=`${fmt(h.v)} <span style="opacity:.75">· 클릭해서 눈금 추가</span>`; }
+  if(h.mode==='delTick'){ const y=A.Y(h.v);
+    inner=`<line x1="${A.ax-6}" y1="${y}" x2="${A.ax+6}" y2="${y}" stroke="#d33" stroke-width="3" opacity=".7"/>`;
+    tip=`${fmt(h.v)} <span style="opacity:.75">· 클릭해서 눈금 삭제</span>`; }
+  if(h.mode==='addLine'){ const y=A.Y(h.v), x2=A.X(h.x);
+    inner=`<line x1="${A.ax}" y1="${y}" x2="${x2}" y2="${y}" stroke="#2b6cb0" stroke-width="1.5" stroke-dasharray="3 3" opacity=".55"/>
+      <circle cx="${x2}" cy="${y}" r="3" fill="#2b6cb0" opacity=".55"/>`;
+    tip=`y = ${fmt(h.v)}, x = ${fmt(h.x)} <span style="opacity:.75">· 클릭해서 점선 그리기</span>`; }
+  if(h.mode==='delLine'){ const y=A.Y(h.l.y);
+    inner=`<line x1="${A.ax}" y1="${y}" x2="${A.X(h.l.x)}" y2="${y}" stroke="#d33" stroke-width="2.5" stroke-dasharray="3 3" opacity=".7"/>`;
+    tip=`<span style="opacity:.85">클릭해서 이 점선 삭제</span>`; }
+  const sv=document.createElementNS(ns,'svg'); sv.setAttribute('class','pv'); sv.setAttribute('width',W); sv.setAttribute('height',H); sv.innerHTML=inner;
+  wrap.appendChild(sv);
+  const t=document.createElement('div'); t.className='pvtip'; t.innerHTML=tip;
+  t.style.left=(h.px+14)+'px'; t.style.top=(h.py-30)+'px';
+  wrap.appendChild(t);
+}
+function applyHover(h){
+  if(!h) return;
+  if(h.mode==='addPt'){ S.d2.points.push({name:h.name, x:h.x, y:h.y, pos:'ul', dot:true}); render2DLists(); draw(); renderHover(HOV=null); return; }
+  if(h.mode==='addTick'){
+    const t=yTickList(), lb=yLabelList();
+    t.push(h.v); while(lb.length<t.length-1) lb.push(''); lb.length=t.length-1; lb.push('');
+    S.yTicks=t.map(v=>fmt(v).replace('−','-')).join(',');
+    S.yTickLabels=lb.some(x=>x)? lb.join(',') : '';
+  } else if(h.mode==='delTick'){
+    const t=yTickList(), lb=yLabelList();
+    t.splice(h.i,1); if(lb.length>h.i) lb.splice(h.i,1);
+    S.yTicks=t.map(v=>fmt(v).replace('−','-')).join(',');
+    S.yTickLabels=lb.some(x=>x)? lb.join(',') : '';
+    S.yLines=(S.yLines||[]).filter(l=>Math.abs(l.y-h.v)>1e-9);
+  } else if(h.mode==='addLine'){
+    S.yLines=(S.yLines||[]).filter(l=>Math.abs(l.y-h.v)>1e-9);   // 같은 눈금의 점선은 하나만
+    S.yLines.push({y:h.v, x:h.x});
+  } else if(h.mode==='delLine'){
+    S.yLines.splice(h.i,1);
+  }
+  syncInputs(); draw();
+  renderHover(HOV=null);
+}
+(function(){
+  const wrap=document.getElementById('svgWrap');
+  wrap.addEventListener('pointermove',e=>{
+    if(e.target.closest('.dg, .ah')){ if(HOV){ HOV=null; renderHover(null); } return; }
+    HOV=hoverCalc(e); renderHover(HOV);
+  });
+  wrap.addEventListener('pointerleave',()=>{ HOV=null; renderHover(null); });
+  wrap.addEventListener('click',e=>{ if(e.target.closest('.dg, .ah')) return; const h=hoverCalc(e); if(h) applyHover(h); });
+})();
+
+function placeHandles(){
+  const wrap=document.getElementById('svgWrap');
+  wrap.querySelectorAll('.ah, .dg').forEach(e=>e.remove());
+  if(!GEOM) return;
+  (GEOM.drags||[]).forEach(it=>{
+    const d=document.createElement('div');
+    d.className='dg'+(it.kind==='tip'?' tip':'')+(it.d2 && it.kind!=='txt'?' pt2':'')+(it.kind==='rot'?' rot':'');
+    const [x,y,w,h]=it.box; d.style.left=x+'px'; d.style.top=y+'px'; d.style.width=w+'px'; d.style.height=h+'px';
+    d.title=(PTMODE && it.kind==='pt')? '클릭해서 점 삭제' : DG_TIP[it.kind];
+    if(PTMODE && it.kind==='pt') d.classList.add('delpt');
+    d.addEventListener('pointerdown',e=> it.d2 ? start2DDrag(e,it) : startItemDrag(e,it));
+    wrap.appendChild(d);
+  });
+  GEOM.handles.forEach(h=>{
+    const d=document.createElement('div'); d.className='ah '+(h.kind==='x'?'hx':'hy');
+    if(DRAG && DRAG.kind===h.kind) d.classList.add('active');
+    d.style.left=(h.x-12)+'px'; d.style.top=(h.y-12)+'px'; d.title=AH_TIP[h.kind];
+    d.addEventListener('pointerdown',e=>startAxisDrag(e,h));
+    wrap.appendChild(d);
+  });
+}
+function startAxisDrag(e,h){
+  e.preventDefault();
+  const stage=document.getElementById('stage'), wrap=document.getElementById('svgWrap');
+  const sr=stage.getBoundingClientRect(), wr=wrap.getBoundingClientRect();
+  DRAG={ kind:h.kind, x0:e.clientX, y0:e.clientY, W0:+S.W, H0:+S.H,
+    xMax0:+S.xAxMax, yMax0:+S.yMax, yMin0:+S.yMin, waveEnd0:+S.waveEnd, tickEnd0:+S.tickEnd, sx:GEOM.scaleX, sy:GEOM.scaleY,
+    left0: wr.left-sr.left+stage.scrollLeft-parseFloat(getComputedStyle(stage).paddingLeft),
+    top0: wr.top-sr.top+stage.scrollTop-parseFloat(getComputedStyle(stage).paddingTop) };
+  // 끄는 동안 그림 위치를 고정 (가운데 정렬 때문에 그림이 움직이지 않게)
+  stage.classList.add('dragging');
+  wrap.style.marginLeft=DRAG.left0+'px'; wrap.style.marginTop=DRAG.top0+'px';
+  document.body.style.cursor = h.kind==='x' ? 'ew-resize' : 'ns-resize';
+  window.addEventListener('pointermove',moveAxisDrag);
+  window.addEventListener('pointerup',endAxisDrag,{once:true});
+}
+function moveAxisDrag(e){
+  if(!DRAG) return;
+  const d=DRAG, dx=e.clientX-d.x0, dy=e.clientY-d.y0, r=(v,st)=>Math.round(v/st)*st;
+  let grow=0;   // 세로축: 위쪽으로 늘어난 픽셀
+  if(d.kind==='x'){
+    // 가로축 끝과 함께 파동·눈금 끝도 같은 만큼 이동 → 늘린 부분에 파동이 이어서 나타남
+    const v=Math.max(+S.xAxMin+0.2, r(d.xMax0+dx/d.sx,0.1)), dv=v-d.xMax0;
+    S.xAxMax=+v.toFixed(4); S.W=Math.round(d.W0+dv*d.sx);
+    S.waveEnd=+Math.max(+S.waveStart+0.1, d.waveEnd0+dv).toFixed(4);
+    S.tickEnd=+Math.max(+S.xAxMin, d.tickEnd0+dv).toFixed(4);
+  } else {
+    // 세로축: 위쪽과 아래쪽을 같은 만큼 늘이거나 줄임
+    const dmin=-Math.min(d.yMax0, -d.yMin0)+0.05;
+    const dv=Math.max(dmin, r(-dy/d.sy,0.05));
+    S.yMax=+(d.yMax0+dv).toFixed(4); S.yMin=+(d.yMin0-dv).toFixed(4);
+    grow=dv*d.sy; S.H=Math.round(d.H0+2*grow);
+  }
+  const wrap=document.getElementById('svgWrap');
+  // 세로축을 늘릴 때는 가로축(변위 0) 위치를 고정
+  wrap.style.marginTop=(d.top0-grow)+'px';
+  syncInputs(); draw();
+}
+function endAxisDrag(){
+  window.removeEventListener('pointermove',moveAxisDrag);
+  DRAG=null; document.body.style.cursor='';
+  const stage=document.getElementById('stage'), wrap=document.getElementById('svgWrap');
+  stage.classList.remove('dragging'); wrap.style.marginLeft=''; wrap.style.marginTop='';
+  draw();
+}
+
+/* =================================================================
+   그림을 <img>로 표시 → 오른쪽 클릭 "이미지 복사" 가능
+   바로 SVG 이미지로 보여 주고, 조작이 멈추면 3배 해상도 PNG로 교체
+   ================================================================= */
+let rasterTimer=null, lastBlobUrl=null, lastPngBlob=null, curSvg=null;
+const PNG_SCALE=3;
+function rasterize(svgUrl,W,H){
+  return new Promise((res,rej)=>{
+    const im=new Image();
+    im.onload=()=>{
+      const c=document.createElement('canvas'); c.width=Math.round(W*PNG_SCALE); c.height=Math.round(H*PNG_SCALE);
+      const ctx=c.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,c.width,c.height); ctx.drawImage(im,0,0,c.width,c.height);
+      c.toBlob(b=> b? res(b) : rej(new Error('toBlob')), 'image/png');
+    };
+    im.onerror=()=>rej(new Error('load')); im.src=svgUrl;
+  });
+}
+function toImage(){
+  const wrap=document.getElementById('svgWrap'), svg=wrap.querySelector('svg'); if(!svg) return;
+  const W=+svg.getAttribute('width'), H=+svg.getAttribute('height');
+  const svgUrl='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(new XMLSerializer().serializeToString(svg));
+  let img=document.getElementById('waveImg');
+  if(!img){ img=document.createElement('img'); img.id='waveImg'; img.alt='파동 그림'; img.title='오른쪽 클릭 → 이미지 복사'; }
+  img.width=W; img.height=H; img.src=svgUrl;
+  wrap.replaceChildren(img);
+  curSvg={svgUrl,W,H}; lastPngBlob=null;
+  clearTimeout(rasterTimer);
+  rasterTimer=setTimeout(()=>{
+    const mine=curSvg;
+    rasterize(mine.svgUrl,mine.W,mine.H).then(b=>{
+      if(curSvg!==mine) return;                       // 그 사이 그림이 바뀌었으면 버림
+      lastPngBlob=b;
+      // blob: 주소는 이 페이지 밖에서 열리지 않으므로, 그림 데이터를 직접 담은 data: 주소로 표시
+      return blobToDataURL(b).then(u=>{ if(curSvg===mine) img.src=u; });
+    }).catch(()=>{});
+  }, playing? 600 : 150);
+}
+function blobToDataURL(b){ return new Promise(r=>{ const f=new FileReader(); f.onload=()=>r(f.result); f.readAsDataURL(b); }); }
+
+/* =================================================================
+   숫자 입력 → 슬라이더 + 값 표시 (클릭하면 정확한 숫자칸)
+   ================================================================= */
+// 가로축 표시 범위: 축 길이는 그대로 두고 보이는 구간을 통째로 이동
+function panX(v){
+  const d=v-(+S.xAxMin); if(Math.abs(d)<1e-12) return;
+  ['xAxMin','xAxMax','waveStart','waveEnd','tickEnd'].forEach(k=>S[k]=+(+S[k]+d).toFixed(4));
+  if(isNum(S.front1)) S.front1=+(+S.front1+d).toFixed(4);
+  if(isNum(S.w2front)) S.w2front=+(+S.w2front+d).toFixed(4);
+  syncInputs(); draw();
+}
+function syncQuick(){
+  const set=(id,v)=>{ const e=document.getElementById(id); if(e && document.activeElement!==e) e.value=parseFloat((+v).toFixed(6)); };
+  if(S.media[0]){ set('qV',S.media[0].v); } set('qA',S.amp); set('xPan',S.xAxMin); set('qFs',S.fs);
+  const xr=document.getElementById('xRangeTxt'); if(xr) xr.textContent=`보이는 구간: ${fmt(S.xAxMin)} ~ ${fmt(S.xAxMax)} ${S.hMode==='t'?'s':'m'}`;
+  if(S.d2.sources[0]) set('q2Lambda',S.d2.sources[0].lambda);
+}
+function syncChips(){
+  document.querySelectorAll('.chip[data-tog]').forEach(b=>b.classList.toggle('on', S[b.dataset.tog]!==false && !!S[b.dataset.tog]));
+  document.querySelectorAll('.chip[data-tog2]').forEach(b=>b.classList.toggle('on', !!S.d2[b.dataset.tog2]));
+}
+document.querySelectorAll('.chip[data-tog]').forEach(b=>b.addEventListener('click',()=>{
+  const k=b.dataset.tog; S[k]=!S[k];
+  if(k==='w2on') fitY2();
+  if(k==='multi' && S.multi && !S.curves.length){ addCurve(); addCurve(); return; }
+  syncInputs(); draw();
+}));
+document.querySelectorAll('.chip[data-tog2]').forEach(b=>b.addEventListener('click',()=>{ const k=b.dataset.tog2; S.d2[k]=!S.d2[k]; syncInputs(); draw(); }));
+const qIn=(id,fn)=>document.getElementById(id).addEventListener('input',e=>{ const v=parseFloat(e.target.value); if(isFinite(v)) fn(v); });
+qIn('qV',v=>{ if(v<=0) return; const m=S.media[0]; m.v=v; m.lambda=v*S.T; renderMedia(); draw(); });
+qIn('qA',v=>{ if(v<0) return; S.amp=v; fitY2(); draw(); });
+qIn('xPan',v=>panX(v));
+qIn('qFs',v=>{ if(v<8||v>48) return; const k=v/(+S.fs);
+  S.d2.texts.forEach(t=>{ if(isNum(t.size)) t.size=Math.round(+t.size*k*10)/10; });   // 2차원 글자도 같은 비율로
+  S.fs=v; render2DLists(); draw(); });
+qIn('q2Lambda',v=>{ if(v<=0) return; S.d2.sources.forEach(q=>q.lambda=v); render2DLists(); draw(); });
+function togglePanel(on){
+  const open = on===undefined ? document.body.classList.contains('nopanel') : on;
+  document.body.classList.toggle('nopanel', !open);
+  document.getElementById('panelBtn').classList.toggle('on', open);
+}
+function rangeFor(el){
+  const xa=+S.xAxMin, xb=+S.xAxMax, ya=+S.yMin, yb=+S.yMax, d=S.d2;
+  const k=el.dataset.key||el.dataset.k2||el.dataset.f||el.dataset.k||el.id;
+  const inList=id=>!!el.closest('#'+id);
+  const R=(min,max,step)=>({min,max,step});
+  if(inList('srcList')||inList('ptList')||inList('dimList')||inList('txtList')){
+    const span=Math.max(+d.rx1-+d.rx0,+d.ry1-+d.ry0);
+    return ({x:R(+d.rx0-2,+d.rx1+2,0.05), y:R(+d.ry0-2,+d.ry1+2,0.05), x1:R(+d.rx0-2,+d.rx1+2,0.05), x2:R(+d.rx0-2,+d.rx1+2,0.05),
+      y1:R(+d.ry0-2,+d.ry1+2,0.05), y2:R(+d.ry0-2,+d.ry1+2,0.05), lambda:R(0.1,10,0.1), r0:R(0,4,0.05), rmin:R(0,span,0.1),
+      rmax:R(0,span*1.5,0.1), angle:R(-180,180,5), width:R(0.5,span*1.5,0.1), off:R(-40,40,1), size:R(8,40,1)})[k] || R(0,10,0.1);
+  }
+  if(inList('curveList')) return S.hMode==='t'? R(xa,xb,0.05) : R(0,2*S.T,S.T/100);
+  if(inList('segList')) return R(0.5,6,0.25);
+  if(inList('mediaList')) return ({v:R(0.1,20,0.1), end:R(xa,xb,0.1), r:R(-1,1,0.05)})[k] || R(0,10,0.1);
+  return ({
+    T:R(0.1,10,0.1), f:R(0.1,10,0.1), phi:R(-180,180,5), obsX:R(xa,xb,0.05),
+    nameY:R(ya,yb,0.05), arrowY:R(ya,yb,0.05), arrow2Y:R(ya,yb,0.05), arrowX:R(xa,xb,0.1), arrow2X:R(xa,xb,0.1),
+    arrowLen:R(0.2,5,0.1), arrow2Len:R(0.2,5,0.1), front1:R(xa,xb,0.1), w2front:R(xa,xb,0.1),
+    stripH:R(20,120,2), stripGap:R(0,80,2),
+    xAxMin:R(-10,10,0.5), xAxMax:R(1,40,0.1), yMin:R(-5,0,0.05), yMax:R(0,5,0.05),
+    waveStart:R(xa,xb,0.1), waveEnd:R(xa,xb,0.1), tickStep:R(0,5,0.25), tickEnd:R(xa,xb,0.5),
+    labelStep:R(0.25,10,0.25), gridY:R(0,2,0.25), gridX:R(0,5,0.25), labelDx:R(-20,20,1), labelDy:R(-20,20,1), haloW:R(0,10,1),
+    rx0:R(-20,20,0.5), rx1:R(0,40,0.5), ry0:R(-20,20,0.5), ry1:R(0,40,0.5), scale:R(10,100,1), gridStep:R(0.25,5,0.25),
+    crestW:R(0.5,5,0.1), troughW:R(0.5,5,0.1), qV:R(0.1,20,0.1), qA:R(0,5,0.1), xPan:R(-20,20,0.1), qFs:R(10,36,1), q2Lambda:R(0.1,10,0.1),
+  })[k] || R(0,10,0.1);
+}
+function enhanceNumbers(){
+  document.querySelectorAll('#panel input[type=number]:not([data-enh]), #topbar input[type=number]:not([data-enh])').forEach(num=>{
+    num.dataset.enh='1';
+    const wrap=document.createElement('span'); wrap.className='nf';
+    const sl=document.createElement('input'); sl.type='range';
+    const val=document.createElement('button'); val.type='button'; val.className='val'; val.title='눌러서 정확한 값 입력';
+    num.parentNode.insertBefore(wrap,num);
+    wrap.append(sl,val,num);
+    sl.addEventListener('input',()=>{ num.value=sl.value; num.dispatchEvent(new Event('input',{bubbles:true})); syncOne(wrap); });
+    num.addEventListener('input',()=>syncOne(wrap));
+    val.addEventListener('click',()=>{ wrap.classList.add('edit'); num.focus(); num.select(); });
+    num.addEventListener('blur',()=>{ wrap.classList.remove('edit'); syncOne(wrap); });
+    num.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key==='Escape') num.blur(); });
+    syncOne(wrap);
+  });
+}
+function syncOne(wrap){
+  const [sl,val,num]=wrap.children, r=rangeFor(num), raw=num.value;
+  let mn=r.min, mx=r.max; const v=parseFloat(raw);
+  if(isFinite(v)){ if(v<mn) mn=v; if(v>mx) mx=v; }
+  if(mx<=mn) mx=mn+r.step;
+  sl.min=mn; sl.max=mx; sl.step=r.step;
+  if(isFinite(v)) sl.value=v; else sl.value=(num.placeholder==='끝까지'? mx : mn);
+  val.textContent = (raw==='' ? (num.placeholder||'—') : fmt(v));
+}
+function refreshSliders(){ document.querySelectorAll('#panel .nf, #topbar .nf').forEach(w=>{ if(document.activeElement!==w.children[0]) syncOne(w); else w.children[1].textContent=fmt(+w.children[2].value); }); }
+function drawGraph(){
+  const s=S, fs=+s.fs, pad=+s.pad||0;
+  const W=+s.W, H=+s.H;
+  const yTickVals=parseList(s.yTicks);
+  const yTickLbl=String(s.yTickLabels||'').split(',').map(v=>v.trim());
+  const yLblW=Math.max(Math.max(...String(s.yLabel).split('|').map(l=>l.length))*fs*1.0, yTickVals.length? fs*2.2:0, fs*1.0);
+  const legN=(s.multi && s.curves.length && s.curveLegend!=='none')? s.curves.filter(c=>c.label!=='').length : 0;
+  const legH=legN? legN*fs*1.25+4 : 0;
+  const yLines=String(s.yLabel).split('|'), yExtra=(yLines.length-1)*fs*1.15;
+  const topX=Math.max(legH,yExtra);
+  const mL=yLblW+12+pad, mR=(s.xLabelPos==='right'? String(s.xLabel).length*fs*0.62+14 : fs*0.6+8)+pad, mT=fs*0.7+6+pad+topX, mB=8+pad;
+  const pw=W-mL-mR, ph=H-mT-mB;
+  const X=x=>mL+(x-s.xAxMin)/(s.xAxMax-s.xAxMin)*pw;
+  const Y=y=>mT+(s.yMax-y)/(s.yMax-s.yMin)*ph;
+  const x0 = (0>=s.xAxMin && 0<=s.xAxMax)? 0 : s.xAxMin;
+  const ax=X(x0), ay=Y(0);
+  const ah=Math.max(9, s.axisLw*6);
+  let g='', txt='';
+
+  // 격자
+  frontCache={};
+  if(s.grid){
+    const gl=`stroke="#888" stroke-width="0.9" stroke-dasharray="3 3"`;
+    const yv=parseList(s.yTicks), gy0=yv.length? Math.min(...yv):s.yMin, gy1=yv.length? Math.max(...yv):s.yMax;
+    const gx0=x0, gx1=+s.tickEnd;
+    const gX=+s.gridX;   // 세로선(│) 간격 — 가로 방향으로 몇 칸마다
+    if(gX>0) for(let k=Math.ceil((gx0-1e-9)/gX); k*gX<=gx1+1e-9; k++)
+      g+=`<line x1="${X(k*gX)}" y1="${Y(gy1)}" x2="${X(k*gX)}" y2="${Y(gy0)}" ${gl}/>`;
+  }
+  // y 눈금 가로 점선
+  // 클릭으로 그린 점선 (세로축 눈금에서 가로로)
+  (s.yLines||[]).forEach(l=>{ g+=`<line x1="${ax}" y1="${Y(l.y)}" x2="${X(l.x)}" y2="${Y(l.y)}" stroke="#555" stroke-width="1" stroke-dasharray="2 3"/>`; });
+
+  // 경계 점선
+  const xm = s.hMode==='x';
+  if(xm && s.media.length>1){
+    s.media.slice(0,-1).forEach(m=>{ const e=+m.end;
+      if(e>s.xAxMin && e<s.xAxMax) g+=`<line x1="${X(e)}" y1="${Y(s.yMax)+4}" x2="${X(e)}" y2="${Y(s.yMin)}" stroke="#000" stroke-width="1.2" stroke-dasharray="5 4"/>`; });
+  }
+
+  // 축
+  const sw=s.axisLw, SX=s.showXAxis!==false, SY=s.showYAxis!==false;
+  if(SX){ g+=`<line x1="${X(s.xAxMin)}" y1="${ay}" x2="${X(s.xAxMax)-ah*0.6}" y2="${ay}" stroke="#000" stroke-width="${sw}"/>`;
+    g+=arrowHead(X(s.xAxMax),ay,1,0,ah); }
+  if(SY){ g+=`<line x1="${ax}" y1="${Y(s.yMin)}" x2="${ax}" y2="${Y(s.yMax)+ah*0.6}" stroke="#000" stroke-width="${sw}"/>`;
+    g+=arrowHead(ax,Y(s.yMax),0,-1,ah); }
+  GEOM={ scaleX: pw/(s.xAxMax-s.xAxMin), scaleY: ph/(s.yMax-s.yMin), handles:[], drags:[],
+    axis:{ X, Y, ax, ay, SY, plotR: X(s.xAxMax), top: Y(s.yMax), bot: Y(s.yMin),
+      xOf: px=>s.xAxMin+(px-mL)/pw*(s.xAxMax-s.xAxMin), yOf: py=>s.yMax-(py-mT)/ph*(s.yMax-s.yMin) } };
+  if(SX) GEOM.handles.push({kind:'x', x:X(s.xAxMax), y:ay});
+  if(SY) GEOM.handles.push({kind:'yTop', x:ax, y:Y(s.yMax)});
+
+  // x 눈금
+  if(SX && s.tickStep>0){
+    const st=+s.tickStep;
+    for(let k=Math.ceil((s.xAxMin+1e-9)/st); k*st<=s.tickEnd+1e-9; k++){
+      const x=k*st; if(Math.abs(x-x0)<1e-9) continue;
+      g+=`<line x1="${X(x)}" y1="${ay-4}" x2="${X(x)}" y2="${ay+4}" stroke="#000" stroke-width="${Math.max(1,sw*0.8)}"/>`;
+    }
+  }
+  // x 라벨
+  let labels=[];
+  if(s.labelMode==='auto' && s.labelStep>0){
+    const st=+s.labelStep;
+    for(let k=Math.ceil((s.xAxMin-1e-9)/st); k*st<=s.tickEnd+1e-9; k++){ const x=+(k*st).toFixed(6); if(Math.abs(x)>1e-9) labels.push(x); }
+  } else if(s.labelMode==='custom') labels=parseList(s.customLabels);
+  // 파동이 특정 픽셀 상자를 지나가는지 검사
+  const curvesNow=activeCurves();
+  const wsA=Math.max(+s.waveStart,s.xAxMin), weA=Math.min(+s.waveEnd,s.xAxMax);
+  const invX=px=>s.xAxMin+(px-mL)/pw*(s.xAxMax-s.xAxMin);
+  const waveHits=(l,r,t,b)=>{
+    const m=2;
+    for(let px=l-m; px<=r+m; px+=1){ const x=invX(px); if(x<wsA||x>weA) continue;
+      for(const c of curvesNow){ const py=Y(waveY(x,c.p)); if(py>=t-m && py<=b+m) return true; } }
+    return false;
+  };
+  const candidates={
+    right:  (xp,w)=>[xp+3, 'start', xp+3, xp+3+w, 'below'],
+    left:   (xp,w)=>[xp-3, 'end', xp-3-w, xp-3, 'below'],
+    center: (xp,w)=>[xp, 'middle', xp-w/2, xp+w/2, 'below'],
+  };
+  if(!SX) labels=[];
+  labels.forEach(x=>{
+    const str=fmt(x), w=str.length*fs*0.58, capH=fs*0.74, xp=X(x);
+    const dx=+s.labelDx||0, dy=+s.labelDy||0;
+    const belowBase=ay+fs+3, aboveBase=ay-6;
+    let order;
+    if(s.labelPos==='auto') order=[['center','below'],['right','below'],['left','below'],['right','above'],['left','above'],['center','above']];
+    else order=[[s.labelPos,'below']];
+    let pick=null;
+    for(const [h,v] of order){
+      const [tx,anc,l,r]=candidates[h](xp+dx,w);
+      const base=(v==='below'?belowBase:aboveBase)+dy;
+      if(s.labelPos!=='auto' || !waveHits(l,r,base-capH,base+1)){ pick=[tx,base,anc]; break; }
+    }
+    if(!pick){ const [tx,anc]=candidates.right(xp+dx,w); pick=[tx,belowBase+dy,anc]; }
+    txt+=textEl(pick[0],pick[1],str,pick[2]);
+  });
+  // 원점, 축 이름
+  if(s.showOrigin && SY) txt+=textEl(ax-7,ay+fs*0.35,'0','end');
+  if(!SX);
+  else if(s.xLabelPos==='right') txt+=textEl(X(s.xAxMax)+8,ay+fs*0.35,s.xLabel,'start',s.italicVar);
+  else txt+=textEl(X(s.xAxMax)+fs*0.4,ay+fs*1.45,s.xLabel,'end',s.italicVar);
+  if(SY) yLines.forEach((ln,i)=>{ txt+=textEl(ax-6,Y(s.yMax)+fs*0.45-(yLines.length-1-i)*fs*1.15,ln,'end'); });
+
+  // y 눈금
+  if(SY) yTickVals.forEach((v,i)=>{
+    g+=`<line x1="${ax-4}" y1="${Y(v)}" x2="${ax+4}" y2="${Y(v)}" stroke="#000" stroke-width="${Math.max(1,sw*0.8)}"/>`;
+    const lb=(yTickLbl[i]!==undefined && yTickLbl[i]!=='')? yTickLbl[i] : fmt(v);
+    txt+=textEl(ax-7,Y(v)+fs*0.35,lb,'end');
+  });
+
+  // 파동
+  const ws=Math.max(+s.waveStart,s.xAxMin), we=Math.min(+s.waveEnd,s.xAxMax);
+  const segs = xm ? s.media.map((m,i)=>{ const [lo,hi]=bounds(i); return [Math.max(ws,lo), Math.min(we,hi)]; }) : [[ws,we]];
+  const pathOf=(fn)=>{ let d='', pen=false;
+    segs.forEach(([a,b])=>{
+      if(b<=a) return;
+      const n=Math.max(2,Math.ceil((X(b)-X(a))*1.5));
+      for(let j=0;j<=n;j++){ const u=a+(b-a)*j/n, y=fn(u);
+        if(!isFinite(y)){ pen=false; continue; }
+        d+=(pen?'L':'M')+X(u).toFixed(2)+','+Y(y).toFixed(2)+' '; pen=true; }
+    });
+    return d; };
+  const strokeP=(d,da,w)=>`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="${da?'butt':'round'}"${da?` stroke-dasharray="${da}"`:''}/>`;
+  const showSum = !s.w2on || s.w2show!=='parts', showParts = s.w2on && s.w2show!=='sum';
+  curvesNow.forEach(c=>{
+    if(showParts){
+      ['y1','y2'].forEach(k=>{ g+=strokeP(pathOf(u=>{ const [x,t]=waveXT(u,c.p); return comps(x,t)[k]; }), s.w2show==='parts'?(DASH[c.dash]||''):'5 4', s.w2show==='parts'? s.lw : Math.max(1,s.lw*0.55)); });
+    }
+    if(showSum) g+=strokeP(pathOf(u=>waveY(u,c.p)), DASH[c.dash]||'', s.lw);
+    if((s.reflShow==='sep'||s.reflShow==='both') && s.media.length>1)
+      g+=strokeP(pathOf(u=>{ const [x,t]=waveXT(u,c.p); return comps(x,t).yR; }), '5 4', Math.max(1,s.lw*0.6));
+  });
+  // 정상파: 배 진폭(포락선)과 마디 (x축 모드, 두 파동이 겹친 구간)
+  if(xm && s.w2on && (s.envelope||s.nodes)){
+    const t=curvesNow[0].p===undefined? S.t : curvesNow[0].p, d1=+s.dir;
+    const FF=effFronts(), f1=frontPos(FF[0],d1,t), f2=frontPos(FF[1],-d1,t);
+    let lo=ws, hi=we;
+    if(d1>0){ if(f1!==null) hi=Math.min(hi,f1); if(f2!==null) lo=Math.max(lo,f2); }
+    else    { if(f1!==null) lo=Math.max(lo,f1); if(f2!==null) hi=Math.min(hi,f2); }
+    if(hi>lo){
+      const [p1,p2]=effPhases();
+      const amp=x=>{ const A1=ampAt(x), A2=amp2At(x); return Math.sqrt(Math.max(0,A1*A1+A2*A2-2*A1*A2*Math.cos(2*phase(x)+p1+p2))); };
+      if(s.envelope){
+        const segsE=[[lo,hi]], envD=sg=>{ let d=''; const n=Math.ceil((X(hi)-X(lo))*1.5);
+          for(let j=0;j<=n;j++){ const x=lo+(hi-lo)*j/n; d+=(j?'L':'M')+X(x).toFixed(2)+','+Y(sg*amp(x)).toFixed(2)+' '; } return d; };
+        g+=`<path d="${envD(1)}" fill="none" stroke="#666" stroke-width="1.2" stroke-dasharray="4 3"/>`;
+        g+=`<path d="${envD(-1)}" fill="none" stroke="#666" stroke-width="1.2" stroke-dasharray="4 3"/>`;
+      }
+      if(s.nodes){
+        const c=-(p1+p2)/2, P0=phase(lo), P1=phase(hi);
+        for(let n=Math.ceil((P0-c)/Math.PI-1e-9); c+n*Math.PI<=P1+1e-9; n++){
+          const x=invPhase(c+n*Math.PI);
+          g+=`<circle cx="${X(x)}" cy="${ay}" r="4.5" fill="#fff" stroke="#000" stroke-width="1.5"/>`;
+        }
+      }
+    }
+  }
+  // t축 모드: 재생 중 현재 시각 표시 (세로 점선 + 곡선 위 점)
+  if(!xm && +S.t!==0){
+    const span=we-ws; let tm=+S.t;
+    if(span>0) tm = ws + (((tm-ws)%span)+span)%span;
+    const xp=X(tm);
+    g+=`<line x1="${xp}" y1="${Y(s.yMax)}" x2="${xp}" y2="${Y(s.yMin)}" stroke="#d33" stroke-width="1.2" stroke-dasharray="4 3"/>`;
+    curvesNow.forEach(c=>{ const y=waveY(tm,c.p); if(isFinite(y)) g+=`<circle cx="${xp}" cy="${Y(y)}" r="5" fill="#d33"/>`; });
+  }
+  // 앞머리 이름 (A, B)
+  if(xm && !s.multi && !srcMode()){
+    const lab=(F0,d,name,which)=>{ if(!name) return; const f=frontPos(F0,d,S.t); if(f===null||f<ws||f>we) return;
+      const y=comps(f+(d>0?-1e-6:1e-6),S.t)[which]; if(!isFinite(y)) return;
+      txt+=T2(X(f)+(d>0?4:-4), Y(y)-8, name, {anchor:d>0?'start':'end', family:SANS}); };
+    const FL=effFronts();
+    lab(FL[0],+s.dir,s.front1Label,'y1');
+    if(s.w2on) lab(FL[1],-s.dir,s.w2Label,'y2');
+  }
+  // 곡선 범례
+  if(s.multi && s.curves.length && s.curveLegend!=='none'){
+    const L=30, lh=fs*1.25, items=s.curves.filter(c=>c.label!=='');
+    const tw=Math.max(0,...items.map(c=>c.label.replace(/_\{?|\}/g,'').length))*fs*0.55;
+    const x0 = s.curveLegend==='ul' ? ax+fs*1.2 : W-mR-L-8-tw;
+    items.forEach((c,i)=>{ const yy=mT-topX+fs*0.1+i*lh, da=DASH[c.dash]||'';
+      g+=`<line x1="${x0}" y1="${yy}" x2="${x0+L}" y2="${yy}" stroke="${s.color}" stroke-width="${s.lw}"${da?` stroke-dasharray="${da}"`:''}/>`;
+      txt+=T2(x0+L+6, yy+fs*0.35, c.label, {anchor:'start', math:true, halo:false}); });
+  }
+
+  // 매질 이름
+  if(xm && s.media.length>1){
+    s.media.forEach((m,i)=>{
+      const [lo,hi]=bounds(i); const a=Math.max(ws,lo), b=Math.min(we,hi);
+      let lx = isNum(m.labelX)? +m.labelX : (a+b)/2;
+      const ly = isNum(m.labelY)? +m.labelY : +s.nameY;
+      if(b>a || isNum(m.labelX)){
+        txt+=textEl(X(lx),Y(ly)+fs*0.35,m.name,'middle');
+        const w=String(m.name).length*fs*0.95+10;
+        GEOM.drags.push({kind:'name', i, lx0:lx, ly0:ly, vert:true, box:[X(lx)-w/2, Y(ly)-fs*0.7, w, fs*1.4]});
+      }
+    });
+  }
+  // 진행 방향 화살표
+  if(xm && s.showArrow){
+    const x1=X(s.arrowX), x2=X(+s.arrowX+ +s.arrowLen), yy=Y(s.arrowY);
+    const [from,to]= s.dir>0? [x1,x2]:[x2,x1];
+    const ah2=Math.max(8,sw*5.5), dirv=Math.sign(to-from)||1;
+    g+=`<line x1="${from}" y1="${yy}" x2="${to-dirv*ah2*0.6}" y2="${yy}" stroke="#000" stroke-width="${sw}"/>`;
+    g+=arrowHead(to,yy,dirv,0,ah2);
+    txt+=textEl((x1+x2)/2,yy-fs*0.45,s.arrowText,'middle');
+    arrowDrags(1, x1, x2, yy, to===x2);
+  }
+  if(xm && s.w2on && s.showArrow){   // 두 번째 화살표는 첫 번째 화살표 표시 여부를 따름
+    const x1=X(s.arrow2X), x2=X(+s.arrow2X+ +s.arrow2Len), yy=Y(s.arrow2Y);
+    const [from,to]= s.dir>0? [x2,x1]:[x1,x2];
+    const ah2=Math.max(8,sw*5.5), dirv=Math.sign(to-from)||1;
+    g+=`<line x1="${from}" y1="${yy}" x2="${to-dirv*ah2*0.6}" y2="${yy}" stroke="#000" stroke-width="${sw}"/>`;
+    g+=arrowHead(to,yy,dirv,0,ah2);
+    txt+=textEl((x1+x2)/2,yy-fs*0.45,s.arrowText,'middle');
+    arrowDrags(2, x1, x2, yy, to===x2);
+  }
+
+  document.getElementById('svgWrap').innerHTML =
+    `<svg id="waveSvg" xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="100%" height="100%" fill="#fff"/>${g}${txt}</svg>`;
+  updateInfo();
+}
+
+function updateInfo(){
+  if(S.dim==='2d'){ info2D(); return; }
+  const f=1/S.T, w=2*Math.PI/S.T;
+  let h=`T = ${fmt(S.T)} s, f = ${fmt(f)} Hz, ω = ${fmt(w)} rad/s<br>`;
+  if(S.hMode==='t'){ const mi=mediumIdx(+S.obsX); h+=`관찰 위치 x = ${fmt(S.obsX)} m (${esc(S.media[mi].name)})<br>`; }
+  const AMs=mediumAmps();
+  S.media.forEach((m,i)=>{ h+=`${esc(m.name)}: v = ${fmt(m.v)} m/s, λ = ${fmt(m.lambda)} m, k = ${fmt(2*Math.PI/m.lambda)} rad/m, A = ${fmt(AMs[i])}`+(i<S.media.length-1? `, 경계 반사 계수 r = ${fmt(+rAuto(i).toFixed(3))} (${reflType(i).split(' —')[0]})`:'')+'<br>'; });
+  document.getElementById('info').innerHTML=h;
+}
+
+/* ---------- 입력 연결 ---------- */
+function syncInputs(){
+  document.querySelectorAll('[data-key]').forEach(el=>{
+    const v=S[el.dataset.key];
+    if(el.type==='checkbox') el.checked=!!v; else el.value=v;
+  });
+  document.querySelectorAll('[data-k2]').forEach(el=>{
+    const v=S.d2[el.dataset.k2];
+    if(el.type==='checkbox') el.checked=!!v; else el.value=v;
+  });
+  document.getElementById('T').value=parseFloat((+S.T).toFixed(6));
+  document.getElementById('f').value=parseFloat((1/S.T).toFixed(6));
+  if(typeof updateTimeUI==='function') updateTimeUI();
+  if(typeof applyModeUI==='function') applyModeUI();
+}
+document.querySelectorAll('[data-key]').forEach(el=>{
+  const ev = (el.tagName==='SELECT'||el.type==='checkbox'||el.type==='color')?'change':'input';
+  el.addEventListener(ev,()=>{
+    const k=el.dataset.key; let v;
+    if(el.type==='checkbox') v=el.checked;
+    else if(el.dataset.blank!==undefined && el.value.trim()===''){ v=''; }
+    else if(el.type==='number'||el.dataset.type==='int'){ v=parseFloat(el.value); if(!isFinite(v)) return; }
+    else v=el.value;
+    S[k]=v; draw();
+  });
+});
+function setPeriod(T){
+  if(!(T>0)) return;
+  S.T=T;
+  S.media.forEach(m=>{ m.lambda=m.v*T; });   // 속력은 그대로, 파장 = vT
+  renderMedia(); updateTimeUI(); draw();
+}
+document.getElementById('T').addEventListener('input',e=>{ const T=parseFloat(e.target.value); if(T>0){ setPeriod(T); document.getElementById('f').value=parseFloat((1/T).toFixed(6)); }});
+document.getElementById('f').addEventListener('input',e=>{ const f=parseFloat(e.target.value); if(f>0){ setPeriod(1/f); document.getElementById('T').value=parseFloat((1/f).toFixed(6)); }});
+
+/* ---------- 가로축 모드 ---------- */
+const AXKEYS=['xAxMin','xAxMax','waveStart','waveEnd','tickStep','tickEnd','labelMode','labelStep','customLabels','xLabel'];
+function tAxisDefaults(){ const T=S.T;
+  return {xAxMin:0, xAxMax:+(4.2*T).toFixed(4), waveStart:0, waveEnd:+(3.85*T).toFixed(4), tickStep:+(T/4).toFixed(4),
+    tickEnd:+(3.75*T).toFixed(4), labelMode:'auto', labelStep:+(T/2).toFixed(4), customLabels:'', xLabel:'t(s)'}; }
+function setMode(mode){
+  if(mode===S.hMode) return;
+  if(playing) togglePlay();
+  const saved={}; AXKEYS.forEach(k=>saved[k]=S[k]); S.axisSaved[S.hMode]=saved;
+  const load=S.axisSaved[mode] || (mode==='t'? tAxisDefaults() : (()=>{ const o={}; AXKEYS.forEach(k=>o[k]=DEFAULTS[k]); return o; })());
+  Object.assign(S, load); S.hMode=mode; S.curves=[]; S.multi=false; renderCurves();
+  syncInputs(); draw();
+}
+function applyModeUI(){
+  const d2=S.dim==='2d', t=S.hMode==='t' && !d2, fronts=!d2 && !t && S.style1d==='fronts';
+  document.getElementById('dimSel').value=S.dim;
+  document.querySelectorAll('.only1d').forEach(e=>e.style.display=d2?'none':'');
+  document.querySelectorAll('.only2d').forEach(e=>e.style.display=d2?'':'none');
+  document.getElementById('styleRow').style.display=(d2||t)?'none':'';
+  document.getElementById('frontSec').style.display=fronts?'':'none';
+  document.getElementById('curveSec').style.display=d2?'none':'';
+  document.getElementById('w2Bar').style.display=(!d2 && !fronts && S.w2on)?'':'none';
+  document.getElementById('hMode').value=S.hMode;
+  document.getElementById('showYRow').style.display=fronts?'none':'';
+  const sm=S.w2on;
+  document.getElementById('front1Row').style.display=sm?'none':'';
+  if(!d2){
+    document.getElementById('chipY').style.display=fronts?'none':'';
+    document.getElementById('chipArrow').style.display=(t||fronts)?'none':'';
+    document.getElementById('chipW2').style.display=fronts?'none':'';
+    document.getElementById('chipLegend1').style.display=fronts?'':'none';
+  }
+  const lm=S.labelMode;
+  document.getElementById('customRow').style.display=lm==='custom'?'':'none';
+  document.getElementById('labelStepRow').style.display=lm==='auto'?'':'none';
+  document.getElementById('obsCtl').style.display=t?'':'none';
+  document.getElementById('tModeMediaHint').style.display=t?'':'none';
+  document.querySelectorAll('.hu').forEach(e=>e.textContent=t?'s':'m');
+  document.querySelectorAll('.seg').forEach(sg=>{ const v=document.getElementById(sg.dataset.for).value;
+    sg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===v)); });
+}
+document.getElementById('hMode').addEventListener('change',e=>setMode(e.target.value));
+
+/* ---------- 매질 편집 ---------- */
+function renderMedia(){
+  const box=document.getElementById('mediaList'); box.innerHTML='';
+  S.media.forEach((m,i)=>{
+    const last=i===S.media.length-1;
+    const div=document.createElement('div'); div.className='medium';
+    div.innerHTML=`
+      <div class="head"><input type="text" data-f="name" style="width:120px">
+        ${S.media.length>1?'<button data-del style="padding:2px 8px">삭제</button>':''}</div>
+      <div class="grid2">
+        <label class="fl"><span>속력 v</span><input type="number" data-f="v" step="0.5"></label>
+        <div class="fl ro"><span>파장 λ</span><b data-ro="lambda"></b></div>
+        <div class="fl ro"><span>진폭 A</span><b data-ro="A"></b></div>
+        ${last?'':`<label class="fl"><span>경계 x</span><input type="number" data-f="end" step="0.5"></label>
+        <div class="fl ro"><span>반사 계수 r</span><b data-ro="r"></b></div>
+        <div class="fl ro" style="grid-column:1/-1"><span>경계 반사</span><b data-ro="rtype"></b></div>`}
+      </div>`;
+    div.querySelectorAll('[data-f]').forEach(inp=>{
+      const f=inp.dataset.f;
+      inp.value = f==='v'? parseFloat((+m.v).toFixed(6)) : (m[f]??'');
+      inp.addEventListener('input',()=>{
+        if(f==='name'){ m.name=inp.value; draw(); return; }
+        const v=parseFloat(inp.value); if(!isFinite(v)) return;
+        if(f==='v'){ if(v<=0) return; m.v=v; m.lambda=v*S.T; }
+        else if(f==='r'){ m.r=Math.max(-1,Math.min(1,v)); }
+        else m[f]=v;
+        draw();
+      });
+    });
+    const del=div.querySelector('[data-del]');
+    if(del) del.onclick=()=>{ S.media.splice(i,1); renderMedia(); draw(); };
+    box.appendChild(div);
+  });
+  syncMediaRO();
+}
+function syncMediaRO(){
+  const A=mediumAmps();
+  document.querySelectorAll('#mediaList .medium').forEach((div,i)=>{ const m=S.media[i]; if(!m) return;
+    const l=div.querySelector('[data-ro=lambda]'), a=div.querySelector('[data-ro=A]');
+    if(l) l.textContent=fmt(m.v*S.T)+' m'; if(a) a.textContent=fmt(A[i]);
+    const rr=div.querySelector('[data-ro=r]'); if(rr && S.media[i+1]) rr.textContent=fmt(+rAuto(i).toFixed(3));
+    const rt=div.querySelector('[data-ro=rtype]'); if(rt && S.media[i+1]) rt.textContent=reflType(i);
+  });
+}
+function addMedium(){
+  const m=S.media, prev=m[m.length-1];
+  const [lo]=bounds(m.length-1);
+  const a=Math.max(isFinite(lo)?lo:S.waveStart,S.waveStart);
+  prev.end=+(((a+S.waveEnd)/2)).toFixed(2);
+  const letter=String.fromCharCode(65+m.length);
+  prev.r=prev.r||0;
+  m.push({name:'매질 '+letter, end:prev.end+10, lambda:prev.v*2*S.T, v:prev.v*2, r:0, labelX:''});
+  syncInputs(); renderMedia(); draw();
+}
+
+/* ---------- 시간 넘기기 / 초기화 ---------- */
+function setT(t){ S.t=+(+t).toFixed(6); updateTimeUI(); draw(); }
+function stepTime(sign){ const d=(+S.dtVal||0)*(S.dtUnit==='T'?S.T:1); setT(S.t+sign*d); }
+function jumpT(frac){ setT(S.t+frac*S.T); }
+function updateTimeUI(){
+  document.getElementById('t').value=parseFloat((+S.t).toFixed(6));
+  document.getElementById('tInT').textContent=`(= ${fmt(S.t/S.T)} T)`;
+  // 양쪽 끝에서 출발하는 정상파는 두 파동이 구간을 다 지날 때까지 볼 수 있게 슬라이더 범위를 늘림
+  let mx=2;
+  if(S.dim!=='2d' && srcMode()) mx=Math.max(2, Math.ceil((phase(+S.waveEnd)-phase(+S.waveStart))/(2*Math.PI))+1);
+  const r=S.t/S.T, sl=document.getElementById('tSlider');
+  sl.max=mx; document.getElementById('tSliderMax').textContent=`0 ~ ${mx}T`;
+  sl.value = (r>=0 && r<=mx) ? r : (((r%mx)+mx)%mx);
+}
+document.getElementById('tSlider').addEventListener('input',e=>setT(parseFloat(e.target.value)*S.T));
+document.getElementById('t').addEventListener('input',updateTimeUI);
+function resetPlay(){
+  if(playing) togglePlay();
+  S.playSpeed=DEFAULTS.playSpeed; S.dtVal=DEFAULTS.dtVal; S.dtUnit=DEFAULTS.dtUnit;
+  syncInputs(); setT(0);
+}
+function resetAll(){
+  if(playing) togglePlay();
+  const keep={dim:S.dim, hMode:S.hMode, style1d:S.style1d};
+  S=JSON.parse(JSON.stringify(DEFAULTS));
+  S.dim=keep.dim; S.style1d=keep.style1d;
+  if(keep.hMode==='t'){ S.axisSaved.x=Object.fromEntries(AXKEYS.map(k=>[k,S[k]])); Object.assign(S,tAxisDefaults()); S.hMode='t'; }
+  syncInputs(); renderMedia(); render2DLists(); renderCurves(); draw();
+}
+
+/* ---------- 재생 ---------- */
+let playing=false, lastTs=0;
+function togglePlay(){
+  playing=!playing; document.getElementById('playBtn').textContent=playing?'⏸ 정지':'▶ 재생';
+  if(playing){ lastTs=performance.now(); requestAnimationFrame(loop); }
+}
+function loop(ts){
+  if(!playing) return;
+  S.t=+(S.t+(ts-lastTs)/1000*S.playSpeed).toFixed(4); lastTs=ts;
+  updateTimeUI(); draw(); requestAnimationFrame(loop);
+}
+
+/* =================================================================
+   공통: 글자(아래첨자·줄바꿈), 범례
+   ================================================================= */
+const SANS="'Malgun Gothic','Apple SD Gothic Neo','Noto Sans KR',sans-serif";
+const SERIF="'Times New Roman','Batang',serif";
+function rich(str,size,math=false){  // S_1, d_{12} → 아래첨자, math: 영문자 기울임
+  const segs=[]; let i=0, buf='';
+  while(i<str.length){ const c=str[i];
+    if(c==='_' && i+1<str.length){ if(buf){segs.push([0,buf]);buf='';}
+      if(str[i+1]==='{'){ const j=str.indexOf('}',i+2), e=j<0?str.length:j; segs.push([1,str.slice(i+2,e)]); i=e+1; }
+      else { segs.push([1,str[i+1]]); i+=2; }
+    } else { buf+=c; i++; } }
+  if(buf) segs.push([0,buf]);
+  let out='', sub=false; const dy=(size*0.28).toFixed(1);
+  const it=v=> math ? esc(v).replace(/([A-Za-z]+)/g,'<tspan font-style="italic">$1</tspan>') : esc(v);
+  segs.forEach(([t,v])=>{
+    if(t===1){ out+=`<tspan dy="${dy}" font-size="${(size*0.68).toFixed(1)}">${esc(v)}</tspan>`; sub=true; }
+    else { out+=`<tspan${sub?` dy="-${dy}"`:''}>${it(v)}</tspan>`; sub=false; }
+  });
+  return out;
+}
+function T2(x,y,str,o={}){
+  const size=o.size||+S.fs, family=o.family||SERIF, anchor=o.anchor||'middle';
+  const useHalo=(o.halo!==false && S.labelHalo);
+  const lines=String(str).split('|'), lh=size*1.15, y0=y-(lines.length-1)*lh/2;
+  return lines.map((ln,i)=>{
+    const base=`x="${x.toFixed(2)}" y="${(y0+i*lh).toFixed(2)}" font-size="${size}" font-family="${family}" text-anchor="${anchor}"`, inner=rich(ln,size,o.math);
+    // 흰 테두리를 글자 전체 아래에 따로 깔아 기울임체 글자가 지워지지 않게 함
+    return (useHalo? `<text ${base} fill="#fff" stroke="#fff" stroke-width="${S.haloW}" stroke-linejoin="round">${inner}</text>` : '') + `<text ${base} fill="#000">${inner}</text>`;
+  }).join('');
+}
+function legendSvg(cx,y,size,cw,tw,dash){
+  const L=30, a=S.legendCrest||'', b=S.legendTrough||'';
+  const w1=L+6+a.length*size, w2=L+6+b.length*size, gap=size*1.2, tot=w1+gap+w2;
+  let x=cx-tot/2, o='';
+  o+=`<line x1="${x}" y1="${y}" x2="${x+L}" y2="${y}" stroke="#000" stroke-width="${cw}"/>`;
+  o+=T2(x+L+6,y+size*0.35,a,{anchor:'start',family:SANS,size,halo:false});
+  x+=w1+gap;
+  o+=`<line x1="${x}" y1="${y}" x2="${x+L}" y2="${y}" stroke="#000" stroke-width="${tw}" stroke-dasharray="${dash}"/>`;
+  o+=T2(x+L+6,y+size*0.35,b,{anchor:'start',family:SANS,size,halo:false});
+  return o;
+}
+
+/* =================================================================
+   1차원 파면(마루·골 선) 그림
+   ================================================================= */
+function frontPositions(t,a,b){
+  const w=2*Math.PI/S.T, ph=S.phi*Math.PI/180, TWO=2*Math.PI;
+  const g=x=>phase(x) - S.dir*w*t + ph;
+  const N=4000, res={crest:[],trough:[]};
+  let x1=a, g1=g(a);
+  for(let i=1;i<=N;i++){
+    const x2=a+(b-a)*i/N, g2=g(x2), last=i===N;
+    if(g2>g1){
+      [[Math.PI/2,res.crest],[-Math.PI/2,res.trough]].forEach(([c0,arr])=>{
+        for(let n=Math.ceil((g1-c0)/TWO-1e-12); ; n++){
+          const c=c0+n*TWO; if(c>g2+1e-12 || (c>=g2-1e-12 && !last)) break;
+          arr.push(x1+(c-g1)/(g2-g1)*(x2-x1));
+        }
+      });
+    }
+    x1=x2; g1=g2;
+  }
+  return res;
+}
+function drawFronts(){
+  const s=S, fs=+s.fs, W=+s.W, sw=+s.axisLw;
+  // '여러 시각 겹치기'를 켜면 곡선 목록의 시각마다 한 줄씩, 끄면 한 줄만
+  const multiRows = s.multi && s.curves.length;
+  const times = multiRows ? s.curves.map(c=>+c.p) : [0];
+  const rl = multiRows ? s.curves.map(c=>String(c.label||'').trim()) : [];
+  const rowLbl=i=> rl[i] ? rl[i] : (times[i]===0 ? 't = 0' : `t = ${fmt(times[i])}초`);
+  const lblW=Math.max(...times.map((_,i)=>rowLbl(i).replace(/_\{?|\}/g,'').length))*fs*0.6+12;
+  const mL=lblW+10, mR=fs*0.6+10;
+  const nameH=s.media.length>1? fs*1.5:0, top=nameH+8;
+  const sh=+s.stripH, rowH=sh+fs*1.7+ +s.stripGap;
+  const legendH=s.showLegend? fs*2:0;
+  const H=Math.ceil(top+times.length*rowH-(+s.stripGap)+legendH+6);
+  const pw=W-mL-mR, X=x=>mL+(x-s.xAxMin)/(s.xAxMax-s.xAxMin)*pw;
+  GEOM={ scaleX: pw/(s.xAxMax-s.xAxMin), scaleY:1, handles:[], drags:[] };
+  const ws=Math.max(+s.waveStart,s.xAxMin), we=Math.min(+s.waveEnd,s.xAxMax);
+  const ah=Math.max(9,sw*6);
+  let g='', txt='';
+  times.forEach((t,r)=>{
+    const y0=top+r*rowH, yb=y0+sh;
+    // 띠 테두리
+    g+=`<rect x="${X(ws)}" y="${y0}" width="${X(we)-X(ws)}" height="${sh}" fill="none" stroke="#777" stroke-width="1" stroke-dasharray="2 2"/>`;
+    // 파면
+    const fp=frontPositions(t+(+S.t),ws,we);
+    fp.crest.forEach(x=>{ g+=`<line x1="${X(x)}" y1="${y0+5}" x2="${X(x)}" y2="${yb-5}" stroke="${s.color}" stroke-width="${s.lw}"/>`; });
+    fp.trough.forEach(x=>{ g+=`<line x1="${X(x)}" y1="${y0+5}" x2="${X(x)}" y2="${yb-5}" stroke="${s.color}" stroke-width="${s.lw}" stroke-dasharray="6 4"/>`; });
+    if(s.showXAxis!==false){
+    // 축
+    g+=`<line x1="${X(s.xAxMin)}" y1="${yb}" x2="${X(s.xAxMax)-ah*0.6}" y2="${yb}" stroke="#000" stroke-width="${sw}"/>`;
+    g+=arrowHead(X(s.xAxMax),yb,1,0,ah);
+    GEOM.handles.push({kind:'x', x:X(s.xAxMax), y:yb});
+    if(s.tickStep>0){ const st=+s.tickStep;
+      for(let k=Math.ceil((s.xAxMin-1e-9)/st); k*st<=s.tickEnd+1e-9; k++)
+        g+=`<line x1="${X(k*st)}" y1="${yb-4}" x2="${X(k*st)}" y2="${yb+4}" stroke="#000" stroke-width="${Math.max(1,sw*0.8)}"/>`; }
+    let labels=[];
+    if(s.labelMode==='auto' && s.labelStep>0){ const st=+s.labelStep;
+      for(let k=Math.ceil((s.xAxMin-1e-9)/st); k*st<=s.tickEnd+1e-9; k++) labels.push(+(k*st).toFixed(6)); }
+    else if(s.labelMode==='custom') labels=parseList(s.customLabels);
+    labels.forEach(x=>{ txt+=textEl(X(x)+(+s.labelDx||0), yb+fs+3+(+s.labelDy||0), fmt(x), 'middle'); });
+    txt+=textEl(X(s.xAxMax)+fs*0.4, yb+fs*1.45, s.xLabel, 'end', s.italicVar);
+    }
+    txt+=T2(mL-12, y0+sh/2+fs*0.35, rowLbl(r), {anchor:'end', math:true, halo:false});
+    // 매질 이름 (첫 줄 위)
+    if(r===0 && s.media.length>1) s.media.forEach((m,i)=>{ const [lo,hi]=bounds(i); const a=Math.max(ws,lo), b=Math.min(we,hi);
+      const lx=isNum(m.labelX)? +m.labelX : (a+b)/2;
+      if(b>a){ txt+=textEl(X(lx), y0-7, m.name, 'middle');
+        const w=String(m.name).length*fs*0.95+10;
+        GEOM.drags.push({kind:'name', i, lx0:lx, vert:false, box:[X(lx)-w/2, y0-7-fs*1.05, w, fs*1.4]}); } });
+  });
+  if(s.showLegend) txt+=legendSvg(W/2, H-legendH/2-2, fs, s.lw, s.lw, '6 4');
+  document.getElementById('svgWrap').innerHTML =
+    `<svg id="waveSvg" xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="100%" height="100%" fill="#fff"/>${g}${txt}</svg>`;
+  updateInfo();
+}
+
+/* =================================================================
+   2차원 그리기
+   ================================================================= */
+const POSOPT=[['u','위'],['d','아래'],['l','왼쪽'],['r','오른쪽'],['ul','왼쪽 위'],['ur','오른쪽 위'],['dl','왼쪽 아래'],['dr','오른쪽 아래']];
+function posOff(pos,fs){
+  return ({u:[0,-9,'middle'], d:[0,fs+5,'middle'], l:[-8,fs*0.35,'end'], r:[8,fs*0.35,'start'],
+    ul:[-5,-7,'end'], ur:[5,-7,'start'], dl:[-5,fs+3,'end'], dr:[5,fs+3,'start']})[pos] || [0,-9,'middle'];
+}
+const num=(v,d)=>{ const n=parseFloat(v); return isFinite(n)?n:d; };
+function resolvePt(str){
+  const k=String(str||'').trim(), d=S.d2;
+  const p=d.points.find(q=>q.name===k) || d.sources.find(q=>q.type==='point' && q.name===k);
+  if(p) return [+p.x,+p.y];
+  const m=k.split(',').map(Number); if(m.length===2 && m.every(isFinite)) return m;
+  return null;
+}
+let FREEZE2D=null, LAST2D=null, D2DRAG=null, PTMODE=false;
+const PT_NAMES=['P','Q','R','A','B','C','D','E','F','G','H','K','L','M','N'];
+function nextPtName(){ const used=new Set(S.d2.points.map(p=>p.name)); return PT_NAMES.find(c=>!used.has(c)) || ('P_'+(S.d2.points.length+1)); }
+function togglePtMode(on){
+  PTMODE = on===undefined ? !PTMODE : on;
+  document.getElementById('ptModeBtn').classList.toggle('on',PTMODE);
+  document.body.classList.toggle('ptmode',PTMODE);
+  if(!PTMODE) renderHover(HOV=null);
+  draw();
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Escape' && PTMODE) togglePtMode(false); });
+/* 점 찍을 때 붙는 위치: 파면(마루·골)끼리의 교차점 → 격자 교차점 → 0.05 단위 */
+function frontCurves(){
+  const d=S.d2, out=[], rx0=+d.rx0, rx1=+d.rx1, ry0=+d.ry0, ry1=+d.ry1;
+  const corners=[[rx0,ry0],[rx0,ry1],[rx1,ry0],[rx1,ry1]];
+  d.sources.forEach(q=>{
+    const lam=num(q.lambda,0); if(!(lam>0)) return;
+    const base=num(q.r0,0)+lam/S.T*S.t, rmin=num(q.rmin,0);
+    const offs=[]; if(d.showCrest) offs.push([0,'마루']); if(d.showTrough) offs.push([lam/2,'골']);
+    if(q.type==='point'){
+      const rmax=Math.min(num(q.rmax,Infinity), Math.max(...corners.map(([cx,cy])=>Math.hypot(cx-q.x,cy-q.y)))+lam);
+      offs.forEach(([o,k])=>{ for(let n=Math.ceil((rmin-base-o)/lam-1e-9);;n++){ const r=base+o+n*lam; if(r>rmax+1e-9) break; if(r>1e-9) out.push({t:'c',cx:+q.x,cy:+q.y,r,k}); } });
+    } else {
+      const a=q.angle*Math.PI/180, ux=Math.cos(a), uy=Math.sin(a), h=num(q.width,6)/2;
+      const rmax=Math.min(num(q.rmax,Infinity), Math.max(...corners.map(([cx,cy])=>(cx-q.x)*ux+(cy-q.y)*uy))+lam);
+      offs.forEach(([o,k])=>{ for(let n=Math.ceil((rmin-base-o)/lam-1e-9);;n++){ const r=base+o+n*lam; if(r>rmax+1e-9) break; if(r>=0) out.push({t:'l',px:+q.x+ux*r,py:+q.y+uy*r,dx:-uy,dy:ux,h,k}); } });
+    }
+  });
+  return out;
+}
+function intersect(A,B){
+  const P=[];
+  if(A.t==='c'&&B.t==='c'){
+    const dx=B.cx-A.cx, dy=B.cy-A.cy, D=Math.hypot(dx,dy); if(D<1e-9||D>A.r+B.r||D<Math.abs(A.r-B.r)) return P;
+    const a=(A.r*A.r-B.r*B.r+D*D)/(2*D), hh=Math.sqrt(Math.max(0,A.r*A.r-a*a)), mx=A.cx+a*dx/D, my=A.cy+a*dy/D;
+    P.push([mx+hh*dy/D, my-hh*dx/D],[mx-hh*dy/D, my+hh*dx/D]);
+  } else if(A.t==='l'&&B.t==='l'){
+    const det=A.dx*(-B.dy)-A.dy*(-B.dx); if(Math.abs(det)<1e-9) return P;
+    const bx=B.px-A.px, by=B.py-A.py, s=(bx*(-B.dy)-by*(-B.dx))/det, u=(A.dx*by-A.dy*bx)/det;
+    if(Math.abs(s)<=A.h+1e-9 && Math.abs(u)<=B.h+1e-9) P.push([A.px+A.dx*s, A.py+A.dy*s]);
+  } else {
+    const C=A.t==='c'?A:B, L=A.t==='c'?B:A;
+    const fx=L.px-C.cx, fy=L.py-C.cy, b=fx*L.dx+fy*L.dy, c=fx*fx+fy*fy-C.r*C.r, disc=b*b-c;
+    if(disc<0) return P;
+    [-b+Math.sqrt(disc), -b-Math.sqrt(disc)].forEach(s=>{ if(Math.abs(s)<=L.h+1e-9) P.push([L.px+L.dx*s, L.py+L.dy*s]); });
+  }
+  return P;
+}
+function snapPoint2D(x,y,sc){
+  const tol=10/sc, F=frontCurves(); let best=null;
+  for(let i=0;i<F.length;i++) for(let j=i+1;j<F.length;j++){
+    intersect(F[i],F[j]).forEach(([px,py])=>{ const dd=Math.hypot(px-x,py-y);
+      if(dd<tol && (!best||dd<best.d)) best={d:dd,x:px,y:py,k:F[i].k===F[j].k? `${F[i].k}+${F[j].k} 교차점` : '마루+골 교차점'}; });
+  }
+  if(best) return [+best.x.toFixed(3), +best.y.toFixed(3), best.k];
+  const d=S.d2;
+  if(d.grid && d.gridStep>0){ const g=+d.gridStep, gx=Math.round(x/g)*g, gy=Math.round(y/g)*g;
+    if(Math.hypot(gx-x,gy-y)<7/sc) return [+gx.toFixed(3), +gy.toFixed(3), '격자 교차점']; }
+  return [+(Math.round(x/0.05)*0.05).toFixed(3), +(Math.round(y/0.05)*0.05).toFixed(3), ''];
+}
+function draw2D(){
+  GEOM=null;
+  const d=S.d2, fs=+S.fs, sc=num(d.scale,40);
+  const rx0=+d.rx0, rx1=+d.rx1, ry0=+d.ry0, ry1=+d.ry1;
+  let bx0=rx0,bx1=rx1,by0=ry0,by1=ry1;
+  const inc=(x,y)=>{ if(!isFinite(x)||!isFinite(y)) return; bx0=Math.min(bx0,x);bx1=Math.max(bx1,x);by0=Math.min(by0,y);by1=Math.max(by1,y); };
+  d.points.forEach(p=>inc(+p.x,+p.y));
+  d.dims.forEach(m=>{inc(+m.x1,+m.y1);inc(+m.x2,+m.y2);});
+  d.texts.forEach(t=>inc(+t.x,+t.y));
+  d.sources.forEach(q=>{ if(q.type==='point'){ if(q.showDot) inc(+q.x,+q.y); }
+    else if(q.bar){ const a=q.angle*Math.PI/180, px=-Math.sin(a), py=Math.cos(a), h=q.width/2;
+      inc(+q.x+px*h,+q.y+py*h); inc(+q.x-px*h,+q.y-py*h);
+      if(q.barText){ const ls=String(q.barText).split('|'), nl=ls.length, dd=fs*(0.9+0.6*nl)/sc, ux=Math.cos(a), uy=Math.sin(a);
+        const cx=+q.x-ux*dd, cy=+q.y-uy*dd, hw=Math.max(...ls.map(l=>l.length))*fs*0.55/sc, hh=(nl*fs*1.15/2+4)/sc;
+        inc(cx-hw,cy-hh); inc(cx+hw,cy+hh); } } });
+  // 끄는 동안에는 그림 범위를 고정해서 끌던 대상이 마우스를 따라오게 함
+  if(FREEZE2D){ ({bx0,bx1,by0,by1}=FREEZE2D); } else LAST2D={bx0,bx1,by0,by1};
+  const pad=fs*1.5+12, legendH=S.showLegend? fs*1.6:0;
+  const W=Math.ceil((bx1-bx0)*sc+2*pad), H=Math.ceil((by1-by0)*sc+2*pad+legendH);
+  const X=x=>pad+(x-bx0)*sc, Y=y=>pad+(by1-y)*sc;
+  GEOM={ handles:[], drags:[], sc, d2map:{ xOf:px=>bx0+(px-pad)/sc, yOf:py=>by1-(py-pad)/sc, X, Y } };
+  // 끌 수 있는 대상: 파원, 평면파 막대(중심·끝), 점, 글자, 치수선(양 끝·가운데)
+  const D=(kind,ref,cx,cy,w=20,h=20,extra={})=>GEOM.drags.push(Object.assign({kind, d2:true, ref, box:[cx-w/2,cy-h/2,w,h]},extra));
+  d.sources.forEach((q,i)=>{
+    if(q.type==='point') D('src',q,X(q.x),Y(q.y));
+    else { const a=q.angle*Math.PI/180, px=-Math.sin(a), py=Math.cos(a), h=num(q.width,6)/2;
+      D('src',q,X(q.x),Y(q.y),22,22);
+      D('rot',q,X(+q.x+px*h),Y(+q.y+py*h),18,18); }
+  });
+  d.points.forEach(p=>D('pt',p,X(p.x),Y(p.y)));
+  d.texts.forEach(t=>{ const size=num(t.size,fs), w=Math.max(...String(t.text).split('|').map(l=>l.length))*size*0.8+10; D('txt',t,X(t.x),Y(t.y),w,size*1.4*String(t.text).split('|').length); });
+  d.dims.forEach(m=>{ D('dim1',m,X(m.x1),Y(m.y1),16,16); D('dim2',m,X(m.x2),Y(m.y2),16,16);
+    D('dimm',m,(X(m.x1)+X(m.x2))/2,(Y(m.y1)+Y(m.y2))/2,22,22); });
+  let g='', fr='', txt='', bg='';
+  const cw=num(d.crestW,2), tw=num(d.troughW,2), dash='7 5';
+
+  // 격자
+  if(d.grid && d.gridStep>0){ const st=+d.gridStep, gl=`stroke="#888" stroke-width="0.9" stroke-dasharray="1.5 3"`;
+    for(let k=Math.ceil((rx0-1e-9)/st); k*st<=rx1+1e-9; k++) bg+=`<line x1="${X(k*st)}" y1="${Y(ry0)}" x2="${X(k*st)}" y2="${Y(ry1)}" ${gl}/>`;
+    for(let k=Math.ceil((ry0-1e-9)/st); k*st<=ry1+1e-9; k++) bg+=`<line x1="${X(rx0)}" y1="${Y(k*st)}" x2="${X(rx1)}" y2="${Y(k*st)}" ${gl}/>`; }
+  if(d.border) bg+=`<rect x="${X(rx0)}" y="${Y(ry1)}" width="${(rx1-rx0)*sc}" height="${(ry1-ry0)*sc}" fill="none" stroke="#000" stroke-width="1"/>`;
+
+  // 파면
+  const corners=[[rx0,ry0],[rx0,ry1],[rx1,ry0],[rx1,ry1]];
+  d.sources.forEach(q=>{
+    const lam=num(q.lambda,0); if(!(lam>0)) return;
+    const v=lam/S.T, base=num(q.r0,0)+v*S.t, rmin=num(q.rmin,0);
+    const sets=[]; if(d.showCrest) sets.push([0,cw,'']); if(d.showTrough) sets.push([lam/2,tw,dash]);
+    if(q.type==='point'){
+      const far=Math.max(...corners.map(([cx,cy])=>Math.hypot(cx-q.x,cy-q.y)));
+      const rmax=Math.min(num(q.rmax,Infinity), far+lam);
+      sets.forEach(([off,w,da])=>{
+        for(let n=Math.ceil((rmin-base-off)/lam-1e-9); ; n++){ const r=base+off+n*lam; if(r>rmax+1e-9) break; if(r<=1e-9) continue;
+          fr+=`<circle cx="${X(q.x)}" cy="${Y(q.y)}" r="${(r*sc).toFixed(2)}" fill="none" stroke="#000" stroke-width="${w}"${da?` stroke-dasharray="${da}"`:''}/>`; } });
+    } else {
+      const a=q.angle*Math.PI/180, ux=Math.cos(a), uy=Math.sin(a), px=-uy, py=ux, h=num(q.width,6)/2;
+      const far=Math.max(...corners.map(([cx,cy])=>(cx-q.x)*ux+(cy-q.y)*uy));
+      const rmax=Math.min(num(q.rmax,Infinity), far+lam);
+      sets.forEach(([off,w,da])=>{
+        for(let n=Math.ceil((rmin-base-off)/lam-1e-9); ; n++){ const r=base+off+n*lam; if(r>rmax+1e-9) break; if(r<0) continue;
+          const cx=+q.x+ux*r, cy=+q.y+uy*r;
+          fr+=`<line x1="${X(cx+px*h)}" y1="${Y(cy+py*h)}" x2="${X(cx-px*h)}" y2="${Y(cy-py*h)}" stroke="#000" stroke-width="${w}"${da?` stroke-dasharray="${da}"`:''}/>`; } });
+      if(q.bar){
+        g+=`<line x1="${X(+q.x+px*h)}" y1="${Y(+q.y+py*h)}" x2="${X(+q.x-px*h)}" y2="${Y(+q.y-py*h)}" stroke="#999" stroke-width="9"/>`;
+        if(q.barText){ const nl=String(q.barText).split('|').length, dd=fs*(0.9+0.6*nl);
+          txt+=T2(X(q.x)-ux*dd, Y(q.y)+uy*dd+fs*0.35, q.barText, {family:SANS}); }
+      }
+    }
+  });
+  const clip=`<clipPath id="clip2d"><rect x="${X(rx0)}" y="${Y(ry1)}" width="${(rx1-rx0)*sc}" height="${(ry1-ry0)*sc}"/></clipPath>`;
+
+  // 선분
+  d.segs.forEach(sg=>{ const a=resolvePt(sg.from), b=resolvePt(sg.to); if(!a||!b) return;
+    g+=`<line x1="${X(a[0])}" y1="${Y(a[1])}" x2="${X(b[0])}" y2="${Y(b[1])}" stroke="#000" stroke-width="${num(sg.w,2.5)}"${sg.dash?' stroke-dasharray="6 4"':''}/>`; });
+
+  // 치수선
+  d.dims.forEach(m=>{
+    const x1=X(+m.x1), y1=Y(+m.y1), x2=X(+m.x2), y2=Y(+m.y2), L=Math.hypot(x2-x1,y2-y1); if(L<1) return;
+    const ux=(x2-x1)/L, uy=(y2-y1)/L, nx=-uy, ny=ux, ahs=8;
+    const arrows=m.ends==='arrow'||m.ends==='arrowbar', bars=m.ends==='bar'||m.ends==='arrowbar';
+    const s1=arrows?ahs*0.6:0;
+    g+=`<line x1="${x1+ux*s1}" y1="${y1+uy*s1}" x2="${x2-ux*s1}" y2="${y2-uy*s1}" stroke="#000" stroke-width="1.2"/>`;
+    if(arrows){ g+=arrowHead(x1,y1,-ux,-uy,ahs); g+=arrowHead(x2,y2,ux,uy,ahs); }
+    if(bars){ const b=7; [[x1,y1],[x2,y2]].forEach(([x,y])=>{ g+=`<line x1="${x+nx*b}" y1="${y+ny*b}" x2="${x-nx*b}" y2="${y-ny*b}" stroke="#000" stroke-width="1.2"/>`; }); }
+    const off=num(m.off,12), mx=(x1+x2)/2+nx*off, my=(y1+y2)/2+ny*off;
+    const sgn=Math.sign(off)||1, ex=nx*sgn, ey=ny*sgn;
+    let anchor='middle', by=my+fs*0.35;
+    if(Math.abs(ex)>Math.abs(ey)) anchor= ex>0?'start':'end';
+    else by = ey>0 ? my+fs*0.75 : my;
+    txt+=T2(mx,by,m.label,{anchor});
+  });
+
+  // 파원 점·이름
+  d.sources.forEach(q=>{ if(q.type!=='point'||!q.showDot) return;
+    g+=`<circle cx="${X(q.x)}" cy="${Y(q.y)}" r="3.8" fill="#000"/>`;
+    if(q.name){ const [dx,dy,an]=posOff(q.pos,fs); txt+=T2(X(q.x)+dx,Y(q.y)+dy,q.name,{anchor:an}); } });
+  // 점
+  d.points.forEach(p=>{ if(p.dot) g+=`<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="3.8" fill="#000"/>`;
+    if(p.name){ const [dx,dy,an]=posOff(p.pos,fs); txt+=T2(X(p.x)+dx,Y(p.y)+dy,p.name,{anchor:an}); } });
+  // 글자
+  d.texts.forEach(t=>{ const size=num(t.size,fs); txt+=T2(X(t.x),Y(t.y)+size*0.35,t.text,{size,family:t.family==='sans'?SANS:SERIF}); });
+  // 범례
+  if(S.showLegend) txt+=legendSvg(W/2, H-pad*0.5-legendH*0.45, fs, cw, tw, dash);
+
+  document.getElementById('svgWrap').innerHTML =
+    `<svg id="waveSvg" xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><defs>${clip}</defs><rect width="100%" height="100%" fill="#fff"/>${bg}<g clip-path="url(#clip2d)">${fr}</g>${g}${txt}</svg>`;
+  updateInfo();
+}
+const plain=s=>String(s).replace(/_\{([^}]*)\}/g,'$1').replace(/_(.)/g,'$1');
+function info2D(){
+  const d=S.d2;
+  let h=`T = ${fmt(S.T)} s, f = ${fmt(1/S.T)} Hz, t = ${fmt(S.t)} s<br>`;
+  const ps=d.sources.filter(q=>q.type==='point');
+  d.sources.forEach((q,i)=>{ h+=`${q.type==='point'?esc(plain(q.name)||'점파원'):'평면파 '+(i+1)}: λ = ${fmt(q.lambda)}, v = ${fmt(q.lambda/S.T)}<br>`; });
+  if(ps.length){
+    d.points.forEach(p=>{
+      const ds=ps.map(q=>Math.hypot(p.x-q.x,p.y-q.y));
+      h+=`<b>${esc(plain(p.name))}</b>: `+ds.map((r,i)=>`${esc(plain(ps[i].name))}까지 ${fmt(r)}`).join(', ');
+      if(ds.length===2){ const dr=Math.abs(ds[0]-ds[1]), lam=+ps[0].lambda;
+        h+=`, 경로차 ${fmt(dr)}`+(ps[0].lambda==ps[1].lambda && lam>0? ` (= ${fmt(dr/lam)}λ)`:''); }
+      h+='<br>';
+    });
+  }
+  document.getElementById('info').innerHTML=h;
+}
+
+/* ---------- 2차원 목록 편집 ---------- */
+function fieldHtml(f){
+  if(f.type==='select') return `<select data-k="${f.k}">${f.options.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select>`;
+  if(f.type==='check') return `<input type="checkbox" data-k="${f.k}">`;
+  return `<input type="${f.type==='text'?'text':'number'}" data-k="${f.k}" step="${f.step||0.5}"${f.blank?' placeholder="끝까지"':''}>`;
+}
+function listEditor(boxId, arr, fieldsFn, titleFn, rer=render2DLists){
+  const box=document.getElementById(boxId); box.innerHTML='';
+  arr.forEach((it,i)=>{
+    const fields=fieldsFn(it), div=document.createElement('div'); div.className='medium';
+    div.innerHTML=`<div class="head"><b style="font-size:12px">${titleFn(it,i)}</b><button data-del style="padding:2px 8px">삭제</button></div>
+      <div class="grid2">${fields.map(f=>`<label class="fl"><span>${f.label}</span>${fieldHtml(f)}</label>`).join('')}</div>`;
+    div.querySelectorAll('[data-k]').forEach(inp=>{
+      const f=fields.find(ff=>ff.k===inp.dataset.k);
+      if(inp.type==='checkbox') inp.checked=!!it[f.k]; else inp.value=(it[f.k]??'');
+      const ev=(inp.tagName==='SELECT'||inp.type==='checkbox')?'change':'input';
+      inp.addEventListener(ev,()=>{
+        let v;
+        if(inp.type==='checkbox') v=inp.checked;
+        else if(f.type==='number'){ if(inp.value==='' && f.blank) v=''; else { v=parseFloat(inp.value); if(!isFinite(v)) return; if(f.pos && v<=0) return; } }
+        else v=inp.value;
+        it[f.k]=v;
+        if(f.k==='type' && v==='plane'){ // 평면파로 바꾸면 진행 방향이 영역 가운데를 향하도록
+          const dd=S.d2, cx=(+dd.rx0+ +dd.rx1)/2-it.x, cy=(+dd.ry0+ +dd.ry1)/2-it.y;
+          if(Math.hypot(cx,cy)>1e-6) it.angle=Math.round(Math.atan2(cy,cx)*180/Math.PI/5)*5;
+          if(!(+it.rmin<1)) it.rmin=0.5; }
+        if(f.rerender) rer(); draw();
+      });
+    });
+    div.querySelector('[data-del]').onclick=()=>{ arr.splice(i,1); rer(); draw(); };
+    box.appendChild(div);
+  });
+}
+function render2DLists(){
+  const d=S.d2;
+  listEditor('srcList', d.sources, it=> it.type==='point' ? [
+      {k:'type',label:'종류',type:'select',options:[['point','점파원'],['plane','평면파']],rerender:true},
+      {k:'name',label:'이름',type:'text'},
+      {k:'x',label:'x',type:'number'},{k:'y',label:'y',type:'number'},
+      {k:'lambda',label:'파장 λ',type:'number',pos:true},{k:'r0',label:'첫 마루',type:'number',step:0.25},
+      {k:'rmin',label:'최소 r',type:'number'},{k:'rmax',label:'최대 r',type:'number',blank:true},
+      {k:'showDot',label:'점 표시',type:'check'},{k:'pos',label:'이름 위치',type:'select',options:POSOPT},
+    ] : [
+      {k:'type',label:'종류',type:'select',options:[['point','점파원'],['plane','평면파']],rerender:true},
+      {k:'angle',label:'방향(°)',type:'number',step:15},
+      {k:'x',label:'장치 x',type:'number'},{k:'y',label:'장치 y',type:'number'},
+      {k:'lambda',label:'파장 λ',type:'number',pos:true},{k:'r0',label:'첫 마루',type:'number',step:0.25},
+      {k:'rmin',label:'최소 거리',type:'number'},{k:'rmax',label:'최대 거리',type:'number',blank:true},
+      {k:'width',label:'파면 길이',type:'number'},{k:'bar',label:'장치 표시',type:'check'},
+      {k:'barText',label:'장치 글자',type:'text'},
+    ], (it,i)=> it.type==='point' ? `점파원 ${esc(plain(it.name))}` : `평면파 ${i+1}`);
+  listEditor('ptList', d.points, ()=>[
+      {k:'name',label:'이름',type:'text'},{k:'pos',label:'이름 위치',type:'select',options:POSOPT},
+      {k:'x',label:'x',type:'number',step:0.25},{k:'y',label:'y',type:'number',step:0.25},
+      {k:'dot',label:'점 표시',type:'check'},
+    ], it=>`점 ${esc(plain(it.name))}`);
+  listEditor('segList', d.segs, ()=>[
+      {k:'from',label:'시작',type:'text'},{k:'to',label:'끝',type:'text'},
+      {k:'w',label:'굵기',type:'number',step:0.5},{k:'dash',label:'점선',type:'check'},
+    ], (it,i)=>`선분 ${i+1}`);
+  listEditor('dimList', d.dims, ()=>[
+      {k:'x1',label:'x₁',type:'number',step:0.25},{k:'y1',label:'y₁',type:'number',step:0.25},
+      {k:'x2',label:'x₂',type:'number',step:0.25},{k:'y2',label:'y₂',type:'number',step:0.25},
+      {k:'label',label:'글자',type:'text'},{k:'off',label:'글자 거리',type:'number',step:2},
+      {k:'ends',label:'끝 모양',type:'select',options:[['arrowbar','화살표+막대'],['arrow','화살표'],['bar','막대']]},
+    ], (it,i)=>`치수선 ${i+1}`);
+  listEditor('txtList', d.texts, ()=>[
+      {k:'text',label:'글자',type:'text'},{k:'size',label:'크기',type:'number',step:1},
+      {k:'x',label:'x',type:'number',step:0.25},{k:'y',label:'y',type:'number',step:0.25},
+      {k:'family',label:'글꼴',type:'select',options:[['serif','명조'],['sans','고딕']]},
+    ], (it,i)=>`글자 ${i+1}`);
+}
+function renderCurves(){
+  const t=S.hMode==='t';
+  listEditor('curveList', S.curves, ()=>[
+      {k:'p', label: t?'위치 x':'시각 t', type:'number', step:0.05},
+      {k:'dash', label:'선 모양', type:'select', options:[['solid','실선'],['dashed','점선'],['dotted','촘촘한 점선']]},
+      {k:'label', label:'범례 글자', type:'text'},
+    ], (it,i)=>`곡선 ${i+1}`, renderCurves);
+  document.getElementById('curveUnit').textContent = t? '값은 관찰 위치 x(m)입니다.' : '값은 시각 t(s)입니다.';
+}
+function addCurve(){
+  const t=S.hMode==='t', n=S.curves.length;
+  const dashes=['solid','dashed','dotted'];
+  if(t) S.curves.push({p:n===0?0:+(n*0.5).toFixed(2), dash:dashes[n%3], label:n===0?'x=0':`x=x_${n}`});
+  else S.curves.push({p:n===0?0:+(S.T*0.25*n).toFixed(4), dash:dashes[n%3], label:n===0?'t=0':`t=t_${n===1?0:n-1}`});
+  S.multi=true; syncInputs(); renderCurves(); draw();
+}
+function add2D(kind){
+  const d=S.d2, cx=(+d.rx0+ +d.rx1)/2, cy=(+d.ry0+ +d.ry1)/2;
+  if(kind==='src'){ const n=d.sources.filter(q=>q.type==='point').length+1;
+    d.sources.push({type:'point', name:'S_'+n, x:cx, y:cy, lambda:2, r0:0, rmin:0.5, rmax:'', showDot:true, pos:'d', angle:-90, width:8, bar:true, barText:'물결파|발생 장치'}); }
+  if(kind==='plane') d.sources.push({type:'plane', name:'', x:cx, y:+d.ry1, lambda:2, r0:0, rmin:0.5, rmax:'', showDot:false, pos:'d', angle:-90, width:8, bar:true, barText:'물결파|발생 장치'});
+  if(kind==='pt'){ const nm=nextPtName();
+    d.points.push({name:nm, x:cx, y:cy, pos:'ul', dot:true}); }
+  if(kind==='seg') d.segs.push({from:d.points[0]?.name||'0,0', to:d.points[1]?.name||'1,1', w:2.5, dash:false});
+  if(kind==='dim') d.dims.push({x1:+d.rx1-1, y1:+d.ry0-0.4, x2:+d.rx1, y2:+d.ry0-0.4, label:'1 m', ends:'arrowbar', off:12});
+  if(kind==='txt') d.texts.push({text:'(가)', size:+S.fs, x:cx, y:+d.ry0-1, family:'serif'});
+  render2DLists(); draw();
+}
+document.querySelectorAll('[data-k2]').forEach(el=>{
+  const ev=(el.tagName==='SELECT'||el.type==='checkbox')?'change':'input';
+  el.addEventListener(ev,()=>{ let v;
+    if(el.type==='checkbox') v=el.checked; else if(el.type==='number'){ v=parseFloat(el.value); if(!isFinite(v)) return; } else v=el.value;
+    S.d2[el.dataset.k2]=v; draw(); });
+});
+document.querySelectorAll('.seg button').forEach(b=>b.addEventListener('click',()=>{
+  const sel=document.getElementById(b.parentElement.dataset.for);
+  if(sel.value===b.dataset.v) return;
+  sel.value=b.dataset.v; sel.dispatchEvent(new Event('change'));
+  applyModeUI();   // 선택된 버튼 색 갱신
+}));
+document.getElementById('dimSel').addEventListener('change',e=>{ if(PTMODE && e.target.value!=='2d') togglePtMode(false); S.dim=e.target.value; syncInputs(); draw(); });
+document.querySelector('[data-key=style1d]').addEventListener('change',()=>applyModeUI());
+document.querySelector('[data-key=labelMode]').addEventListener('change',()=>applyModeUI());
+// 반대 방향 파동을 켜면 합성파(최대 A1+A2)가 잘리지 않게 세로축 범위를 넓힘
+function fitY2(){
+  if(!S.w2on) return;
+  const Amax=Math.max(...mediumAmps())+Math.max(...mediumAmps(-S.dir));
+  if(S.yMax < Amax*1.15 || S.yMin > -Amax*1.15){
+    S.yMax=+(Math.max(S.yMax, Amax*1.3)).toFixed(2); S.yMin=+(Math.min(S.yMin, -Amax*1.2)).toFixed(2);
+    syncInputs(); draw();
+  }
+}
+document.querySelector('[data-key=multi]').addEventListener('change',()=>{ if(S.multi && !S.curves.length){ addCurve(); addCurve(); } });
+
+
+syncInputs(); renderMedia(); render2DLists(); renderCurves(); draw();
+</script>
+</body>
+</html>
