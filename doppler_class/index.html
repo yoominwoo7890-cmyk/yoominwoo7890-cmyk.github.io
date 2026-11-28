@@ -298,6 +298,19 @@ button.b.rec:hover:not(:disabled){background:var(--red-soft);border-color:#eab5b
 .rectip{margin:0;font-size:13px;color:var(--muted);max-width:440px;line-height:1.55}
 .rectip b{color:var(--body)}
 @keyframes blink{50%{opacity:.25}}
+.ask{margin-top:34px}
+.askcard{background:var(--paper);border:1px solid var(--rule);border-radius:8px;box-shadow:var(--shadow);padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.askq{display:flex;gap:10px;align-items:flex-start;font-size:16px;font-weight:700;color:var(--ink);line-height:1.45}
+.qmark{flex:0 0 auto;width:26px;height:26px;border-radius:7px;background:var(--blue);color:#fff;font-family:var(--mono);font-size:13px;display:flex;align-items:center;justify-content:center;margin-top:-1px}
+.askhint{margin:0 0 2px 36px;font-size:13px;color:var(--muted)}
+#ansText{width:100%;font-family:var(--ui);font-size:15px;line-height:1.6;color:var(--ink);background:var(--surface);border:1px solid var(--rule);border-radius:7px;padding:11px 13px;resize:vertical;min-height:130px}
+#ansText:focus-visible{outline:2px solid var(--blue);outline-offset:1px;background:var(--paper)}
+.askfoot{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap}
+.askfoot .k{font-family:var(--mono);font-size:12px}
+.askfoot .st{flex:1 1 200px;font-size:13px;font-weight:600;text-align:right}
+.askfoot .st.ok{color:var(--green)} .askfoot .st.bad{color:var(--red)} .askfoot .st.wait{color:var(--muted)}
+.askcard.done{border-color:#cfe8dd}
+@media(max-width:600px){.askhint{margin-left:0}.askfoot .st{text-align:left}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}.rechd .dot{animation:none}}
 </style>
 </head>
@@ -533,6 +546,19 @@ button.b.rec:hover:not(:disabled){background:var(--red-soft);border-color:#eab5b
       </ul>
     </div>
   </div>
+  <section class="block ask" id="askBlock" aria-labelledby="askQ">
+    <div class="blockhd"><h2>생각 나누기</h2><span class="meta">실험 결과와 따로 제출합니다</span></div>
+    <div class="askcard">
+      <label for="ansText" class="askq" id="askQ"><span class="qmark">Q</span>도플러 효과를 어떻게 이용할 수 있을까요?</label>
+      <p class="askhint">생활이나 과학·기술에서 도플러 효과가 쓰이는 예를 들고, 무엇을 알아내는 데 쓰이는지 적어 보세요.</p>
+      <textarea id="ansText" rows="6" maxlength="2000" placeholder="여기에 내 생각을 적어 주세요."></textarea>
+      <div class="askfoot">
+        <span class="k" id="ansCount">0 / 2000자</span>
+        <span class="st" id="ansStatus" role="status"></span>
+        <button type="button" class="b pri" id="ansBtn" disabled>응답 제출</button>
+      </div>
+    </div>
+  </section>
 </main>
 
 <nav class="rail" id="rail" aria-label="진행 단계">
@@ -1569,7 +1595,7 @@ $("#gateForm").addEventListener("submit", (e) => {
   if (err){ $("#gateErr").textContent = err; return; }
   STU.id = id; STU.name = name; saveStu();
   $("#whoId").textContent = id; $("#whoName").textContent = name; $("#who").hidden = false;
-  $("#gate").hidden = true; resetSubmit();
+  $("#gate").hidden = true; resetSubmit(); loadDraft();
 });
 $("#whoChange").onclick = openGate;
 
@@ -1588,15 +1614,44 @@ function submitUrl(){
   return "";
 }
 const hasServer = () => inAppsScript() || !!submitUrl();
-function sendResult(payload){
-  if (inAppsScript()) return new Promise((res, rej) => google.script.run.withSuccessHandler(res).withFailureHandler(rej).submitResult(payload));
+function sendResult(payload, kind){
+  const answer = kind === "answer";
+  if (inAppsScript()) return new Promise((res, rej) => { const r = google.script.run.withSuccessHandler(res).withFailureHandler(rej); answer ? r.submitAnswer(payload) : r.submitResult(payload); });
   // text/plain keeps this a "simple" request (no CORS preflight, which Apps Script does not answer)
-  return fetch(submitUrl(), { method:"POST", headers:{ "Content-Type":"text/plain;charset=utf-8" }, body: JSON.stringify({ action:"submit", data:payload }) })
+  return fetch(submitUrl(), { method:"POST", headers:{ "Content-Type":"text/plain;charset=utf-8" }, body: JSON.stringify({ action: answer ? "answer" : "submit", data:payload }) })
     .then((r) => { if (!r.ok) throw new Error(`서버 응답 ${r.status}`); return r.json(); })
     .then((j) => { if (!j || !j.ok) throw new Error((j && j.error) || "서버가 거절했습니다"); return j; })
     .catch((e) => { throw new Error(e instanceof TypeError ? "인터넷 연결 또는 제출 주소를 확인하세요" : e.message); });
 }
 function setSubStatus(t, cls){ const el = $("#subStatus"); el.textContent = t || ""; el.className = "st" + (cls ? " " + cls : ""); }
+// --- answer to the question ---
+const ANS = { last:"", busy:false };
+const draftKey = () => "doppler.answer." + (STU.id || "_");
+function loadDraft(){ let v = ""; try { v = localStorage.getItem(draftKey()) || ""; } catch (e) {} $("#ansText").value = v; ANS.last = ""; setAnsStatus(""); $("#askBlock .askcard").classList.remove("done"); syncAns(); }
+function setAnsStatus(t, cls){ const el = $("#ansStatus"); el.textContent = t || ""; el.className = "st" + (cls ? " " + cls : ""); }
+function syncAns(){
+  const t = $("#ansText").value, n = t.trim().length;
+  $("#ansCount").textContent = `${t.length} / 2000자`;
+  const btn = $("#ansBtn");
+  if (DEMO){ btn.disabled = true; setAnsStatus("시연 모드에서는 제출되지 않습니다", "wait"); return; }
+  btn.disabled = ANS.busy || !STU.id || n === 0;
+  const same = ANS.last && ANS.last === t.trim();
+  $("#askBlock .askcard").classList.toggle("done", !!same);
+  if (ANS.last && !same) setAnsStatus("내용이 바뀌었습니다 · 다시 제출하세요", "wait");
+  else if (!ANS.last && !ANS.busy && $("#ansStatus").className.indexOf("bad") < 0) setAnsStatus(n ? "" : "적은 뒤 '응답 제출'을 누르세요", "wait");
+}
+$("#ansText").addEventListener("input", () => { try { localStorage.setItem(draftKey(), $("#ansText").value); } catch (e) {} if ($("#ansStatus").className.indexOf("bad") >= 0) setAnsStatus(""); syncAns(); });
+$("#ansBtn").onclick = () => {
+  const text = $("#ansText").value.trim();
+  if (!text || !STU.id || DEMO) return;
+  if (!hasServer()){ setAnsStatus("제출 주소가 없습니다 · 선생님이 알려 준 주소로 다시 여세요", "bad"); return; }
+  const btn = $("#ansBtn"); ANS.busy = true; btn.disabled = true; btn.textContent = "제출 중…"; setAnsStatus("");
+  sendResult({ studentId:STU.id, name:STU.name, answer:text }, "answer")
+    .then((res) => { ANS.busy = false; ANS.last = text; btn.textContent = "다시 제출";
+      setAnsStatus(`제출했습니다 · ${res && res.time ? res.time : ""}` + (res && res.count > 1 ? ` (${res.count}번째 제출)` : ""), "ok"); syncAns(); })
+    .catch((err) => { ANS.busy = false; btn.textContent = "응답 제출"; setAnsStatus("제출하지 못했습니다 · " + ((err && err.message) || "잠시 뒤 다시 시도하세요"), "bad"); syncAns(); });
+};
+
 function resetSubmit(){ lastSubmitted = ""; setSubStatus(""); $("#submitBox").classList.remove("done"); syncSubmit(); }
 function syncSubmit(){
   if (DEMO){ $("#submitBtn").disabled = true; $("#subDesc").textContent = "시연 모드에서는 제출되지 않습니다. 학생 화면에서는 이 버튼으로 값을 제출합니다."; return; }
@@ -1631,6 +1686,7 @@ $("#submitBtn").onclick = () => {
   if (window.location && window.location.hash === "#linear") S.mode = "linear";
   applyModeUI();
   setStep(0);
+  syncAns();
   if (DEMO){
     ["#demo", "#demo2", "#demoWav", "#demoBar"].forEach((q) => { $(q).hidden = false; });
     $("#who").hidden = false; $("#whoId").textContent = "시연"; $("#whoName").textContent = "교사"; $("#whoChange").hidden = true;
