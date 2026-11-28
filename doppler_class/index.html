@@ -298,7 +298,7 @@ button.b.rec:hover:not(:disabled){background:var(--red-soft);border-color:#eab5b
 .rectip{margin:0;font-size:13px;color:var(--muted);max-width:440px;line-height:1.55}
 .rectip b{color:var(--body)}
 @keyframes blink{50%{opacity:.25}}
-.ask{margin-top:34px}
+.ask{margin-top:22px}
 .askcard{background:var(--paper);border:1px solid var(--rule);border-radius:8px;box-shadow:var(--shadow);padding:16px 18px;display:flex;flex-direction:column;gap:10px}
 .askq{display:flex;gap:10px;align-items:flex-start;font-size:16px;font-weight:700;color:var(--ink);line-height:1.45}
 .qmark{flex:0 0 auto;width:26px;height:26px;border-radius:7px;background:var(--blue);color:#fff;font-family:var(--mono);font-size:13px;display:flex;align-items:center;justify-content:center;margin-top:-1px}
@@ -483,6 +483,20 @@ button.b.rec:hover:not(:disabled){background:var(--red-soft);border-color:#eab5b
       </div>
     </div>
 
+  <section class="block ask" id="askBlock" aria-labelledby="askQ">
+    <div class="blockhd"><h2>생각 나누기</h2><span class="meta">실험 결과와 따로 제출합니다</span></div>
+    <div class="askcard">
+      <label for="ansText" class="askq" id="askQ"><span class="qmark">Q</span>도플러 효과를 어떻게 이용할 수 있을까요?</label>
+      <p class="askhint">자신만의 아이디어를 제시해보세요.</p>
+      <textarea id="ansText" rows="6" maxlength="2000" placeholder="여기에 내 생각을 적어 주세요."></textarea>
+      <div class="askfoot">
+        <span class="k" id="ansCount">0 / 2000자</span>
+        <span class="st" id="ansStatus" role="status"></span>
+        <button type="button" class="b pri" id="ansBtn" disabled>응답 제출</button>
+      </div>
+    </div>
+  </section>
+
     <div class="block" id="orbitBlock">
       <div class="blockhd"><h2>원운동에서 접근과 후퇴</h2><span class="meta" id="orbitMeta"></span></div>
       <div class="orbit">
@@ -546,19 +560,6 @@ button.b.rec:hover:not(:disabled){background:var(--red-soft);border-color:#eab5b
       </ul>
     </div>
   </div>
-  <section class="block ask" id="askBlock" aria-labelledby="askQ">
-    <div class="blockhd"><h2>생각 나누기</h2><span class="meta">실험 결과와 따로 제출합니다</span></div>
-    <div class="askcard">
-      <label for="ansText" class="askq" id="askQ"><span class="qmark">Q</span>도플러 효과를 어떻게 이용할 수 있을까요?</label>
-      <p class="askhint">생활이나 과학·기술에서 도플러 효과가 쓰이는 예를 들고, 무엇을 알아내는 데 쓰이는지 적어 보세요.</p>
-      <textarea id="ansText" rows="6" maxlength="2000" placeholder="여기에 내 생각을 적어 주세요."></textarea>
-      <div class="askfoot">
-        <span class="k" id="ansCount">0 / 2000자</span>
-        <span class="st" id="ansStatus" role="status"></span>
-        <button type="button" class="b pri" id="ansBtn" disabled>응답 제출</button>
-      </div>
-    </div>
-  </section>
 </main>
 
 <nav class="rail" id="rail" aria-label="진행 단계">
